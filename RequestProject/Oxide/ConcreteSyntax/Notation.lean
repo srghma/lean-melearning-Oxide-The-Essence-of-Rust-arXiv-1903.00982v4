@@ -1,53 +1,64 @@
 module
 public meta import Lean.Elab.Term
+public import Mathlib.Data.Fin.VecNotation
 public import RequestProject.Oxide.Syntax.Runtime
 
 /-!
 # Oxide: concrete syntax `[OXIDE| … ]`
 
 A concrete-syntax embedding of Oxide in Lean.  `[OXIDE| e ]` elaborates the
-Oxide expression `e` to a closed de Bruijn term `Oxide.Term 0`; named variables
-and named regions are resolved to de Bruijn indices at macro-expansion time.
-`[OXIDE_FN| fn f<…>(…) -> τ { e } ]` elaborates a global function definition
-to an `Oxide.FnDef`.
+Oxide expression `e` to a closed, scope-indexed term `Oxide.Term []`; named
+variables, regions, type variables and frame variables are resolved to typed de
+Bruijn indices at macro-expansion time (`In.there (… In.here)` for any binder,
+`TVar.skipVar`/`TVar.skipRgn` chains for term variables).  An ill-scoped program
+(an unbound name, a borrow at an abstract region, a term variable of an older
+frame) is rejected at expansion time, or fails to elaborate.
+
+`[OXIDE_TY| τ ]` elaborates a closed type `Oxide.Ty []`, and
+`[OXIDE_FN| fn f<…>(…) -> τ { e } ]` a global function definition `Oxide.FnDef`.
 
 Since `'a` is lexed by Lean as the start of a character literal, regions are
 written as Lean name literals: `` `a `` stands for the region `'a`.
 
 Grammar:
 * types: `u32`, `bool`, `unit`, `()`, type variables `T`, `` &`a uniq τ ``,
-  `` &`a shrd τ ``, `[τ; n]`, `[τ]`, `(τ,)`, `(τ₁, …, τₙ)`, `Either<τ₁, τ₂>`, dead
-  types `τ†`, and function types
+  `` &`a shrd τ ``, `` &`a ω [τ] `` (reference to a slice), `[τ; n]`, `(τ,)`,
+  `(τ₁, …, τₙ)`, `Either<τ₁, τ₂>`, and function types
   `` fn<@φ, …, `a, …; T, …>(τ₁, …, τₙ)[Φ] -> τ where `a : `b, … `` (the binders,
   the captured environment `[Φ]` and the bounds are optional; without `[Φ]` the
-  environment is the empty frame);
-* frame expressions `Φ`: frame variables `@φ` and concrete frames
-  `` @{ x : τ, `r ↦ {}, … } `` (entries oldest first; region entries have empty
-  loan sets, since loans refer to absolute places);
+  environment is the empty frame).  Dead types `τ†` and unsized types `[τ]` are
+  not types of this grammar (they belong to the separate sorts of maybe-dead and
+  maybe-unsized types), so they cannot be written here;
+* frame expressions `Φ`: frame variables `@φ` and literal frames
+  `` @{ x : τ, `r ↦ {}, … } `` (entries oldest first; the types of a literal frame
+  live in the scope of the frame itself, so they may mention its regions; region
+  entries have empty loan sets);
 * place expressions: `x`, `*p`, `p.n`, `(p)` (nested projections are written
   `(p.0).1`, since `0.1` is lexed as a decimal literal);
-* expressions: `()`, `n`, `true`, `false`, `p`, `` &`a ω p ``, `` &`a ω p[e] ``,
-  `` &`a ω p[e₁..e₂] ``, `p[e]`, `p := e`, `` letrgn<`a> { e } ``,
-  `let x : τ = e₁; e₂`, `e₁; e₂`, `|x₁ : τ₁, …| -> τ { e }`, `|| -> τ { e }`,
-  `f(e₁, …)`, `` f::<Φ, …, `a, …; τ, …>(e₁, …) ``, `if e { e₁ } else { e₂ }`,
-  `(e,)`, `(e₁, …, eₙ)`, `[e₁, …]`, `for x in e { e' }`, `while e { e' }`,
+* expressions: `()`, `n`, `true`, `false`, `p`, `` &`r ω p ``, `` &`r ω p[e] ``,
+  `` &`r ω p[e₁..e₂] `` (borrows name a *concrete* region, bound by `letrgn`),
+  `p[e]`, `p := e`, `` letrgn<`r> { e } ``, `let x : τ = e₁; e₂`, `e₁; e₂`,
+  `|x₁ : τ₁, …| -> τ { e }`, `|| -> τ { e }`, `f(e₁, …)`,
+  `` f::<Φ, …, `a, …; τ, …>(e₁, …) ``, `if e { e₁ } else { e₂ }`, `(e,)`,
+  `(e₁, …, eₙ)`, `[e₁, …]`, `for x in e { e' }`, `while e { e' }`,
   `abort!("msg")`, `Left::<τ₁, τ₂>(e)`, `Right::<τ₁, τ₂>(e)`,
   `match e { Left(x) => e₁, Right(y) => e₂ }` and blocks `{ e }`.
   An identifier that is not a bound variable denotes a global function.
-* runtime forms: `framed![x₁, …, xₘ] { e }` (the body only sees the `m` variables of
-  its own frame, `xₘ` being the most recent), `shift! x { e }`, `shiftprov! { e }`,
-  pointers `ptr!(ℓ steps)` with a root level `ℓ` and steps `.n`, `[n]`, `[n₁..n₂]`,
-  `dead!`, and arbitrary runtime values `val!(v)` where `v` is built from
-  constants, function names, `dead!`, `ptr!(…)`, tuples `(v,)`/`(v₁, …)`, arrays
-  `[v, …]`, slices `|v, …|`, injections `Left::<τ₁, τ₂>(v)`/`Right::<…>(v)` and
-  closure values `` closure![a = v, … | `r, …] |x : τ, …| -> τ { e } `` (captured
-  values oldest first, then the captured regions, the last one being
-  `Region.bound 0` in the body; the body sees only the parameters and the
-  captured variables).
+* values (as they appear at runtime): `val!(v)` where `v` is built from
+  constants, function names, `dead!`, pointers `ptr!(x steps)` to a variable `x`
+  in scope with steps `.n`, `[n]`, `[n₁..n₂]`, tuples `(v,)`/`(v₁, …)`, arrays
+  `[v, …]`, slices `|v, …|` and injections `Left::<τ₁, τ₂>(v)`/`Right::<…>(v)`.
+  There are no runtime term forms: the machine keeps frames and pending pops in
+  its continuation.
 * global functions: `` fn f<@φ, …, `a, …; T, …>(x : τ, …) -> τ where `a : `b { e } ``.
 
 Ownership qualifiers `uniq`/`shrd` and the base types are parsed as identifiers
 (so that they do not become reserved keywords of Lean).
+
+Scopes: closure and function parameters `x₁, …, x_k` are pushed so that `xᵢ` is
+the `i`-th most recent binder (`x₁` is the most recent); the binders
+`<@φ̄, `ϱ̄; ᾱ>` of a signature are pushed as `ᾱ` (`α₁` most recent), then `ϱ̄`,
+then `φ̄`, matching `Oxide.Binders.ctx`.
 -/
 
 public section
@@ -86,10 +97,9 @@ syntax "(" ")" : oxide_ty
 syntax "(" oxide_ty ")" : oxide_ty
 syntax "(" oxide_ty "," oxide_ty,+ ")" : oxide_ty
 syntax "(" oxide_ty "," ")" : oxide_ty
-syntax:max oxide_ty "†" : oxide_ty
+syntax "&" oxide_rgn ident "[" oxide_ty "]" : oxide_ty
 syntax "&" oxide_rgn ident oxide_ty : oxide_ty
 syntax "[" oxide_ty ";" num "]" : oxide_ty
-syntax "[" oxide_ty "]" : oxide_ty
 syntax "Either" "<" oxide_ty "," oxide_ty ">" : oxide_ty
 syntax "fn" ("<" oxide_gbinder,* (";" ident,*)? ">")? "(" oxide_ty,* ")" ("[" oxide_frm "]")?
   " -> " oxide_ty (" where " sepBy1(oxide_rgn " : " oxide_rgn, ","))? : oxide_ty
@@ -137,22 +147,15 @@ syntax num : oxide_val
 syntax "(" ")" : oxide_val
 syntax ident : oxide_val
 syntax "dead!" : oxide_val
-syntax "ptr!" "(" num oxide_rstep* ")" : oxide_val
+syntax "ptr!" "(" ident oxide_rstep* ")" : oxide_val
 syntax "(" oxide_val "," oxide_val,+ ")" : oxide_val
 syntax "(" oxide_val "," ")" : oxide_val
 syntax "[" oxide_val,* "]" : oxide_val
 syntax "|" oxide_val,* "|" : oxide_val
 syntax "Left" "::<" oxide_ty "," oxide_ty ">" "(" oxide_val ")" : oxide_val
 syntax "Right" "::<" oxide_ty "," oxide_ty ">" "(" oxide_val ")" : oxide_val
-syntax "closure!" "[" sepBy(ident " = " oxide_val, ",") ("|" oxide_rgn,*)? "]"
-  "|" oxide_param,* "|" " -> " oxide_ty "{" oxide "}" : oxide_val
 
-syntax "dead!" : oxide
-syntax "ptr!" "(" num oxide_rstep* ")" : oxide
 syntax "val!" "(" oxide_val ")" : oxide
-syntax "framed!" "[" ident,* "]" "{" oxide "}" : oxide
-syntax "shift!" ident "{" oxide "}" : oxide
-syntax "shiftprov!" "{" oxide "}" : oxide
 
 syntax "fn " ident ("<" oxide_gbinder,* (";" ident,*)? ">")? "(" oxide_param,* ")" " -> " oxide_ty
   (" where " sepBy1(oxide_rgn " : " oxide_rgn, ","))? "{" oxide "}" : oxide_fn
@@ -167,30 +170,70 @@ namespace Oxide.Notation
 
 open Lean
 
-/-- Names in scope during the translation.  All lists are innermost first, except
-`absRgns`, `tyVars` and `frmVars`, which list the binders of the enclosing function in
-order (index `i` = `i`-th binder). -/
-structure Scope where
-  vars : List Name := []
-  letRgns : List Name := []
-  absRgns : List Name := []
-  tyVars : List Name := []
-  frmVars : List Name := []
+/-- Sorts of binders, as seen by the translation. -/
+inductive Sort' where
+  | fvar | abs | tvar | var | rgn | frame
+  deriving BEq, Inhabited
+
+/-- The scope during the translation: named binders, most recent first (frame
+boundaries have the anonymous name). -/
+abbrev Scope := List (Name × Sort')
 
 abbrev TransM := ReaderT Scope MacroM
 
-def idx? (l : List Name) (x : Name) : Option Nat := l.idxOf? x
+/-- The position of the most recent binder named `x` with a sort satisfying `p`. -/
+def lookup (s : Scope) (x : Name) (p : Sort' → Bool) : Option (Nat × Sort') :=
+  go s 0
+where
+  go : Scope → Nat → Option (Nat × Sort')
+    | [], _ => none
+    | (y, b) :: s, n => if y == x && p b then some (n, b) else go s (n + 1)
 
-def transRgn : TSyntax `oxide_rgn → TransM Lean.Term
-  | `(oxide_rgn| $n:name) => do
-      let s ← read
-      let x := n.getName
-      match idx? s.letRgns x with
-      | some i => `(Oxide.Region.bound $(quote i))
-      | none => match idx? s.absRgns x with
-        | some i => `(Oxide.Region.abs $(quote i))
-        | none => Macro.throwErrorAt n s!"unknown region {x}"
+/-- The typed de Bruijn index `In.there^n In.here`. -/
+def mkIn : Nat → MacroM Lean.Term
+  | 0 => `(Oxide.In.here)
+  | n + 1 => do `(Oxide.In.there $(← mkIn n))
+
+/-- The index of the binder named `x` of sort `b`. -/
+def inIdx (x : Ident) (b : Sort') (what : String) : TransM Lean.Term := do
+  match lookup (← read) x.getId (· == b) with
+  | some (n, _) => mkIn n
+  | none => Macro.throwErrorAt x s!"unknown {what} {x.getId}"
+
+/-- A term variable of the top frame: a chain of `TVar.skipVar`/`TVar.skipRgn`
+ending in `TVar.here`. -/
+def tvarIdx (x : Ident) : TransM Lean.Term := do
+  let rec go : Scope → MacroM Lean.Term
+    | [] => Macro.throwErrorAt x s!"unknown variable {x.getId}"
+    | (y, b) :: s =>
+      if y == x.getId && b == .var then `(Oxide.TVar.here)
+      else match b with
+        | .var => do `(Oxide.TVar.skipVar $(← go s))
+        | .rgn => do `(Oxide.TVar.skipRgn $(← go s))
+        | _ => Macro.throwErrorAt x
+            s!"variable {x.getId} is not a variable of the current frame"
+  go (← read)
+
+def rgnName : TSyntax `oxide_rgn → MacroM Name
+  | `(oxide_rgn| $n:name) => pure n.getName
   | stx => Macro.throwErrorAt stx "ill-formed region"
+
+/-- A region: the most recent binder of that name, concrete (`letrgn`) or
+abstract (signature). -/
+def transRgn (r : TSyntax `oxide_rgn) : TransM Lean.Term := do
+  let x ← rgnName r
+  match lookup (← read) x (fun b => b == .rgn || b == .abs) with
+  | some (n, .rgn) => `(Oxide.Region.conc $(← mkIn n))
+  | some (n, _) => `(Oxide.Region.abs $(← mkIn n))
+  | none => Macro.throwErrorAt r s!"unknown region {x}"
+
+/-- A concrete region (for borrows). -/
+def transConcRgn (r : TSyntax `oxide_rgn) : TransM Lean.Term := do
+  let x ← rgnName r
+  match lookup (← read) x (fun b => b == .rgn || b == .abs) with
+  | some (n, .rgn) => mkIn n
+  | some _ => Macro.throwErrorAt r s!"borrows need a concrete region, but {x} is abstract"
+  | none => Macro.throwErrorAt r s!"unknown region {x}"
 
 def transOwn (o : Ident) : TransM Lean.Term :=
   match o.getId with
@@ -198,9 +241,8 @@ def transOwn (o : Ident) : TransM Lean.Term :=
   | `shrd => `(Oxide.Own.shrd)
   | _ => Macro.throwErrorAt o "expected `uniq` or `shrd`"
 
-def rgnName : TSyntax `oxide_rgn → MacroM Name
-  | `(oxide_rgn| $n:name) => pure n.getName
-  | stx => Macro.throwErrorAt stx "ill-formed region"
+/-- `![t₁, …, tₙ]`. -/
+def mkVec (ts : List Lean.Term) : MacroM Lean.Term := `(![$(ts.toArray),*])
 
 /-- Split generic binders `@φ, …, `a, …` into frame variables and abstract regions. -/
 def splitBinders (bs : List (TSyntax `oxide_gbinder)) : MacroM (List Name × List Name) := do
@@ -213,21 +255,33 @@ def splitBinders (bs : List (TSyntax `oxide_gbinder)) : MacroM (List Name × Lis
     | _ => Macro.throwErrorAt b "ill-formed binder"
   pure (frms, rgns)
 
-/-- The index of an abstract region among the given binders. -/
-def absIdxIn (l : List Name) (r : TSyntax `oxide_rgn) : MacroM Nat := do
-  let x ← rgnName r
-  match idx? l x with
-  | some i => pure i
-  | none => Macro.throwErrorAt r s!"unknown abstract region {x}"
+/-- The scope extension made by signature binders (cf. `Oxide.Binders.ctx`). -/
+def binderScope (frms rgns αs : List Name) : Scope :=
+  αs.map (·, .tvar) ++ rgns.map (·, .abs) ++ frms.map (·, .fvar)
 
-/-- Extend the scope with the binders of a polymorphic signature. -/
-def extendScope (frms rgns αs : List Name) (s : Scope) : Scope :=
-  { s with absRgns := rgns ++ s.absRgns, tyVars := αs ++ s.tyVars, frmVars := frms ++ s.frmVars }
+/-- The `Oxide.Binders` record. -/
+def mkBinders (frms rgns αs : List Name) : MacroM Lean.Term :=
+  `(({ nφ := $(quote frms.length), nϱ := $(quote rgns.length), nα := $(quote αs.length) } :
+      Oxide.Binders))
 
-/-- The name of a region entry of a frame. -/
-def fentryRgn : TSyntax `oxide_fentry → Option Name
-  | `(oxide_fentry| $n:name ↦ { }) => some n.getName
-  | _ => none
+/-- Bounds `ϱᵢ : ϱⱼ` as pairs of indices among the signature's regions. -/
+def mkBounds (rgns : List Name) (b₁ b₂ : Option (Array (TSyntax `oxide_rgn))) :
+    MacroM Lean.Term := do
+  let bnds ← match b₁, b₂ with
+    | some b₁, some b₂ => (b₁.toList.zip b₂.toList).mapM fun (x, y) => do
+        let ix ← rgnName x
+        let iy ← rgnName y
+        let some i := rgns.idxOf? ix | Macro.throwErrorAt x s!"unknown abstract region {ix}"
+        let some j := rgns.idxOf? iy | Macro.throwErrorAt y s!"unknown abstract region {iy}"
+        `((⟨$(quote i), by decide⟩, ⟨$(quote j), by decide⟩))
+    | _, _ => pure []
+  `([$(bnds.toArray),*])
+
+/-- The sort and name of a frame entry. -/
+def fentryInfo : TSyntax `oxide_fentry → MacroM (Name × Sort')
+  | `(oxide_fentry| $x:ident : $_t:oxide_ty) => pure (x.getId, .var)
+  | `(oxide_fentry| $r:oxide_rgn ↦ { }) => do pure (← rgnName r, .rgn)
+  | stx => Macro.throwErrorAt stx "ill-formed frame entry"
 
 mutual
 partial def transTy : TSyntax `oxide_ty → TransM Lean.Term
@@ -236,20 +290,18 @@ partial def transTy : TSyntax `oxide_ty → TransM Lean.Term
       | `u32 => `(Oxide.Ty.u32)
       | `bool => `(Oxide.Ty.bool)
       | `unit => `(Oxide.Ty.unit)
-      | a => match idx? (← read).tyVars a with
-        | some i => `(Oxide.Ty.tvar $(quote i))
-        | none => Macro.throwErrorAt x s!"unknown type {a}"
+      | _ => do `(Oxide.Ty.tvar $(← inIdx x .tvar "type variable"))
   | `(oxide_ty| ( )) => `(Oxide.Ty.unit)
   | `(oxide_ty| ( $t:oxide_ty )) => transTy t
-  | `(oxide_ty| ( $t:oxide_ty , )) => do `(Oxide.Ty.tuple [$(← transTy t)])
+  | `(oxide_ty| ( $t:oxide_ty , )) => do `(Oxide.Ty.tuple 1 $(← mkVec [← transTy t]))
   | `(oxide_ty| ( $t:oxide_ty, $ts:oxide_ty,* )) => do
       let ts ← (t :: ts.getElems.toList).mapM transTy
-      `(Oxide.Ty.tuple [$(ts.toArray),*])
-  | `(oxide_ty| $t:oxide_ty †) => do `(Oxide.Ty.dead $(← transTy t))
+      `(Oxide.Ty.tuple $(quote ts.length) $(← mkVec ts))
+  | `(oxide_ty| & $r:oxide_rgn $o:ident [ $t:oxide_ty ]) => do
+      `(Oxide.Ty.ref $(← transRgn r) $(← transOwn o) (Oxide.XTy.slice $(← transTy t)))
   | `(oxide_ty| & $r:oxide_rgn $o:ident $t:oxide_ty) => do
-      `(Oxide.Ty.ref $(← transRgn r) $(← transOwn o) $(← transTy t))
+      `(Oxide.Ty.ref $(← transRgn r) $(← transOwn o) (Oxide.XTy.sized $(← transTy t)))
   | `(oxide_ty| [ $t:oxide_ty ; $n:num ]) => do `(Oxide.Ty.array $(← transTy t) $n)
-  | `(oxide_ty| [ $t:oxide_ty ]) => do `(Oxide.Ty.slice $(← transTy t))
   | `(oxide_ty| Either < $t₁:oxide_ty , $t₂:oxide_ty >) => do
       `(Oxide.Ty.sum $(← transTy t₁) $(← transTy t₂))
   | `(oxide_ty| fn $[< $bs:oxide_gbinder,* $[; $αs:ident,*]? >]? ( $ts:oxide_ty,* )
@@ -260,45 +312,37 @@ partial def transTy : TSyntax `oxide_ty → TransM Lean.Term
       let αs : List Name := match αs with
         | some (some αs) => αs.getElems.toList.map (·.getId)
         | _ => []
-      let inner {β : Type} (m : TransM β) : TransM β := withReader (extendScope frms rgns αs) m
+      let inner {β : Type} (m : TransM β) : TransM β :=
+        withReader (binderScope frms rgns αs ++ ·) m
       let ts ← inner (ts.getElems.toList.mapM transTy)
       let r ← inner (transTy r)
       let Φ ← match Φ with
         | some Φ => inner (transFrm Φ)
-        | none => `(Oxide.FrameExpr.frame [])
-      let bnds ← match b₁, b₂ with
-        | some b₁, some b₂ => (b₁.toList.zip b₂.toList).mapM fun (x, y) => do
-            let i ← absIdxIn rgns x
-            let j ← absIdxIn rgns y
-            `(($(quote i), $(quote j)))
-        | _, _ => pure []
-      `(Oxide.Ty.fn $(quote frms.length) $(quote rgns.length) $(quote αs.length)
-          [$(ts.toArray),*] $r $Φ [$(bnds.toArray),*])
+        | none => `(Oxide.FrameExpr.empty)
+      `(Oxide.Ty.fn $(← mkBinders frms rgns αs) $(quote ts.length) $(← mkVec ts) $r $Φ
+          $(← mkBounds rgns b₁ b₂))
   | stx => Macro.throwErrorAt stx "ill-formed Oxide type"
 
-/-- Frame expressions: a frame variable `@φ`, or a frame `@{ x : τ, `r ↦ {}, … }`
-(entries oldest first; inside the frame its own regions are `Region.bound j`, the
-`j`-th most recent region entry). -/
+/-- Frame expressions: a frame variable `@φ`, or a literal frame
+`@{ x : τ, `r ↦ {}, … }` (entries oldest first), whose types are translated in the
+scope of the frame itself. -/
 partial def transFrm : TSyntax `oxide_frm → TransM Lean.Term
-  | `(oxide_frm| @ $x:ident) => do
-      match idx? (← read).frmVars x.getId with
-      | some i => `(Oxide.FrameExpr.var $(quote i))
-      | none => Macro.throwErrorAt x s!"unknown frame variable {x.getId}"
+  | `(oxide_frm| @ $x:ident) => do `(Oxide.FrameExpr.var $(← inIdx x .fvar "frame variable"))
   | `(oxide_frm| @ { $es:oxide_fentry,* }) => do
-      let es := es.getElems.toList
-      let rgns := (es.filterMap fentryRgn).reverse
+      let es := es.getElems.toList.reverse
+      let infos ← es.mapM fun e => (fentryInfo e : MacroM _)
       let inner {β : Type} (m : TransM β) : TransM β :=
-        withReader (fun s => { s with letRgns := rgns ++ s.letRgns }) m
-      let mut ents : Array Lean.Term := #[]
-      for e in es do
+        withReader (fun s => infos ++ (Name.anonymous, .frame) :: s) m
+      let shape ← infos.mapM fun (_, b) => match b with
+        | .var => `(Oxide.Bnd.var)
+        | _ => `(Oxide.Bnd.rgn)
+      let mut acc ← `(Oxide.FrameTy.nil)
+      for e in es.reverse do
         match e with
         | `(oxide_fentry| $_x:ident : $t:oxide_ty) =>
-            let t ← inner (transTy t)
-            ents := ents.push (← `(Oxide.FrameEntry.var $t))
-        | `(oxide_fentry| $_r:oxide_rgn ↦ { }) =>
-            ents := ents.push (← `(Oxide.FrameEntry.rgn []))
-        | _ => Macro.throwErrorAt e "ill-formed frame entry"
-      `(Oxide.FrameExpr.frame [$(ents.reverse),*])
+            acc ← `(Oxide.FrameTy.var $(← inner (transTy t)) $acc)
+        | _ => acc ← `(Oxide.FrameTy.rgn [] $acc)
+      `(Oxide.FrameExpr.frame [$(shape.toArray),*] $acc)
   | stx => Macro.throwErrorAt stx "ill-formed frame expression"
 end
 
@@ -312,25 +356,19 @@ partial def transPlace : TSyntax `oxide_place → TransM (Ident × List Lean.Ter
       pure (x, ops ++ [← `(Oxide.POp.deref)])
   | `(oxide_place| $p:oxide_place.$i:num) => do
       let (x, ops) ← transPlace p
-      let n : Nat := i.getNat
-      pure (x, ops ++ [← `(Oxide.POp.proj $(quote n))])
+      pure (x, ops ++ [← `(Oxide.POp.proj $i)])
   | stx => Macro.throwErrorAt stx "ill-formed place expression"
 
 def mkPlace (p : TSyntax `oxide_place) : TransM Lean.Term := do
   let (x, ops) ← transPlace p
-  match idx? (← read).vars x.getId with
-  | some i =>
-      `(({ root := ⟨$(quote i), by decide⟩, ops := [$(ops.toArray),*] } : Oxide.PlaceExpr _))
-  | none => Macro.throwErrorAt x s!"unknown variable {x.getId}"
+  `(({ root := $(← tvarIdx x), ops := [$(ops.toArray),*] } : Oxide.PlaceExpr _))
 
-def withVar (x : Name) (m : TransM α) : TransM α :=
-  withReader (fun s => { s with vars := x :: s.vars }) m
+def withVar {α : Type} (x : Name) (m : TransM α) : TransM α :=
+  withReader ((x, .var) :: ·) m
 
-def withVars (xs : List Name) (m : TransM α) : TransM α :=
-  withReader (fun s => { s with vars := xs.reverse ++ s.vars }) m
-
-def mkTerms (ts : List Lean.Term) : MacroM Lean.Term := do
-  ts.foldrM (fun t acc => `(Oxide.Terms.cons $t $acc)) (← `(Oxide.Terms.nil))
+/-- Push parameters `x₁, …, x_k` (`x₁` most recent). -/
+def withParams {α : Type} (xs : List Name) (m : TransM α) : TransM α :=
+  withReader (xs.map (·, .var) ++ ·) m
 
 def transParam : TSyntax `oxide_param → TransM (Name × Lean.Term)
   | `(oxide_param| $x:ident : $t:oxide_ty) => do pure (x.getId, ← transTy t)
@@ -343,40 +381,60 @@ def transRStep : TSyntax `oxide_rstep → MacroM Lean.Term
   | `(oxide_rstep| [ $i:num .. $j:num ]) => `(Oxide.RStep.slice $i $j)
   | stx => Macro.throwErrorAt stx "ill-formed referent step"
 
-def mkPtr (root : TSyntax `num) (steps : Array (TSyntax `oxide_rstep)) : MacroM Lean.Term := do
-  let steps ← steps.toList.mapM transRStep
-  `(Oxide.Value.ptr { root := $root, steps := [$(steps.toArray),*] })
+/-- Runtime values. -/
+partial def transVal : TSyntax `oxide_val → TransM Lean.Term
+  | `(oxide_val| $n:num) => `(Oxide.Value.num $n)
+  | `(oxide_val| ( )) => `(Oxide.Value.unit)
+  | `(oxide_val| $x:ident) => match x.getId with
+      | `true => `(Oxide.Value.tt)
+      | `false => `(Oxide.Value.ff)
+      | f => `(Oxide.Value.fn $(quote f.toString))
+  | `(oxide_val| dead!) => `(Oxide.Value.dead)
+  | `(oxide_val| ptr!( $x:ident $steps:oxide_rstep* )) => do
+      let steps ← steps.toList.mapM fun st => (transRStep st : MacroM Lean.Term)
+      `(Oxide.Value.ptr { root := $(← inIdx x .var "variable"), steps := [$(steps.toArray),*] })
+  | `(oxide_val| ( $v:oxide_val , )) => do `(Oxide.Value.tuple 1 $(← mkVec [← transVal v]))
+  | `(oxide_val| ( $v:oxide_val, $vs:oxide_val,* )) => do
+      let vs ← (v :: vs.getElems.toList).mapM transVal
+      `(Oxide.Value.tuple $(quote vs.length) $(← mkVec vs))
+  | `(oxide_val| [ $vs:oxide_val,* ]) => do
+      let vs ← vs.getElems.toList.mapM transVal
+      `(Oxide.Value.array $(quote vs.length) $(← mkVec vs))
+  | `(oxide_val| | $vs:oxide_val,* |) => do
+      let vs ← vs.getElems.toList.mapM transVal
+      `(Oxide.Value.slice $(quote vs.length) $(← mkVec vs))
+  | `(oxide_val| Left::<$t₁:oxide_ty, $t₂:oxide_ty>($v:oxide_val)) => do
+      `(Oxide.Value.inl $(← transTy t₁) $(← transTy t₂) $(← transVal v))
+  | `(oxide_val| Right::<$t₁:oxide_ty, $t₂:oxide_ty>($v:oxide_val)) => do
+      `(Oxide.Value.inr $(← transTy t₁) $(← transTy t₂) $(← transVal v))
+  | stx => Macro.throwErrorAt stx "ill-formed Oxide value"
 
-mutual
 partial def transExpr : TSyntax `oxide → TransM Lean.Term
   | `(oxide| $n:num) => `(Oxide.Term.val (Oxide.Value.num $n))
   | `(oxide| ( )) => `(Oxide.Term.val Oxide.Value.unit)
   | `(oxide| $p:oxide_place) => do
       match p with
       | `(oxide_place| $x:ident) =>
-          if (idx? (← read).vars x.getId).isSome then `(Oxide.Term.place $(← mkPlace p))
+          if (lookup (← read) x.getId (· == .var)).isSome then `(Oxide.Term.place $(← mkPlace p))
           else match x.getId with
             | `true => `(Oxide.Term.val Oxide.Value.tt)
             | `false => `(Oxide.Term.val Oxide.Value.ff)
             | f => `(Oxide.Term.val (Oxide.Value.fn $(quote f.toString)))
       | _ => `(Oxide.Term.place $(← mkPlace p))
   | `(oxide| & $r:oxide_rgn $o:ident $p:oxide_place) => do
-      `(Oxide.Term.borrow $(← transRgn r) $(← transOwn o) $(← mkPlace p))
+      `(Oxide.Term.borrow $(← transConcRgn r) $(← transOwn o) $(← mkPlace p))
   | `(oxide| & $r:oxide_rgn $o:ident $p:oxide_place [ $e:oxide ]) => do
-      `(Oxide.Term.borrowIdx $(← transRgn r) $(← transOwn o) $(← mkPlace p) $(← transExpr e))
+      `(Oxide.Term.borrowIdx $(← transConcRgn r) $(← transOwn o) $(← mkPlace p) $(← transExpr e))
   | `(oxide| & $r:oxide_rgn $o:ident $p:oxide_place [ $e₁:oxide .. $e₂:oxide ]) => do
-      `(Oxide.Term.borrowSlice $(← transRgn r) $(← transOwn o) $(← mkPlace p)
+      `(Oxide.Term.borrowSlice $(← transConcRgn r) $(← transOwn o) $(← mkPlace p)
           $(← transExpr e₁) $(← transExpr e₂))
   | `(oxide| $p:oxide_place [ $e:oxide ]) => do
       `(Oxide.Term.index $(← mkPlace p) $(← transExpr e))
   | `(oxide| $p:oxide_place := $e:oxide) => do
       `(Oxide.Term.assign $(← mkPlace p) $(← transExpr e))
   | `(oxide| letrgn < $r:oxide_rgn > { $e:oxide }) => do
-      match r with
-      | `(oxide_rgn| $n:name) =>
-          let e ← withReader (fun s => { s with letRgns := n.getName :: s.letRgns }) (transExpr e)
-          `(Oxide.Term.letrgn $e)
-      | _ => Macro.throwErrorAt r "ill-formed region"
+      let x ← rgnName r
+      `(Oxide.Term.letrgn $(← withReader ((x, .rgn) :: ·) (transExpr e)))
   | `(oxide| let $x:ident : $t:oxide_ty = $e₁:oxide; $e₂:oxide) => do
       let t ← transTy t
       let e₁ ← transExpr e₁
@@ -387,14 +445,13 @@ partial def transExpr : TSyntax `oxide → TransM Lean.Term
   | `(oxide| | $ps:oxide_param,* | -> $r:oxide_ty { $e:oxide }) => do
       let ps ← ps.getElems.toList.mapM transParam
       let r ← transTy r
-      let body ← withVars (ps.map (·.1)) (transExpr e)
-      let tys := ps.map (·.2)
-      `(Oxide.Term.closure $(quote ps.length) [$(tys.toArray),*] $r $body)
+      let body ← withParams (ps.map (·.1)) (transExpr e)
+      `(Oxide.Term.closure $(quote ps.length) $(← mkVec (ps.map (·.2))) $r $body)
   | `(oxide| || -> $r:oxide_ty { $e:oxide }) => do
-      `(Oxide.Term.closure 0 [] $(← transTy r) $(← transExpr e))
+      `(Oxide.Term.closure 0 ![] $(← transTy r) $(← transExpr e))
   | `(oxide| $f:oxide($args:oxide,*)) => do
       let args ← args.getElems.toList.mapM transExpr
-      `(Oxide.Term.app $(← transExpr f) [] [] [] $(← mkTerms args))
+      `(Oxide.Term.app $(← transExpr f) {} ![] ![] ![] $(quote args.length) $(← mkVec args))
   | `(oxide| $f:oxide::<$gs:oxide_garg,*; $ts:oxide_ty,*>($args:oxide,*)) => do
       let mut Φs : List Lean.Term := []
       let mut rs : List Lean.Term := []
@@ -405,18 +462,20 @@ partial def transExpr : TSyntax `oxide → TransM Lean.Term
         | _ => Macro.throwErrorAt g "ill-formed generic argument"
       let ts ← ts.getElems.toList.mapM transTy
       let args ← args.getElems.toList.mapM transExpr
-      `(Oxide.Term.app $(← transExpr f) [$(Φs.toArray),*] [$(rs.toArray),*] [$(ts.toArray),*]
-          $(← mkTerms args))
+      `(Oxide.Term.app $(← transExpr f)
+          ({ nφ := $(quote Φs.length), nϱ := $(quote rs.length), nα := $(quote ts.length) } :
+            Oxide.Binders)
+          $(← mkVec Φs) $(← mkVec rs) $(← mkVec ts) $(quote args.length) $(← mkVec args))
   | `(oxide| if $c:oxide { $e₁:oxide } else { $e₂:oxide }) => do
       `(Oxide.Term.ite $(← transExpr c) $(← transExpr e₁) $(← transExpr e₂))
   | `(oxide| ( $e:oxide , )) => do
-      `(Oxide.Term.tuple $(← mkTerms [← transExpr e]))
+      `(Oxide.Term.tuple 1 $(← mkVec [← transExpr e]))
   | `(oxide| ( $e:oxide, $es:oxide,* )) => do
       let es ← (e :: es.getElems.toList).mapM transExpr
-      `(Oxide.Term.tuple $(← mkTerms es))
+      `(Oxide.Term.tuple $(quote es.length) $(← mkVec es))
   | `(oxide| [ $es:oxide,* ]) => do
       let es ← es.getElems.toList.mapM transExpr
-      `(Oxide.Term.array $(← mkTerms es))
+      `(Oxide.Term.array $(quote es.length) $(← mkVec es))
   | `(oxide| for $x:ident in $e₁:oxide { $e₂:oxide }) => do
       `(Oxide.Term.forE $(← transExpr e₁) $(← withVar x.getId (transExpr e₂)))
   | `(oxide| while $e₁:oxide { $e₂:oxide }) => do
@@ -430,67 +489,8 @@ partial def transExpr : TSyntax `oxide → TransM Lean.Term
       `(Oxide.Term.matchE $(← transExpr e) $(← withVar x.getId (transExpr e₁))
           $(← withVar y.getId (transExpr e₂)))
   | `(oxide| { $e:oxide }) => transExpr e
-  | `(oxide| dead!) => `(Oxide.Term.val Oxide.Value.dead)
-  | `(oxide| ptr!( $r:num $steps:oxide_rstep* )) => do `(Oxide.Term.val $(← mkPtr r steps))
   | `(oxide| val!( $v:oxide_val )) => do `(Oxide.Term.val $(← transVal v))
-  | `(oxide| framed![ $xs:ident,* ] { $e:oxide }) => do
-      let xs := xs.getElems.toList.map (·.getId)
-      let e ← withReader (fun s => { s with vars := xs.reverse }) (transExpr e)
-      `(Oxide.Term.framed $(quote xs.length) $e)
-  | `(oxide| shift! $x:ident { $e:oxide }) => do
-      `(Oxide.Term.shift $(← withVar x.getId (transExpr e)))
-  | `(oxide| shiftprov! { $e:oxide }) => do `(Oxide.Term.shiftRgn $(← transExpr e))
   | stx => Macro.throwErrorAt stx "ill-formed Oxide expression"
-
-/-- Runtime values. -/
-partial def transVal : TSyntax `oxide_val → TransM Lean.Term
-  | `(oxide_val| $n:num) => `(Oxide.Value.num $n)
-  | `(oxide_val| ( )) => `(Oxide.Value.unit)
-  | `(oxide_val| $x:ident) => match x.getId with
-      | `true => `(Oxide.Value.tt)
-      | `false => `(Oxide.Value.ff)
-      | f => `(Oxide.Value.fn $(quote f.toString))
-  | `(oxide_val| dead!) => `(Oxide.Value.dead)
-  | `(oxide_val| ptr!( $r:num $steps:oxide_rstep* )) => mkPtr r steps
-  | `(oxide_val| ( $v:oxide_val , )) => do `(Oxide.Value.tuple [$(← transVal v)])
-  | `(oxide_val| ( $v:oxide_val, $vs:oxide_val,* )) => do
-      let vs ← (v :: vs.getElems.toList).mapM transVal
-      `(Oxide.Value.tuple [$(vs.toArray),*])
-  | `(oxide_val| [ $vs:oxide_val,* ]) => do
-      let vs ← vs.getElems.toList.mapM transVal
-      `(Oxide.Value.array [$(vs.toArray),*])
-  | `(oxide_val| | $vs:oxide_val,* |) => do
-      let vs ← vs.getElems.toList.mapM transVal
-      `(Oxide.Value.slice [$(vs.toArray),*])
-  | `(oxide_val| Left::<$t₁:oxide_ty, $t₂:oxide_ty>($v:oxide_val)) => do
-      `(Oxide.Value.inl $(← transTy t₁) $(← transTy t₂) $(← transVal v))
-  | `(oxide_val| Right::<$t₁:oxide_ty, $t₂:oxide_ty>($v:oxide_val)) => do
-      `(Oxide.Value.inr $(← transTy t₁) $(← transTy t₂) $(← transVal v))
-  | `(oxide_val| closure![ $[$xs:ident = $vs:oxide_val],* $[| $rs:oxide_rgn,*]? ]
-        | $ps:oxide_param,* | -> $r:oxide_ty { $e:oxide }) => do
-      let xs := xs.toList.map (·.getId)
-      let vs ← vs.toList.mapM transVal
-      let rs ← match rs with
-        | some rs => rs.getElems.toList.mapM (fun r => (rgnName r : MacroM Name))
-        | none => pure []
-      let inner {β : Type} (m : TransM β) : TransM β :=
-        withReader (fun s => { s with letRgns := rs.reverse ++ s.letRgns }) m
-      let ps ← ps.getElems.toList.mapM transParam
-      let r ← transTy r
-      let body ← inner (withReader (fun s => { s with vars := (xs ++ ps.map (·.1)).reverse })
-        (transExpr e))
-      let tys := ps.map (·.2)
-      `(Oxide.Value.closure $(quote xs.length) $(quote ps.length) $(quote rs.length)
-          [$(vs.reverse.toArray),*] [$(tys.toArray),*] $r $body)
-  | stx => Macro.throwErrorAt stx "ill-formed Oxide value"
-
-end
-
-def absIdx (s : Scope) (r : TSyntax `oxide_rgn) : MacroM Nat := do
-  let x ← rgnName r
-  match idx? s.absRgns x with
-  | some i => pure i
-  | none => Macro.throwErrorAt r s!"unknown abstract region {x}"
 
 def transFn : TSyntax `oxide_fn → MacroM Lean.Term
   | `(oxide_fn| fn $f:ident $[< $bs:oxide_gbinder,* $[; $αs:ident,*]? >]? ( $ps:oxide_param,* )
@@ -501,33 +501,26 @@ def transFn : TSyntax `oxide_fn → MacroM Lean.Term
       let αs : List Name := match αs with
         | some (some αs) => αs.getElems.toList.map (·.getId)
         | _ => []
-      let s : Scope := { absRgns := rs, tyVars := αs, frmVars := frms }
+      let s : Scope := binderScope frms rs αs
       let ps ← (ps.getElems.toList.mapM transParam).run s
       let r ← (transTy r).run s
-      let body ← (withVars (ps.map (·.1)) (transExpr e)).run s
-      let bnds ← match b₁, b₂ with
-        | some b₁, some b₂ => (b₁.toList.zip b₂.toList).mapM fun (x, y) => do
-            let i ← absIdx s x
-            let j ← absIdx s y
-            `(($(quote i), $(quote j)))
-        | _, _ => pure []
-      let tys := ps.map (·.2)
-      `(({ name := $(quote f.getId.toString), nφ := $(quote frms.length),
-           nϱ := $(quote rs.length), nα := $(quote αs.length), params := [$(tys.toArray),*],
-           ret := $r, bounds := [$(bnds.toArray),*], body := $body } : Oxide.FnDef))
+      let body ← (withParams (ps.map (·.1)) (transExpr e)).run ((Name.anonymous, .frame) :: s)
+      `(({ name := $(quote f.getId.toString), binders := $(← mkBinders frms rs αs),
+           k := $(quote ps.length), params := $(← mkVec (ps.map (·.2))), ret := $r,
+           bounds := $(← mkBounds rs b₁ b₂), body := $body } : Oxide.FnDef))
   | stx => Macro.throwErrorAt stx "ill-formed Oxide function definition"
 
 end Oxide.Notation
 
-/-- `[OXIDE| e ]`: the closed Oxide expression `e` as a de Bruijn term `Oxide.Term 0`. -/
+/-- `[OXIDE| e ]`: the closed Oxide expression `e` as a scoped term `Oxide.Term []`. -/
 macro "[OXIDE| " e:oxide " ]" : term => do
-  let t ← (Oxide.Notation.transExpr e).run {}
-  `(($t : Oxide.Term 0))
+  let t ← (Oxide.Notation.transExpr e).run []
+  `(($t : Oxide.Term []))
 
-/-- `[OXIDE_TY| τ ]`: a closed Oxide type. -/
+/-- `[OXIDE_TY| τ ]`: a closed Oxide type `Oxide.Ty []`. -/
 macro "[OXIDE_TY| " t:oxide_ty " ]" : term => do
-  let t ← (Oxide.Notation.transTy t).run {}
-  `(($t : Oxide.Ty))
+  let t ← (Oxide.Notation.transTy t).run []
+  `(($t : Oxide.Ty []))
 
 /-- `[OXIDE_FN| fn f<…>(…) -> τ { e } ]`: a global function definition. -/
 macro "[OXIDE_FN| " d:oxide_fn " ]" : term => Oxide.Notation.transFn d

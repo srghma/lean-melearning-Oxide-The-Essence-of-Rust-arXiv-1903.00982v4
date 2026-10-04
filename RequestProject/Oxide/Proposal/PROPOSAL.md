@@ -7,9 +7,33 @@ This proposal answers four questions:
 3. Should `Ty` be parametrized too?
 4. Should `Term` carry contexts, and if so which ones?
 
-A prototype of the proposed design is in this folder (`Scopes.lean`, `Types.lean`,
-`Terms.lean`, `Strengthening.lean`, `Contexts.lean`). It builds and contains no
-`sorry`. The rest of the formalization does not use it yet.
+> **Status: implemented.** This design is now the only grammar of the
+> formalization, and the old `Nat`-indexed development has been removed. The
+> prototype files that used to sit in this folder were folded into
+> `Syntax/` and `Metafunctions/`.
+>
+> The open questions of §6 were decided as follows: a **continuation-based
+> machine** (R2), **`Fin k → _`** fields, the **type-sort split** in the first
+> step, and **replacing** the old development.
+>
+> Differences from the text below:
+> * There are no runtime forms (`framed`, `shift`, `shiftRgn`) in `Term`; the
+>   continuation (`Cont`) records the pops.
+> * Popping strengthens the result value strictly: the machine is stuck if the
+>   value mentions a popped binder. Garbage left in older stack slots is
+>   strengthened leniently, becoming `dead`.
+> * The typing rules require the result type and the remaining stack typing to
+>   be strengthenable at the end of every binder's scope (§3.3).
+> * Closure capture is an explicit selection `Sel f Γ`.
+> * `framedPop_dangling`/`framedPop_ok` are subsumed by the machine's `popFrame`.
+>
+> The question raised in §3.3 has been answered negatively: progress does not
+> hold for these rules (`not_progress`, `Metatheory/Counterexamples/Progress.lean`),
+> because a closure body may mention a region that does not occur in the
+> closure's type. See `../README.md` for the results.
+>
+> The rest of this document is the original proposal. It refers to files of the
+> removed development.
 
 ---
 

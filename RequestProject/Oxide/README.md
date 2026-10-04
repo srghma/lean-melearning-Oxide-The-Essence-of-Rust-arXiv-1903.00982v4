@@ -1,135 +1,173 @@
-# Oxide: The Essence of Rust — Lean 4 formalization
+# Oxide: The Essence of Rust — Lean 4 formalization (scope-indexed)
 
 This directory formalizes the language Oxide (Weiss, Gierczak, Patterson, Ahmed,
-*Oxide: The Essence of Rust*) following the paper's appendix sources
-(`formalization.tex`, `full-lang.tex`, `proofs.tex`, `progress_proof.tex`,
-`preservation_proof.tex`, and the `oxide/*.sty` macro files containing the rules).
+*Oxide: The Essence of Rust*) following the paper's appendix sources.
+
+The development implements `Proposal/PROPOSAL.md`. There is only one grammar:
+every syntactic class is indexed by a **scope** `Γ : Ctx := List Bnd`, the list
+of the sorts of all binders in scope, most recent first. The sorts are frame
+variables, abstract regions, type variables, term variables, concrete regions
+and frame boundaries. A closed program is an `Oxide.Term []`, and the `Term n`
+of a calculus with only term variables is the special case `Γ = vars n`.
+
+The open choices of §6 of the proposal were decided as follows:
+
+| Choice | Decision |
+| --- | --- |
+| runtime forms `framed`/`shift` in terms, or a continuation-based machine | **continuation-based (CK) machine**: there are no runtime term forms; the continuation records the bindings and frames to pop |
+| `Fin k → _` fields or length-indexed lists | **`Fin k → _`** (tuples, arrays, closure parameters, call arguments and instantiations) |
+| split the type sorts in the first step | **split**: `Ty` (sized, initialized), `XTy` (maybe unsized), `MTy` (maybe dead) |
+| replace the old development or build beside it | **replace**: the old `Nat`-indexed development has been removed |
 
 ## Files
 
-The Lean files are grouped into folders following the sections of the paper
-(§3 "Oxide, Formally" and appendices A–E).  `READING_GUIDE.md` in this directory
-gives the full file-by-file map and a suggested reading order;
-`RequestProject/Oxide.lean` imports everything.
+`READING_GUIDE.md` gives the file-by-file map; `RequestProject/Oxide.lean`
+imports everything.
 
-| Folder | Paper section |
+| Folder | Content |
 | --- | --- |
-| `Syntax/` | §3.1 Syntax, §3.2 Types, §3.3 Environments (appendix A) |
-| `Metafunctions/` | appendix C Metafunctions |
-| `AliasManagement/` | §3.4 Region-Based Alias Management (appendix B.3) |
-| `Typechecking/` | §3.5 Typechecking Oxide Programs (appendix B) |
-| `OperationalSemantics/` | §3.6 Operational Semantics (appendix D) |
-| `Metatheory/` | §3.7 Well-typed Oxide programs won't go wrong! (appendix E) |
-| `ConcreteSyntax/` | not in the paper: the `[OXIDE| … ]` syntax and examples |
-| `Proposal/` | not in the paper: proposal (`PROPOSAL.md`) and prototype of a scope-indexed `Term`/`Ty`; not used by the rest |
+| `Syntax/` | scopes and typed de Bruijn indices (`Scopes.lean`); places, types, terms, stack typings, stacks, continuations and configurations |
+| `Metafunctions/` | type-level substitution (instantiating a polymorphic function), metafunctions on types, places, stack typings and stacks (appendix C) |
+| `AliasManagement/` | place typing and ownership safety (§3.4) |
+| `Typechecking/` | outlives and region rewriting, the typing judgment, stack validity and well-formed global environments, typing of continuations and configurations (§3.5, appendix B) |
+| `OperationalSemantics/` | the abstract machine (§3.6, appendix D) |
+| `Metatheory/` | statements of §3.7 and counterexamples |
+| `ConcreteSyntax/` | `[OXIDE| … ]`, `[OXIDE_TY| … ]`, `[OXIDE_FN| … ]` and examples |
+| `Proposal/` | the proposal that this development implements |
+
+## What scope-indexing enforces
+
+* `In b Γ` is a typed de Bruijn index: it is always in range and points at a
+  binder of sort `b`. Term variables (`TVar Γ`) can only reach the current
+  frame, because no constructor skips a frame boundary.
+* Regions are `Region.abs (i : In .abs Γ)` or `Region.conc (r : In .rgn Γ)`.
+  `letrgn` binds a `.rgn`, so there is no "opening" of regions. Borrows take a
+  concrete region `In .rgn Γ`.
+* A function type `Ty.fn b k params ret env bounds` binds `b.ctx` in its
+  parameters, result and environment. Its bounds are `Fin b.nϱ` pairs.
+* A call `Term.app f b Φs ρs τs k args` carries exactly `b.nφ` frames, `b.nϱ`
+  regions and `b.nα` types.
+* Closure bodies are `Term (vars k ++ Γ)`. Closure values carry their captured
+  frame `Env Γ f` and a body in `vars k ++ (f ++ .frame :: Γ)`. Global function
+  bodies are `Term (vars k ++ .frame :: b.ctx)`.
+* Loans, places in loans and referents (pointers) are rooted at `In .var Γ`, so
+  they can point into older frames but never past the end of the stack.
+* The stack typing `StackTy S` and the stack `Stack S` are indexed by the same
+  scope as the term in focus, so lookups (`varTy`, `loans`, `get`) are total.
+  The type environment `Δ` is folded into the stack typing: type-level binders
+  are entries of it, and outlives constraints are pairs of `In .abs S`.
+* The sorts of types are separate families, so the paper's sort premises
+  (`τ^SI`, `τ^XI`, `τ^SD`, `τ^SX`) and the length premises are gone from the
+  typing rules.
 
 ## Results
 
-* `canonical_forms` — proved.
-* `progress : Progress G` — proved for every global environment `G`
-  (Lemma "Progress").
-* `not_preservation : ¬ Preservation G` — proved for every `G`.  The paper's
-  Preservation lemma quantifies over all well-typed runtime configurations.
-  `T-Framed` types the body of `framed e` in the stack typing whose top frame is
-  the one `E-Framed` pops, and nothing stops the resulting value from pointing
-  into that frame.  With `Γ = [[r ↦ {shrd x}, x : u32]]` and `σ = [[r, x ↦ 5]]`,
-  the configuration `(σ; framed (ptr x))` has type `&r shrd u32` and output
-  stack typing `•`. It steps to `(•; ptr x)`, and `ptr x` only has dead types in
-  the empty stack typing. Dead types never rewrite into reference types, so no
-  stack typing and type satisfy the conclusion of Preservation.
-* `not_type_safety : ¬ TypeSafety G` — proved for every `G`.  The program
-  `let x : bool = true; x; if x { () } else { () }` is well typed (`ts_typed`).
-  `E-Move` and `E-Copy` both apply to the place `x` (as in the paper's rules,
-  `E-Move` has no copyability side condition), so the first use of `x` may move
-  it.  The second use then copies `dead`, and `if dead { … } else { … }` is stuck
-  (`ts_steps`, `ts_stuck`).
-* `not_type_safety_closure : ¬ TypeSafety G` — proved for every `G`, without using
-  `E-Move`.  In
-  `` letrgn<`r> { let x : bool = true; let p : &`r shrd bool = (|| -> &`r shrd bool { &`r shrd x })(); if *p { () } else { () } } ``
-  the closure body borrows its own copy of `x` into the outer region `` `r ``
-  (allowed by `T-Closure`, `T-Borrow` and `T-AppClosure`).  The pointer designates
-  a slot of the closure's frame by its level; after `E-Framed` pops that frame and
-  `p` is pushed, the pointer designates `p` itself, so `*p` reads a pointer and the
-  `if` is stuck.  With the paper's named variables the pointer `ptr x` would
-  instead designate the outer `x` after the pop, so this failure comes from
-  representing referents by de Bruijn levels.
-* `not_preservationReach` and `not_reachableTyped` — proved.  Restricting
-  Preservation to configurations reachable from a well-typed closed program run on
-  the empty stack (`PreservationReach`) does not repair it: such a lemma implies
-  that every reachable configuration is well typed (`reachableTyped_of_preservationReach`),
-  which implies type safety (`type_safety_of_reachableTyped`), which is false.
-  The move counterexample contains no `framed`, so no extra condition on
-  `T-Framed` alone can repair preservation either.
-* `type_safety` — commented out (its statement is refuted) and replaced by
-  `type_safety_false`.  `type_safety_of_progress_preservation` formalizes the
-  paper's derivation, but its preservation hypothesis is refuted.
+All the results below are proved without `sorry`, using only the standard
+axioms (`propext`, `Classical.choice`, `Quot.sound`).
 
-Repairing type safety requires dealing with both counterexamples, for example by
-(i) making the choice between `E-Move` and `E-Copy` type-directed (say, a
-move/copy annotation on place uses, filled in by the type checker), and (ii) adding
-a no-escape condition for frames that are popped (`T-Framed`, the closure body in
-`T-Closure`/`T-ClosureValue`): neither the result type nor the loans left in the
-remaining stack typing may refer to the popped frame.  These changes are not made
-here; whether they suffice is not established, and no corrected preservation or
-type safety theorem is proved.
+* `canonical_forms` — proved for the new value typing.
+* `type_safety_of_progress_preservation` — the paper's derivation of type
+  safety from progress and preservation, for the machine.
+* `not_type_safety : ¬ TypeSafety G` and `not_preservation : ¬ Preservation G`,
+  for every `G` (`Metatheory/Counterexamples/TypeSafety.lean`). The program
+  `let x : bool = true; x; if x { () } else { () }` is well typed (`ts_typed`).
+  `E-Move` has no copyability side condition, so the first use of `x` may move
+  it. The second use then reads `dead`, and the machine is stuck at `if dead`.
+  The stuck configuration is not well typed, which refutes preservation too.
+  Scoping plays no role in this counterexample.
+* `not_progress : ¬ Progress G` and `not_type_safety_scope : ¬ TypeSafety G`,
+  for every `G` (`Metatheory/Counterexamples/Progress.lean`). This failure is
+  new, and it comes from the scoping. The paper's `T-Closure` and
+  `T-ClosureValue` do not restrict the regions that occur in type annotations
+  inside a closure body. So the closure
+  `` || -> () { Right::<&`r shrd (), ()>(()); () } `` has type `() → ()`, which
+  does not mention `` `r ``, and it may leave the scope of `` `r ``. In the
+  program `` letrgn<`r> { || -> () { Right::<&`r shrd (), ()>(()); () } } ``,
+  popping `` `r `` would have to strengthen the closure value past `` `r ``.
+  That fails, so the machine is stuck. The program is well typed
+  (`tp_prog_typed`) and reaches that configuration (`tp_steps`). The stuck
+  configuration is well typed itself (`tp_typed`), so progress fails as well.
+  With named regions, as in the paper, the body would just keep a dangling name
+  in an annotation, which is never evaluated.
+* The old development's results about level-based pointers
+  (`not_type_safety_closure`, `not_preservationReach`) have no counterpart:
+  pointers are typed indices, and a dangling pointer cannot be built. Popping
+  a binder that the result value still points to blocks the machine instead.
+
+Not done: there is no proof of progress, preservation or type safety for a
+repaired system. Repairing them needs at least three changes:
+(i) a type-directed choice between `E-Move` and `E-Copy`;
+(ii) requiring that the regions of the enclosing scope that occur in a closure
+body also occur in the closure's type, or are captured by it;
+(iii) an invariant tying pointer values to the loans of the stack typing, so
+that the no-escape checks made when a binder is popped also cover the values
+the machine pops.
+The old development's progress proof was about the old grammar and was removed
+with it. It has not been ported.
 
 ## Representation choices and deviations from the paper
 
-* **De Bruijn indices everywhere.** Term variables are de Bruijn indices relative
-  to the top stack frame. Referents and loans use absolute de Bruijn *levels*.
-  Type-level binders (frame variables, abstract regions, type variables) are
-  nameless. Concrete regions are bound by `letrgn` (and by closures). They are
-  opened with the level of their stack-typing entry, in locally nameless style.
-  Only global function names are strings.
-* **Function names are values** (`Value.fn f`).  `E-Function` and the function
-  value `⟨•, fn …⟩` it produces are not modelled: `E-AppFunction` looks the name up
-  in `Σ` directly.  The paper's main dynamics figure (`full-lang.tex`) does not use
-  `E-Function` either.
-* **Values are a separate syntactic class** embedded with `Term.val`. Tuples,
-  arrays and injections whose components are values take one administrative step
-  to become values (`Step.tupleVal`, …).
-* **Regions at runtime**: `letrgn` pushes a region marker on the stack (and a
-  region entry on the stack typing). The runtime form `shiftRgn` (`shiftprov`)
-  pops it once the body is a value.
-* **`E-Closure` copies the captured values** into the closure's frame. The paper
-  also overwrites the captured variables in `free-nc-vars_σ(e)`, "the variables
-  bound to values that are non-copyable", with `dead`.  Non-copyability is a
-  property of types, and runtime values do not determine it (a pointer value does
-  not record whether it is a shared or unique reference), so this metafunction
-  cannot be computed from the stack; as with `E-Move`, marking variables dead
-  without type information would make well-typed programs get stuck. `T-Closure` still marks them
-  dead statically. The concrete regions captured by a closure are the regions of
-  the body that do not occur in the signature (computed syntactically).
-* **Slices use half-open bounds** `[n₁, n₂)`. `T-BorrowSlice` allows slicing
-  arrays as well as slices.
-* **Referent typing** (`WF-RefIndexSlice`, `WF-RefSliceSlice`) adds the bound check
-  against the designated slice. The paper omits it, but the lemma "well-formed
-  references evaluate to well-typed values" needs it.
-* **Outlives bounds** of a polymorphic function `ϱ₁ : ϱ₂` are checked as
+* **Continuation-based machine.** A configuration `⟨S, σ, e, κ⟩` has a stack
+  `σ : Stack S`, a focus `e : Term S` and a continuation `κ : Cont S`.
+  Compound terms push a continuation frame, and values are consumed by the top
+  frame. `let`, `for`, `match`, `letrgn` and calls push a binding or a frame on
+  the stack, together with a `popVar`, `popRgn` or `popFrame k f` continuation
+  frame. These replace the paper's `shift e`, `shiftprov e` and `framed e`.
+* **Popping.** When the result value reaches a pop frame, it is strengthened
+  past the popped binders. If it still mentions them, the machine is stuck.
+  The remaining stack entries are strengthened leniently: values left in older
+  slots that mention a popped binder become `dead` (`Value.prenameD`). Only
+  slots whose type is already dead can hold such values.
+* **No-escape checks in typing.** Where a binder's scope ends (`T-Let`,
+  `T-LetRegion`, `T-ForArray`, `T-ForSlice`, `T-Match`, a closure body's frame
+  in `T-Closure`/`T-ClosureValue`, and the `pop*` continuation rules), the
+  rules first garbage-collect loans, keeping the regions of the result type.
+  They then require the result type and every remaining type and loan to be
+  strengthenable past the binder. The paper leaves this implicit. It is the
+  missing no-escape condition of `T-Framed`.
+* **Closure captures.** `T-Closure` and `E-Closure` take an explicit selection
+  `s : Sel f Γ` of the entries of the current frame that are captured. The body
+  as written is the captured body renamed back (`body = body'.rename s.ren`).
+  The selection is relational, so the machine is nondeterministic in what it
+  captures. `E-Closure` copies the captured values and does not overwrite
+  non-copyable captures with `dead` (non-copyability is a property of types).
+  `T-Closure` marks them dead statically (`killNC`).
+* **Continuation typing.** `ContOK G Θ Γ τ κ` types a continuation, using each
+  typing rule minus the premise for the subterm in focus. `ConfigTyped` says
+  the stack is valid for a stack typing, the focus is typed and the
+  continuation accepts the result. `Progress`, `Preservation` and `TypeSafety`
+  are stated for this machine.
+* **Function names are values** (`Value.fn f`). `E-AppFunction` looks the name
+  up in `Σ` and instantiates the body with type-level substitution
+  (`FnDef.instBody`).
+* **Values are a separate syntactic class**, embedded with `Term.val`. They
+  live in the scope of the stack. Tuples, arrays and injections take an
+  administrative step to become values.
+* **Slices use half-open bounds** `[n₁, n₂)`. Referent typing adds the bound
+  check against the designated slice.
+* **Outlives bounds** of a polymorphic function, `ϱ₁ : ϱ₂`, are checked as
   `δ(ϱ₁) :> δ(ϱ₂)` at the call site.
-* **Sorts of metavariables** (`τ^SI`, `τ^XI`, …) are explicit premises using the
-  predicates `Ty.SI`, `Ty.XI`, `Ty.SD`, `Ty.SX`.
-* **Judgments as single inductive families**: the typing judgments (expressions,
-  argument lists, values, lists of values), the outlives judgments and the
-  rewriting judgments are each one inductive family indexed by the form of the
-  judgment. This lets Lean's `induction` work on them. The paper's individual
-  judgments are recovered as abbreviations.
-* **Progress is generalized** to stack typings that refine the one satisfied by
-  the stack (`Refines`). Refinement only replaces components by dead types,
-  because `T-Drop`/`T-Move` change the stack typing without changing the stack.
-  The type environment plays no role in the proof, so progress holds in any `Δ`.
+* **`MTy`** has two representations of a fully initialized tuple, as in the
+  paper's grammar. `MTy.toTy?` identifies them.
+* **Judgments as single inductive families**: `Typing` (expressions, argument
+  lists, values, maybe-unsized values, maybe-dead values, lists of values,
+  captured environments), `OutlivesJ` and `RewriteJ`. The paper's judgments are
+  abbreviations (`HasType`, `HasTypeV`, …).
 
 ## Concrete syntax
 
 ```lean
-example : [OXIDE| let x : u32 = 5; x ] =
-    Term.letE Ty.u32 (.val (Value.num 5)) (.place ⟨0, []⟩) := rfl
+example : [OXIDE| let x : u32 = 1; let y : u32 = 2; (x, y) ] =
+    Term.letE Ty.u32 (.val (Value.num 1)) (.letE Ty.u32 (.val (Value.num 2))
+      (.tuple 2 ![.place ⟨.skipVar .here, []⟩, .place ⟨.here, []⟩])) := rfl
 ```
 
-Regions are written as Lean name literals (`` `a `` for `'a`), because Lean lexes
-`'a` as a character literal. Frame variables and frame arguments are written
-with `@` (`@φ`, `` @{x : u32, `r ↦ {}} ``). See `ConcreteSyntax/Notation.lean` for the full
-grammar (including polymorphic function types
-`` fn<@φ, `a; T>(τ̄)[Φ] -> τ where `a : `b ``, 1-tuples `(e,)`, dead types `τ†`
-and the runtime forms `framed!`, `shift!`, `shiftprov!`, `ptr!`, `dead!`, `val!`,
-`closure!`) and `ConcreteSyntax/Examples.lean` for examples.
+Names are resolved to typed indices when the macro expands. Unbound names,
+borrows at abstract regions and references to variables of another frame are
+rejected. Regions are written as Lean name literals (`` `a `` for `'a`), and
+frame variables and literal frames with `@`. The types of a literal frame
+`` @{x : u32, `s ↦ {}, y : &`s shrd u32} `` live in the frame's own scope.
+Dead types and bare slice types cannot be written, because they belong to the
+other sorts. See `ConcreteSyntax/Notation.lean` for the grammar and
+`ConcreteSyntax/Examples.lean` for examples, including a machine run of
+`let x : u32 = 5; x` and the counterexample programs in concrete syntax.

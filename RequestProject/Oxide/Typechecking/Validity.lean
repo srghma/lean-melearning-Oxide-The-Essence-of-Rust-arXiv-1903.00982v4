@@ -1,65 +1,43 @@
 module
 
 public import RequestProject.Oxide.Typechecking.Typing
+public import RequestProject.Oxide.Metafunctions.Stacks
 
 /-!
-# Typechecking, part 3: stack validity and well-formed environments
+# Typechecking, part 3: stack validity and well-formed global environments
 
 Appendix B.1 ("Well-Formedness Judgments") and B.5 ("Additional Judgments") of
-the paper: stack validity `Σ ⊢ σ : Γ` (used in the statements of §3.7),
-temporaries, and well-formedness of type environments, global function
-definitions and global environments `Σ`.
+the paper: stack validity `Σ ⊢ σ : Γ` (used in the statements of §3.7) and
+well-formedness of global function definitions and global environments `Σ`.
+
+Since the stack and the stack typing are indexed by the same scope, stack
+validity is simply: every slot holds a value of the (maybe-dead) type recorded
+for it.
 -/
 
 @[expose] public section
 
 namespace Oxide
 
-/-! ## Stack validity, temporaries and well-formed environments -/
-
-/-- Alignment of an entry of a frame typing with an entry of a stack frame: a
-variable binding `x : τ` corresponds to a value of type `τ` (typed in the stack
-typing `Γf` of the frame and the frames below it), a region binding to a region
-marker. -/
-def FrameOK (G : GlobalEnv) (Γf : StackTy) : FrameEntry → StackEntry → Prop
-  | .var τ, .val v => HasTypeV G {} [] Γf v τ
-  | .rgn _, .rgn => True
-  | _, _ => False
-
 /-- `Σ ⊢ σ : Γ` (`WF-StackEmpty`, `WF-StackFrame`): every value of the stack has
 the type attributed to it by the stack typing. -/
-inductive StoreValid (G : GlobalEnv) : StackTy → Stack → Prop
-  | empty : StoreValid G [] []
-  | frame (Γ : StackTy) (σ : Stack) (Φ : FrameTy) (ς : StackFrame)
-      (h : StoreValid G Γ σ) (hv : List.Forall₂ (FrameOK G (Φ :: Γ)) Φ ς) :
-      StoreValid G (Φ :: Γ) (ς :: σ)
+def StoreValid (G : GlobalEnv) {S : Ctx} (Γ : StackTy S) (σ : Stack S) : Prop :=
+  ∀ x : In .var S, HasTypeM G Γ (σ.get x) (Γ.varTy x)
 
-/-- `Σ; Γ ⊢ v̄ : Θ` (`WF-Temporaries`). -/
-def TempValid (G : GlobalEnv) (Γ : StackTy) (vs : List Value) (Θ : TempTy) : Prop :=
-  vs.length = Θ.length ∧
-    ∀ (i : Nat) (v : Value) (τ : Ty), vs[i]? = some v → Θ[i]? = some τ →
-      HasTypeV G {} (Θ.take i) Γ v τ
+/-- The stack typing in which the body of a global function is checked: its
+binders and bounds, a frame boundary, and the parameters. -/
+def FnDef.bodyTy (d : FnDef) : StackTy (vars d.k ++ .frame :: d.binders.ctx) :=
+  ((StackTy.ofBinders d.binders d.bounds).pushFrame (f := []) .nil).pushVars
+    fun i => (d.params i).rename (TRen.wkFrame [] _)
 
-/-- `⊢ Δ` (`WF-TVar*`): outlives constraints only mention bound regions. -/
-def TyEnvWF (Δ : TyEnv) : Prop := ∀ b ∈ Δ.outlives, b.1 < Δ.nrgn ∧ b.2 < Δ.nrgn
-
-/-- `Σ; Δ; Γ ⊢ Θ` (`WF-TemporaryTyping`). -/
-def TempWF (G : GlobalEnv) (Δ : TyEnv) (Γ : StackTy) (Θ : TempTy) : Prop :=
-  ∀ τ ∈ Θ, TyWF G Δ Γ τ ∧
-    ∀ r ∈ τ.frgns, ¬ ∃ τb ∈ Γ.cod, r ∈ τb.frgns ∧ Γ.loans? r = some []
-
-/-- `Σ ⊢ fn f … { e }` (`WF-FunctionDefinition`). -/
+/-- `Σ ⊢ fn f … { e }` (`WF-FunctionDefinition`): the body has a type that can be
+rewritten into the return type, and its frame can be popped. -/
 def FnDefWF (G : GlobalEnv) (d : FnDef) : Prop :=
-  (∀ b ∈ d.bounds, b.1 < d.nϱ ∧ b.2 < d.nϱ) ∧
-    ∃ τf Γ', HasType G (({} : TyEnv).extend d.nφ d.nϱ d.nα d.bounds) []
-        [d.params.reverse.map FrameEntry.var] d.body τf Γ' ∧
-      Rewrite (({} : TyEnv).extend d.nφ d.nϱ d.nα d.bounds) [] .combine [] τf d.ret []
+  ∃ τf Γo Γo', HasType G [] d.bodyTy d.body τf Γo ∧
+    Rewrite [] .combine Γo τf (d.ret.rename (TRen.frameRen d.k [] _)) Γo' ∧
+    ((gcLoans [d.ret.rename (TRen.frameRen d.k [] _)] Γo').popFrame d.k []).isSome
 
 /-- `⊢ Σ` (`WF-GlobalEnv`). -/
 def GlobalWF (G : GlobalEnv) : Prop := ∀ d ∈ G, FnDefWF G d
-
-/-- `⊢ Σ; Δ; Γ; Θ` (`WF-Environments`). -/
-def CtxWF (G : GlobalEnv) (Δ : TyEnv) (Γ : StackTy) (Θ : TempTy) : Prop :=
-  GlobalWF G ∧ TyEnvWF Δ ∧ StackWF G Δ Γ ∧ TempWF G Δ Γ Θ
 
 end Oxide

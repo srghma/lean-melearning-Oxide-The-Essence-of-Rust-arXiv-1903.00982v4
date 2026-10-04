@@ -1,3 +1,33 @@
+# Summary of changes for run b85312ae-ce47-4ab4-be70-87d6663ef10b
+I implemented `RequestProject/Oxide/Proposal/PROPOSAL.md` with your choices: a continuation-based machine, `Fin k → _` fields, split type sorts, and replacing the old development. It is now the only grammar, and the old `Nat`-indexed files are gone. `lake build` passes with no `sorry`, and the main theorems use only the standard axioms. The catch: I did not reprove progress. It turns out to be false for the new rules, and Lean now proves that.
+
+**The grammar.** Everything is indexed by a scope `Γ : List Bnd`, the binders in scope, most recent first. A closed program is `Term []`, and `Term (vars n)` is the plain `Term n` case.
+- Typed indices: `In b Γ` points at a binder of a given sort; `TVar Γ` points at a variable of the current frame and cannot cross a frame boundary.
+- Types are three families: `Ty` (sized, initialized), `XTy` (maybe unsized) and `MTy` (maybe dead).
+- Borrows only take concrete regions. Calls carry their binders, and their argument counts match by construction.
+- Stack typings (with `Δ` folded in) and stacks use the same scope, so lookups are total.
+
+**Built on top of it:** type-level substitution, the metafunctions, ownership safety, outlives and region rewriting, the typing rules, stack validity, and the machine (`OperationalSemantics/Machine.lean`). The machine has no `framed`/`shift` forms: its continuation records the pops. Continuations get their own typing judgment (`ContOK`, `ConfigTyped`), and progress, preservation and type safety are stated for the machine.
+
+**Concrete syntax.** `[OXIDE| … ]`, `[OXIDE_TY| … ]` and `[OXIDE_FN| … ]` were ported. They turn names into typed indices and reject unbound names, borrows at abstract regions, and variables of another frame. `ConcreteSyntax/Examples.lean` checks the examples by `rfl` and runs `let x : u32 = 5; x` on the machine to a final state.
+
+**Results (all proved):**
+- `canonical_forms`, and `type_safety_of_progress_preservation`.
+- `not_type_safety` and `not_preservation`: the `E-Move` program `let x : bool = true; x; if x {()} else {()}` refutes both. Scoping plays no part here.
+- `not_progress` and `not_type_safety_scope`: these are new and caused by the scoping. A closure body may mention a region in an annotation without that region appearing in the closure's type. So `` letrgn<`r> { || -> () { Right::<&`r shrd (), ()>(()); () } } `` is well typed, but popping `` `r `` then fails, and the machine gets stuck. The stuck configuration is itself well typed. With the paper's named regions this would just leave a harmless dangling name. Proposal §3.3 predicted the problem would move to progress; this confirms it.
+
+**Not done.** Progress isn't proved: the old proof, written for the old grammar, was removed with it, and the statement is now false anyway. No repaired system and no supporting lemmas exist yet. A repair would need at least:
+- a type-directed choice between move and copy;
+- closure bodies mentioning only regions that appear in their type or that they capture;
+- an invariant linking pointer values to loans.
+
+**Design choices beyond the proposal:**
+- The result value is strengthened strictly when a binder is popped; leftover values in older stack slots become `dead` instead.
+- The typing rules check that nothing escapes when a binder's scope ends.
+- Closure capture is an explicit selection, so the machine can choose what a closure captures.
+
+**Docs.** `RequestProject/Oxide/README.md`, `READING_GUIDE.md`, `MISSING.md` and `GAPS_AND_GRAMMAR_DIFFERENCES.md` are rewritten. `PROPOSAL.md` has a status note recording what was decided and what differs from its text. The Properties table is updated: stale entries removed, the new results added.
+
 # Summary of changes for run ca2d47cd-9bd0-4213-ae67-cdfb495a73f6
 I wrote the proposal in `RequestProject/Oxide/Proposal/PROPOSAL.md`, together with a small prototype of the design in the same folder. The prototype builds with no `sorry`, and the existing development doesn't use it yet, so nothing else changed. Short answers to your questions:
 
