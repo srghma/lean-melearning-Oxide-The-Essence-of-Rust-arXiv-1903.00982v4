@@ -21,6 +21,7 @@ gives the full file-by-file map and a suggested reading order;
 | `OperationalSemantics/` | §3.6 Operational Semantics (appendix D) |
 | `Metatheory/` | §3.7 Well-typed Oxide programs won't go wrong! (appendix E) |
 | `ConcreteSyntax/` | not in the paper: the `[OXIDE| … ]` syntax and examples |
+| `Proposal/` | not in the paper: proposal (`PROPOSAL.md`) and prototype of a scope-indexed `Term`/`Ty`; not used by the rest |
 
 ## Results
 

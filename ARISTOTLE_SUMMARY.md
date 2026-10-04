@@ -1,3 +1,42 @@
+# Summary of changes for run ca2d47cd-9bd0-4213-ae67-cdfb495a73f6
+I wrote the proposal in `RequestProject/Oxide/Proposal/PROPOSAL.md`, together with a small prototype of the design in the same folder. The prototype builds with no `sorry`, and the existing development doesn't use it yet, so nothing else changed. Short answers to your questions:
+
+- **Should `Term` be parametrized by more than `Nat`?** Yes. Today `Term n` only makes the current frame's variables well scoped. Regions, type variables, frame variables, function-type bounds and stack levels are plain `Nat`s, closure arity needs a `params.length = k` side condition, `framed m` is unrelated to the stack, and so on (§1 lists them all, with the typing premises that currently check them). The proposal indexes `Term` by a *scope* `Γ : List Bnd`: the kinds of every binder in scope, most recent first. The kinds are frame variables, abstract regions, type variables, term variables, concrete regions and frame boundaries.
+  - Variables are de Bruijn indices that also record what kind of binder they point to (`In b Γ`), so they can't be out of range or point at the wrong kind.
+  - Term variables (`TVar Γ`) can't cross a frame boundary, but regions, loans and pointers can.
+  - `Term n` is the special case where every binder is a variable, and a closed program is `Term []`.
+  - A record of counts would be simpler arithmetic, but it can't say which frame a variable lives in, which `framed`, loans and closures need (alternatives compared in §4).
+- **Should `Ty` be parametrized too?** Yes, by the same scope. Types mention regions bound by `letrgn`, type-level binders, and (in closure types) loans that name stack places. With regions as scoped indices, the `bound`/`conc` distinction and "opening" with stack levels go away. I also propose splitting `Ty` by the paper's sorts into separate types: sized (`Ty`), maybe-unsized (`XTy`) and maybe-dead (`MTy`). That replaces about 40 sort premises in the typing rules.
+- **Should `Term` have contexts? Which?** Only the scope, i.e. the context with the types erased. I argue against making terms carry the full typing context (intrinsically typed terms):
+  - typing is flow-sensitive (`Γ ⇒ Γ'`) and not syntax-directed (`T-Drop`);
+  - its side conditions are statements about `Γ`;
+  - the evaluation step would have to preserve types by construction, and the project already proves Preservation false for these rules.
+
+  Instead, the stack typing (which absorbs `Δ`) and the runtime stack are indexed by the same scope, so lookups always succeed instead of returning `Option`. Pushing a binder weakens everything stored; popping one *strengthens* and can fail. Function names stay strings (§4.3).
+- **A design question I haven't checked:** `T-LetRegion` checks the popped region only against the result type, not against the output stack typing. With a scoped stack typing, popping the region forces that check. Whether today's rules guarantee it is unknown (§3.3).
+
+**One consequence for the counterexamples (§3.3).** With scoped syntax, the configuration behind `not_preservation` (`framed (ptr x)` with `x` in the popped frame) can no longer produce a dangling pointer: popping the frame just fails. `framedPop_dangling` in `Contexts.lean` checks this by `rfl`, and `framedPop_ok` checks that a value not mentioning the frame pops fine. The level reuse behind the closure counterexample can't be represented at all. The underlying problem doesn't disappear, though: it moves from Preservation to Progress, and the `T-Framed` repair is still needed. The move/copy counterexample is unaffected.
+
+**Prototype files:**
+- `Scopes.lean`: scopes, variables, renamings, weakening.
+- `Types.lean`: the scoped types.
+- `Terms.lean`: `Term`, `Value` and closure environments, renaming, function definitions.
+- `Strengthening.lean`: renamings that can fail, for all syntax.
+- `Contexts.lean`: stacks and stack typings with lookups that always succeed, push/pop, an example closed program and the two theorems above.
+
+**Also in the proposal:**
+- costs and risks: weakening on every push, scope-equality casts, no automatic `DecidableEq`, porting about 1,400 lines of progress proof;
+- smaller improvements that are worth doing on their own;
+- a five-step migration plan.
+
+**Open choices for you (§6):**
+- keep `framed`/`shift` inside terms, as the paper does, or move to a continuation-based machine;
+- `Fin k → _` fields or length-indexed lists;
+- whether to split the type sorts in the first step;
+- whether to replace the current development or build alongside it.
+
+I added a pointer to the folder in `RequestProject/Oxide/README.md`. The Properties table now lists the proposed `Term` and `Ty` and `framedPop_dangling` (proved).
+
 # Summary of changes for run eeafb7c4-08f5-4397-85a4-411ef4cf8209
 I rebuilt the project and checked it against the paper's appendix lemmas (`proofs.tex`). `lake build` succeeds. The only `sorry`s are inside the two commented-out statements in `Metatheory/Safety.lean`, and both of those statements are proved false. I wrote the full lemma-by-lemma checklist to the new file `RequestProject/Oxide/MISSING.md` and changed no Lean code. Here is what is missing:
 
