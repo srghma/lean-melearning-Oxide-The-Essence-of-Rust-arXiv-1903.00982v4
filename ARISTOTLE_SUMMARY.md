@@ -1,3 +1,65 @@
+# Summary of changes for run b0f50c89-b356-4d9c-8dfa-fef1d8b651c2
+As you asked, I changed no files. Everything below comes from reading the current sources (mainly `Syntax/Places.lean`, `Types.lean`, `Terms.lean`, `Runtime.lean`, `Environments.lean`, and the place helpers in `Metafunctions/Places.lean` and `Metafunctions/Stacks.lean`). None of it has been built or checked in Lean.
+
+## Making `POp` correct by construction
+
+`POp` has only two cases, so the type itself has little room for error. The problems come from how it is used:
+
+1. **Out-of-range projections.** `proj (i : Nat)` can name a field that doesn't exist. Whether `.i` is valid depends on the type of what is being projected. Turning `i` into `Fin k` needs that `k`.
+2. **Unstructured lists.** `List POp` mixes dereferences and projections freely. Yet most code wants a structure, "a place, then a dereference, then the rest". As a result:
+   - `APlaceExpr.base` and `splitDeref` use `takeWhile`/`dropWhile`/`filterMap`;
+   - `IsPlace` is `POp.deref ∉ p.ops`;
+   - the machine's `E-Move` carries the premise `hplace : POp.deref ∉ p.ops`.
+
+**Fix for problem 2 (cheap, recommended): structure place expressions by their dereferences.** In the paper, `p` is always a place `π₀` followed by groups of the form "dereference, then projections". Encode exactly that:
+```
+structure Place (Γ) where root : In .var Γ; path : List Nat        -- today's APlace
+inductive PExpr (Γ) | place (π : Place Γ) | deref (p : PExpr Γ) (path : List Nat)
+```
+The dereference becomes structure rather than an element of a list, so:
+- `base` and `splitDeref` become plain pattern matches;
+- `IsPlace p` becomes "`p` is `.place π`";
+- plugging a place expression into a context becomes structural.
+
+Two further steps follow from it:
+- Let `Term.place` (or a separate `move` constructor) take a `Place` where a place is required. Then the `hplace` premise disappears.
+- Apply the same reshaping to term-level places (rooted at a current-frame variable) and to `Referent`/`RStep`.
+
+A literal mirror of the paper grammar (`x | *p | p.n`) would also work. The grouped form fits better because every helper splits at a dereference.
+
+**Fix for problem 1: projection paths indexed by a type.** A `Fin` index needs the arity. A term doesn't have it, because a variable's type is not part of the scope:
+- it changes as the program runs (moves);
+- it can be an opaque type variable;
+- dereferencing can land in a slice.
+
+Putting types into the scope would make terms intrinsically typed, which the earlier proposal argued against. Typed paths do fit where the type is already known:
+- **Type lookup and update** (`Γ(π)`, `Γ[π ↦ τ]`) can use a `Ty.Path τ`, with a case `proj (i : Fin k) : Path (τs i) → Path (tuple k τs)`.
+- **Value read and write** can use a similar path into the value. `readSteps` and `modifySteps` would then always succeed.
+
+Untyped `Nat` paths would be converted once, with a function returning `Option (Path τ)`, inside the typing rule that already checks the place. So the place syntax stays untyped, and the code behind it stops returning `Option` for out-of-range indices.
+
+## Other things that could be made correct by construction or improved
+
+1. **Move vs. copy (fixes a known counterexample).** Mark each use of a place in the term as move or copy, as Rust's MIR does with `Operand::Move`/`Copy`. The typing rule then requires a copyable type for `copy`. This is the type-directed choice behind `not_preservation` and `not_type_safety`, built into the syntax.
+2. **Closures and regions (targets the `not_progress` counterexample).** Give `Term.closure` a selection of the binders the body may see: its parameters, what it captures, and the regions in its type. The `Sel` machinery from `Syntax/Scopes.lean` could do this, with the body typed in that smaller scope. Then the body cannot mention a region that is missing from the closure's type, which is exactly how `not_progress` arises.
+3. **`MTy` indexed by its declared type.** Use `MTy.Of (τ : Ty Γ)` with cases `init`, `dead`, and a tuple case taking one `MTy.Of (τs i)` per field. Two invariants then hold structurally:
+   - a partially moved variable always keeps its declared type;
+   - the typed path `Ty.Path τ` from above applies to it directly.
+
+   The duplicate encodings of a fully initialized tuple (`init (tuple …)` and `tuple (init …)`) would also go away: either forbid an all-`init` tuple case or normalize with a smart constructor.
+4. **Global functions.** Today `Value.fn (f : String)` can name a function that doesn't exist, `GlobalEnv` is a `List` that may contain duplicate names, and `lookup` returns `Option`. Instead, index terms by a global signature, the list of declared function types. Then:
+   - `Value.fn` holds an index into that list;
+   - `FnDef` bodies are typed against the signature (mutual recursion still works);
+   - lookup always succeeds and names are unique by construction.
+5. **Argument and element lists in continuations.** `Cont.appArg`, `Cont.tuple` and `Cont.array` store `done : List (Value S)` and `rest : List (Term S)` with no link to the arity. Use `Fin i → Value` and `Fin j → Term` with `k = i + 1 + j`, or a length-indexed zipper. The machine's arity checks become types.
+6. **Slices and indexing.**
+   - `RStep.slice i j` needs `i ≤ j`, which is why `spliceFin` takes `hm : m = j - i`. Storing a start and a length instead removes that side condition.
+   - Index bounds can only become `Fin n` with the typed value paths from above.
+7. **Literals.** `Prim.num (n : Nat)` is typed as `u32` but is unbounded. Use `UInt32` or `Fin (2^32)`, or index `Prim` by `BaseTy` so a literal carries its base type.
+8. **Type arguments of calls.** `Term.app` and `Cont.appFn` both pass three separate functions `Φs`, `ρs`, `τs` for the same `Binders`. Bundle them into one structure, essentially a type-level substitution out of `b.ctx`. It can then be reused directly by `Metafunctions/Substitution.lean`.
+9. **Runtime scopes.** `Slots` has no case for type variables, abstract regions or frame variables, so a `Stack S` over such a scope is simply empty. That is already correct, but implicit. A separate runtime-scope type (only variables, regions and frames) would state it, and would remove the placeholder `dead unit` entries that `SlotTys.markers` invents.
+10. **Cost to keep in mind.** Every `Fin k → _` or type-indexed field takes away derived `DecidableEq` and makes renaming proofs heavier. The cheapest steps with the largest effect are the place-expression reshaping (first fix above) and the move/copy and closure items (1 and 2). Items 1 and 2 also target the two kinds of counterexample in the current development.
+
 # Summary of changes for run b85312ae-ce47-4ab4-be70-87d6663ef10b
 I implemented `RequestProject/Oxide/Proposal/PROPOSAL.md` with your choices: a continuation-based machine, `Fin k → _` fields, split type sorts, and replacing the old development. It is now the only grammar, and the old `Nat`-indexed files are gone. `lake build` passes with no `sorry`, and the main theorems use only the standard axioms. The catch: I did not reprove progress. It turns out to be false for the new rules, and Lean now proves that.
 
