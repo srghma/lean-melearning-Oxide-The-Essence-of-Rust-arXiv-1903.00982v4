@@ -1,3 +1,41 @@
+# Summary of changes for run 894bf31f-4f74-4547-8380-572560837dc7
+I didn't change any files. These answers come from reading the current sources (`Typing.lean`, `Machine.lean`, `Scopes.lean`, `Types.lean`, `TypeSubst.lean`, `Notation.lean`). None of the reasoning below has been checked in Lean, and progress, preservation and type safety are still stated but not proved.
+
+## 1. Should `T-Move` accept copyable types?
+
+**It isn't a soundness bug.** The paper's restriction stopped being a safety condition once move and copy became separate syntax:
+- In the paper, one place-use form is typed either way, and the type decides between `T-Move` and `T-Copy`. The runtime rule `E-Move` can't see types, so it may kill a `bool` that the typing treated as copied. That mismatch was the old `not_type_safety` counterexample.
+- Now the syntax decides. `Term.move π` sets the place to `.dead τ` in the typing and writes `dead` in `E-Move`, whatever its type. The typing and the stack always agree on what is dead.
+- A later use of a moved copyable place is ill typed, because `T-Copy` needs a `PlaceTy`. `T-Move` still requires unique ownership safety, so you can't move a place with outstanding shared loans. This is how `Operand::Move` works in Rust's MIR.
+
+**It does make the system differ from the paper.**
+- With the restriction (`τ.copyable = false` added to `T-Move`), the move/copy marking is fully determined by types. A well-typed paper program then has exactly one well-typed marked version, which is the clean "faithful refinement" story.
+- With the relaxation, a program can have several marked versions, and some of them reject later uses.
+
+**The real issue is the concrete syntax, and neither choice fixes it.** `[OXIDE| … ]` turns a bare place without a dereference into a `move`, without looking at types:
+- As things stand, `let x : bool = true; x; if x {…} else {…}` written with bare `x` is a move, then a use of a dead place. It is ill typed, although the paper accepts it. You have to write `copy!(x)`, as the regression program in `MoveCopy.lean` does.
+- With the restriction, even `let x : u32 = 5; x` (the first example in `Examples.lean`) becomes ill typed, because a bare `x` would be a move of a copyable value.
+
+**My recommendation:**
+- If the aim is the paper's type system exactly, add the one-line premise to `T-Move`. In that case also make the elaboration choose by type, as rustc does when it builds MIR. A place without a dereference has a declared root type (every `let` and parameter is annotated), so a bare place can become `copy` when its field type is copyable and `move` otherwise.
+- If the aim is a MIR-style calculus, keep the current rule and describe it as an intended, harmless extension.
+
+The current rule can't, on its own, make a well-typed program get stuck.
+
+## 2. Is `Inst.Covered` a bug?
+
+**No, I believe it's correct.** It says: for every partial renaming `ρ`, if the closure type `τ` survives strengthening by `ρ`, so do the entries `θ`. I expect this to be equivalent to the syntactic check "every binder that occurs free in `θ` also occurs free in `τ`":
+- **Syntactic check implies `Covered`:** strengthening a type succeeds exactly when `ρ` is defined on all of its free binders.
+- **`Covered` implies the syntactic check:** if some binder `x` were free in `θ` but not in `τ`, take the renaming that is the identity except that it drops `x`. Then `τ` survives and `θ` doesn't.
+
+The condition itself isn't in the paper. It was added to close the closure-scope hole (a closure body mentioning a region or variable that its type doesn't record).
+
+**Should it change?** That's a choice about presentation and executability, not correctness.
+- Since the typing judgment is a relation and there is no type checker, the semantic form causes no inconsistency. It is the form preservation will actually use (strengthening a closure value).
+- It is harder to read, and you can't decide it by computation.
+- The better form is a free-binder function or relation on `Region`, `Ty`, `XTy`, `FrameExpr`, `FrameTy`, `Loan`, `Entry` and `Inst`, with the coverage premise stated as inclusion. Keep the current definition as a proved equivalent lemma for the metatheory.
+- That proof needs lemmas about lifting partial renamings under the binders of `fn` types and frames. I haven't done it. I can add it, and/or the `T-Move` change with type-directed elaboration, if you want either.
+
 # Summary of changes for run 856f2a90-5ca8-45f1-9d94-2418b8a76242
 I implemented the main type-safety proposals in the Oxide formalization. `lake build` succeeds (8051 jobs, no warnings). The project has no `sorry`, `axiom` or `@[implemented_by]`, and the key theorems use only `propext`, `Classical.choice` and `Quot.sound`. Progress, preservation and type safety are still stated but not proved for the new rules.
 
