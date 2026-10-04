@@ -16,7 +16,9 @@ and `MISSING.md`.
 | Type environment `Δ` | entries `.fvar`/`.abs`/`.tvar` of the stack typing, plus `StackTy.outlives : List (In .abs S × In .abs S)` | One telescope for `Δ` and `Γ`. |
 | Loans `ω p`, places `π`, referents rooted at a name | rooted at `In .var Γ` | Can point into older frames. Always in range. |
 | Frame typing `Φ` | `FrameTy Γ f`: one entry per binder of the frame shape `f` | Only variable and region entries can be built. |
-| Stack `σ` of frames | `Stack S = Slots S S`, flat, with region markers and frame boundaries | Every value lives in the scope of the whole stack. |
+| Stack `σ` of frames | `Stack sig S = Slots sig S S`, flat, with region markers and frame boundaries | Every value lives in the scope of the whole stack; stacks only exist over runtime scopes (`Slots.runtime`). |
+| Global environment `Σ` (list of named functions) | a signature `sig : Sig` indexing terms; `GlobalEnv sig` has one body per declared function | Function names are indices `FnIdx sig`; lookup is total. |
+| Place expressions `p ::= x \| *p \| p.n` | `PExpr.place ⟨x, path⟩ \| PExpr.deref p path` | Grouped by dereferences; a place `π` is a root and a path. |
 
 ## Expressions
 
@@ -25,8 +27,9 @@ and `MISSING.md`.
 | One expression grammar; values are a sub-grammar of runtime expressions | `Value Γ` is separate, embedded by `Term.val` | |
 | `&r ω p`: concrete regions only | `Term.borrow (r : In .rgn Γ) …` | Enforced by the syntax. |
 | `let x : τ^SI`, closure parameters `τ^SI`, `Left::<τ^SI, τ^SI>` | `Ty Γ` | `Ty` only contains sized initialized types. |
-| `\|x₁:τ₁, …, xₖ:τₖ\| → τ_r { e }` | `Term.closure k (params : Fin k → Ty Γ) ret (body : Term (vars k ++ Γ))` | Parameter `i` is the `i`-th most recent binder. |
-| `e_f::<Φ̄, ρ̄, τ̄>(e₁, …, eₙ)` | `Term.app f b (Φs : Fin b.nφ → _) (ρs : Fin b.nϱ → _) (τs : Fin b.nα → _) k (args : Fin k → _)` | The arities match the binders by construction. |
+| `\|x₁:τ₁, …, xₖ:τₖ\| → τ_r { e }` | `Term.closure f (c : Cap Γ f) o (θ : Inst o Γ) k (params : Fin k → Ty o) ret (body : Term (vars k ++ (f ++ .frame :: o)))` | The body is written in its own scope: parameters (parameter `i` is the `i`-th most recent binder), captured frame `f` (listed by `c`), and outer binders `o` with entries `θ`. |
+| A place used as an operand `p` | `Term.move (π : TPlace Γ)` or `Term.copy (p : PExpr Γ)` | Move or copy is explicit, as in Rust's MIR. |
+| `e_f::<Φ̄, ρ̄, τ̄>(e₁, …, eₙ)` | `Term.app f b (θ : TArgs b Γ) k (args : Fin k → _)` | `TArgs` bundles `Fin b.nφ → _`, `Fin b.nϱ → _`, `Fin b.nα → _`; the arities match the binders by construction. |
 | `(e₁, …, eₙ)`, `[e₁, …, eₙ]` | `Term.tuple k (es : Fin k → Term Γ)`, `Term.array k es` | |
 | Runtime forms `framed e`, `shift e`, `shiftprov e` | none | The machine's continuation frames `popFrame k f`, `popVar` and `popRgn` take their place. |
 
@@ -34,24 +37,25 @@ and `MISSING.md`.
 
 | Paper | Lean | Comment |
 | --- | --- | --- |
-| `v ::= c \| f \| dead \| (v̄) \| [v̄] \| \|v̄\| \| ptr 𝓡 \| ⟨ς, closure⟩` | the same, **plus `inl`/`inr`** | The paper's value grammar leaves out injections, but `E-Match*` needs them. |
-| Closure value `⟨ς, \|x̄:τ̄\| → τ { e }⟩` | `Value.closure f (env : Env Γ f) k params ret (body : Term (vars k ++ (f ++ .frame :: Γ)))` | `f` is the shape of the captured frame. |
+| `v ::= c \| f \| dead \| (v̄) \| [v̄] \| \|v̄\| \| ptr 𝓡 \| ⟨ς, closure⟩` | the same, **plus `inl`/`inr`** | The paper's value grammar leaves out injections, but `E-Match*` needs them. Constants are `Prim b`, indexed by their base type. |
+| Closure value `⟨ς, \|x̄:τ̄\| → τ { e }⟩` | `Value.closure f (env : Env sig Γ f) o (θ : Inst o Γ) k params ret (body : Term sig (vars k ++ (f ++ .frame :: o)))` | `f` is the shape of the captured frame. |
 | `ptr 𝓡` | `Value.ptr (R : Referent Γ)` | A typed index into the stack. |
 
 ## Types
 
 | Paper | Lean | Comment |
 | --- | --- | --- |
-| Sorts `τ^SI`, `τ^XI`, `τ^SD`, `τ^SX` | separate families `Ty` (SI), `XTy` (XI), `MTy` (SX, which includes SD) | Ill-sorted types cannot be written. |
+| Sorts `τ^SI`, `τ^XI`, `τ^SD`, `τ^SX` | separate families `Ty` (SI), `XTy` (XI), `MTy` (SX, which includes SD) | Ill-sorted types cannot be written. `MTy` is a declared type `τ` with a state `MTy.Of τ` (`init`, `dead`, or a tuple of field states). |
 | `∀<φ̄, ϱ̄, ᾱ>(τ̄) →^Φ τ_r where ϱ₁ : ϱ₂` | `Ty.fn b k params ret env (bounds : List (Fin b.nϱ × Fin b.nϱ))` | A closure type is `Ty.fn {} …` (`Ty.closure`). |
 | `Φ ::= φ \| Φ_frame` | `FrameExpr.var (In .fvar Γ) \| FrameExpr.frame f (FrameTy (f ++ .frame :: Γ) f)` | The types of a literal frame live in the frame's own scope. |
-| `u32` | `Ty.u32`, with values in `Nat` | No overflow. The language has no arithmetic. |
+| `u32` | `Ty.u32`, with constants `Prim.num (n : UInt32)` | The language has no arithmetic. |
 
 ## Referents and slices
 
 | Paper | Lean |
 | --- | --- |
-| `𝓡[n₁..n₂]` is inclusive | half-open `[n₁, n₂)`, in `RStep.slice` and in the concrete syntax |
+| `𝓡[n₁..n₂]` is inclusive | `Referent.slice R start len`; the concrete syntax `p[e₁..e₂]` is half-open `[e₁, e₂)` |
+| `𝓡[n].q` | `Referent.index R n q` |
 | `WF-RefIndexSlice`/`WF-RefSliceSlice` have no bound check | bound check against the designated slice |
 
 ## Evaluation contexts

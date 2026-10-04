@@ -21,15 +21,21 @@ namespace StackTy
 
 variable {S : Ctx}
 
+/-- Convert the path of a place into a typed path into the declared type of its
+root (the only point where an out-of-range projection is detected). -/
+def resolve (Γ : StackTy S) (π : APlace S) : Option (TyPath (Γ.varTy π.root).ty) :=
+  TyPath.ofList _ π.path
+
 /-- `Γ(π)`: the (maybe-dead) type at a place. -/
-def placeTy (Γ : StackTy S) (π : APlace S) : Option (MTy S) := (Γ.varTy π.root).atPath π.path
+def placeTy (Γ : StackTy S) (π : APlace S) : Option (MTy S) :=
+  (Γ.resolve π).map (Γ.varTy π.root).st.get
 
 /-- The type at a place, if it is fully initialized. -/
 def placeTyI (Γ : StackTy S) (π : APlace S) : Option (Ty S) := (Γ.placeTy π).bind MTy.toTy?
 
 /-- `Γ[π ↦ τ]`: type update at a place. -/
 def setPlaceTy (Γ : StackTy S) (π : APlace S) (τ : MTy S) : Option (StackTy S) :=
-  ((Γ.varTy π.root).setPath π.path τ).map (Γ.setVarTy π.root)
+  (Γ.resolve π).map fun p => Γ.setVarTy π.root ((Γ.varTy π.root).st.set p τ)
 
 /-- The codomain of `Γ` restricted to variables. -/
 def cod (Γ : StackTy S) : List (MTy S) := Γ.slots.varTys.map Prod.snd
@@ -46,7 +52,7 @@ def places (Γ : StackTy S) : List (APlace S) :=
   Γ.rgns.flatMap fun p => p.2.map fun l => l.pe.base
 
 /-- `Γ ⊖ p`: remove all loans of the form `p°[p]`. -/
-def rsub (Γ : StackTy S) (p : APlaceExpr S) : StackTy S :=
+def rsub (Γ : StackTy S) (p : APExpr S) : StackTy S :=
   Γ.mapLoans fun _ L => L.filter fun l => !decide (p.IsPrefix l.pe)
 
 end StackTy
@@ -109,28 +115,53 @@ def OccursBefore {S : Ctx} (r₁ r₂ : In .rgn S) : Prop := r₂.toNat < r₁.t
 
 /-! ## Closures -/
 
-/-- Build a frame typing of shape `f` from its variable types and loan sets (fails
-if `f` contains entries other than variables and regions). -/
-def FrameTy.build {T : Ctx} : (f : Ctx) → (In .var f → Option (Ty T)) → (In .rgn f → List (Loan T)) →
-    Option (FrameTy T f)
-  | [], _, _ => some .nil
-  | .var :: f, gv, gr => do
-      pure (.var (← gv .here) (← FrameTy.build f (fun j => gv j.there) (fun j => gr j.there)))
-  | .rgn :: f, gv, gr =>
-      (FrameTy.build f (fun j => gv j.there) (fun j => gr j.there)).map (.rgn (gr .here))
-  | _ :: _, _, _ => none
+namespace Cap
+variable {S : Ctx}
+
+/-- The first captured copy of a variable. -/
+def findVar : {f : Ctx} → Cap S f → In .var S → Option (In .var f)
+  | _, .nil, _ => none
+  | _, .var x c, y => if x.toIn = y then some .here else (c.findVar y).map .there
+  | _, .rgn _ c, y => (c.findVar y).map .there
+
+/-- The first captured copy of a region. -/
+def findRgn : {f : Ctx} → Cap S f → In .rgn S → Option (In .rgn f)
+  | _, .nil, _ => none
+  | _, .var _ c, r => (c.findRgn r).map .there
+  | _, .rgn r' c, r => if r' = r then some .here else (c.findRgn r).map .there
+
+/-- The renaming sending each captured entry of `S` to its copy in the captured
+frame `f`, and every other entry past the new frame boundary. -/
+def inv {f : Ctx} (c : Cap S f) : TRen S (f ++ .frame :: S) := ⟨fun {b} _ i =>
+  match b, i with
+  | .var, i => match c.findVar i with
+    | some j => j.inlL
+    | none => In.weakenL f (.there i)
+  | .rgn, i => match c.findRgn i with
+    | some j => j.inlL
+    | none => In.weakenL f (.there i)
+  | _, i => In.weakenL f (.there i)⟩
+
+/-- The frame typing of a captured frame: the types of the captured variables and
+the loan sets of the captured regions, renamed by `ρ`. -/
+def frameTy {T : Ctx} (Γ : StackTy S) (ρ : TRen S T) : {f : Ctx} → Cap S f → Option (FrameTy T f)
+  | _, .nil => some .nil
+  | _, .var x c => do
+      pure (.var (← ((Γ.varTy x.toIn).toTy?).map (Ty.rename ρ)) (← frameTy Γ ρ c))
+  | _, .rgn r c => (frameTy Γ ρ c).map (.rgn ((Γ.loans r).map (Loan.rename ρ)))
+
+end Cap
 
 /-- The frame captured by a closure (`Φ_c` of `T-Closure`): the types of the
-selected variables and the loan sets of the selected regions, where the selected
+captured variables and the loan sets of the captured regions, where the captured
 entries now refer to their copies in the captured frame. -/
-def capturedFrame {S f : Ctx} (Γ : StackTy S) (s : Sel f S) : Option (FrameTy (f ++ .frame :: S) f) :=
-  FrameTy.build f (fun j => ((Γ.varTy (s.renF j)).toTy?).map (Ty.rename s.inv))
-    (fun j => (Γ.loans (s.renF j)).map (Loan.rename s.inv))
+def capturedFrame {S f : Ctx} (Γ : StackTy S) (c : Cap S f) : Option (FrameTy (f ++ .frame :: S) f) :=
+  c.frameTy Γ c.inv
 
 /-- Captured variables of non-copyable type become dead (`T-Closure`). -/
-def killNC {S f : Ctx} (Γ : StackTy S) (s : Sel f S) : StackTy S :=
-  s.selVars.foldl (fun Γ x => match (Γ.varTy x).toTy? with
-    | some τ => if τ.noncopyable then Γ.setVarTy x (.dead τ) else Γ
+def killNC {S f : Ctx} (Γ : StackTy S) (c : Cap S f) : StackTy S :=
+  c.vars.foldl (fun Γ x => match (Γ.varTy x.toIn).toTy? with
+    | some τ => if τ.noncopyable then Γ.setVarTy x.toIn (.dead τ) else Γ
     | none => Γ) Γ
 
 end Oxide

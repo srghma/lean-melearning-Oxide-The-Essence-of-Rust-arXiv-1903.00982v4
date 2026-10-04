@@ -21,23 +21,24 @@ namespace Oxide
 
 /-- `Σ ⊢ σ : Γ` (`WF-StackEmpty`, `WF-StackFrame`): every value of the stack has
 the type attributed to it by the stack typing. -/
-def StoreValid (G : GlobalEnv) {S : Ctx} (Γ : StackTy S) (σ : Stack S) : Prop :=
-  ∀ x : In .var S, HasTypeM G Γ (σ.get x) (Γ.varTy x)
+def StoreValid {sig : Sig} {S : Ctx} (Γ : StackTy S) (σ : Stack sig S) : Prop :=
+  ∀ x : In .var S, HasTypeM sig Γ (σ.get x) (Γ.varTy x)
 
 /-- The stack typing in which the body of a global function is checked: its
 binders and bounds, a frame boundary, and the parameters. -/
-def FnDef.bodyTy (d : FnDef) : StackTy (vars d.k ++ .frame :: d.binders.ctx) :=
+def FnSig.bodyTy (d : FnSig) : StackTy d.bodyCtx :=
   ((StackTy.ofBinders d.binders d.bounds).pushFrame (f := []) .nil).pushVars
     fun i => (d.params i).rename (TRen.wkFrame [] _)
 
 /-- `Σ ⊢ fn f … { e }` (`WF-FunctionDefinition`): the body has a type that can be
 rewritten into the return type, and its frame can be popped. -/
-def FnDefWF (G : GlobalEnv) (d : FnDef) : Prop :=
-  ∃ τf Γo Γo', HasType G [] d.bodyTy d.body τf Γo ∧
+def FnDefWF {sig : Sig} (d : FnSig) (body : Term sig d.bodyCtx) : Prop :=
+  ∃ τf Γo Γo', HasType sig [] d.bodyTy body τf Γo ∧
     Rewrite [] .combine Γo τf (d.ret.rename (TRen.frameRen d.k [] _)) Γo' ∧
     ((gcLoans [d.ret.rename (TRen.frameRen d.k [] _)] Γo').popFrame d.k []).isSome
 
-/-- `⊢ Σ` (`WF-GlobalEnv`). -/
-def GlobalWF (G : GlobalEnv) : Prop := ∀ d ∈ G, FnDefWF G d
+/-- `⊢ Σ` (`WF-GlobalEnv`): every global function body is well typed against the
+signature. -/
+def GlobalWF {sig : Sig} (G : GlobalEnv sig) : Prop := ∀ f : FnIdx sig, FnDefWF f.get (G.body f)
 
 end Oxide

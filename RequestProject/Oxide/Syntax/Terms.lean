@@ -1,31 +1,42 @@
 module
 
-public import RequestProject.Oxide.Syntax.Types
+public import RequestProject.Oxide.Syntax.TypeSubst
 
 /-!
-# Oxide syntax, part 3: terms, values and global environments
+# Oxide syntax, part 4: terms, values and global environments
 
 Paper §3.1 ("The Syntax of Oxide"), Figure "Term Syntax of Oxide"; the values,
 referents and pointers come from §3.6, Figure "Oxide Syntax Extensions for
 Dynamics"; appendix A.
 
-`Term Γ` is indexed by the scope `Γ`:
+`Term sig Γ` is indexed by the scope `Γ` and parametrized by the *global
+signature* `sig`, the list of the types of the declared global functions:
 
 * all type annotations are `Ty Γ` (sized and in scope), so `let`, closure
   parameters and `Left`/`Right` annotations are well sorted by construction;
-* borrows take a concrete region `In .rgn Γ` (the typing rules never accept an
-  abstract region there);
+* borrows take a concrete region `In .rgn Γ`;
 * `letrgn` binds a `.rgn`, `let`/`for`/`match` bind a `.var`;
-* closures, tuples, arrays and calls carry their arity, with the components as
-  `Fin k → _`;
-* a call carries the binders `b` it instantiates, with exactly `b.nφ` frames,
-  `b.nϱ` regions and `b.nα` types;
-* values live in the same scope (pointers are typed indices into the stack), and
-  a closure value's body is scoped by its captured frame.
+* **every use of a place says whether it moves or copies**, as `Operand::Move` and
+  `Operand::Copy` do in Rust's MIR: `move π` takes a *place* `π` (no dereference
+  can be moved out of), `copy p` any place expression;
+* **a closure is written in its own scope**: its body sees its parameters, its
+  captured frame `f` (each captured entry says which variable or region of the
+  current frame it copies, `Cap`) and the outer binders `o` it may mention, given
+  by an explicit substitution `θ : Inst o Γ`.  Its parameter and return types live
+  in `o` as well.  So a closure body can only mention what its type and its
+  captures make available;
+* a call carries the binders `b` it instantiates and its type arguments
+  `TArgs b Γ`;
+* tuples, arrays and calls carry their arity, with the components as `Fin k → _`;
+* constants carry their base type (`Prim b`), and `u32` literals are `UInt32`;
+* **a global function is an index into the signature** (`FnIdx sig`), so it always
+  exists, and the global environment (`GlobalEnv sig`) has exactly one body per
+  declared function, typed against the whole signature (so functions may be
+  mutually recursive).
 
 There are no runtime forms (`framed`, `shift`): the operational semantics is an
 abstract machine whose continuation records the frames and bindings to pop
-(`OperationalSemantics/Machine.lean`).  A closed program is a `Term []`.
+(`OperationalSemantics/Machine.lean`).  A closed program is a `Term sig []`.
 
 Closure and function parameters: parameter `i` (counting from `0` in the order in
 which the parameters are written) is the `i`-th most recent binder of the body.
@@ -35,104 +46,185 @@ which the parameters are written) is the `i`-th most recent binder of the body.
 
 namespace Oxide
 
+/-! ## Global signatures -/
+
+/-- The signature of a global function `fn f<φ̄, ϱ̄, ᾱ>(x₁ : τ₁, …, x_k : τ_k) → τ_r
+where ϱᵢ : ϱⱼ`: closed except for its own binders.  The name is only a label. -/
+structure FnSig where
+  name : String
+  binders : Binders
+  k : Nat
+  params : Fin k → Ty binders.ctx
+  ret : Ty binders.ctx
+  bounds : List (Fin binders.nϱ × Fin binders.nϱ)
+
+/-- Global signatures: the declared global functions. -/
+abbrev Sig := List FnSig
+
+/-- Global function names: indices into a signature. -/
+inductive FnIdx : Sig → Type where
+  | here {s : FnSig} {sig : Sig} : FnIdx (s :: sig)
+  | there {s : FnSig} {sig : Sig} (f : FnIdx sig) : FnIdx (s :: sig)
+  deriving DecidableEq, Repr
+
+/-- The signature of a global function (total). -/
+def FnIdx.get : {sig : Sig} → FnIdx sig → FnSig
+  | s :: _, .here => s
+  | _ :: _, .there f => f.get
+
+/-- The type of a global function (in any scope). -/
+def FnSig.ty {Γ : Ctx} (d : FnSig) : Ty Γ :=
+  .fn d.binders d.k (fun i => (d.params i).rename (TRen.inlL _ Γ))
+    ((d.ret).rename (TRen.inlL _ Γ)) .empty d.bounds
+
+/-- The scope in which the body of a global function is written: its parameters in
+a new frame above its binders. -/
+abbrev FnSig.bodyCtx (d : FnSig) : Ctx := vars d.k ++ .frame :: d.binders.ctx
+
+/-! ## Captures -/
+
+/-- `Cap Γ f`: what a closure captures, as a frame of shape `f`: for each variable
+of the frame the variable of the current frame it copies, for each region the
+region whose loans it records. -/
+inductive Cap (Γ : Ctx) : Ctx → Type where
+  | nil : Cap Γ []
+  | var {f : Ctx} (x : TVar Γ) (c : Cap Γ f) : Cap Γ (.var :: f)
+  | rgn {f : Ctx} (r : In .rgn Γ) (c : Cap Γ f) : Cap Γ (.rgn :: f)
+
+namespace Cap
+
+def rename {Γ Δ : Ctx} (ρ : Ren Γ Δ) : {f : Ctx} → Cap Γ f → Cap Δ f
+  | _, .nil => .nil
+  | _, .var x c => .var (ρ.tvar x) (c.rename ρ)
+  | _, .rgn r c => .rgn (ρ.ren r) (c.rename ρ)
+
+def prename {Γ Δ : Ctx} (ρ : PRenT Γ Δ) : {f : Ctx} → Cap Γ f → Option (Cap Δ f)
+  | _, .nil => some .nil
+  | _, .var x c => do pure (.var (← ρ.tvar x) (← c.prename ρ))
+  | _, .rgn r c => do pure (.rgn (← ρ.ren r) (← c.prename ρ))
+
+/-- The captured variables. -/
+def vars {Γ : Ctx} : {f : Ctx} → Cap Γ f → List (TVar Γ)
+  | _, .nil => []
+  | _, .var x c => x :: c.vars
+  | _, .rgn _ c => c.vars
+
+/-- The captured regions. -/
+def rgns {Γ : Ctx} : {f : Ctx} → Cap Γ f → List (In .rgn Γ)
+  | _, .nil => []
+  | _, .var _ c => c.rgns
+  | _, .rgn r c => r :: c.rgns
+
+end Cap
+
+/-! ## Terms and values -/
+
 mutual
 /-- Oxide expressions in scope `Γ`. -/
-inductive Term : Ctx → Type where
+inductive Term (sig : Sig) : Ctx → Type where
   /-- values (constants, function names; at runtime any value) -/
-  | val {Γ : Ctx} (v : Value Γ) : Term Γ
-  /-- use of a place expression (move or copy) -/
-  | place {Γ : Ctx} (p : PlaceExpr Γ) : Term Γ
+  | val {Γ : Ctx} (v : Value sig Γ) : Term sig Γ
+  /-- move out of a place `π` -/
+  | move {Γ : Ctx} (π : TPlace Γ) : Term sig Γ
+  /-- copy out of a place expression `p` -/
+  | copy {Γ : Ctx} (p : PExpr Γ) : Term sig Γ
   /-- `&r ω p` -/
-  | borrow {Γ : Ctx} (r : In .rgn Γ) (ω : Own) (p : PlaceExpr Γ) : Term Γ
+  | borrow {Γ : Ctx} (r : In .rgn Γ) (ω : Own) (p : PExpr Γ) : Term sig Γ
   /-- `&r ω p[e]` -/
-  | borrowIdx {Γ : Ctx} (r : In .rgn Γ) (ω : Own) (p : PlaceExpr Γ) (e : Term Γ) : Term Γ
+  | borrowIdx {Γ : Ctx} (r : In .rgn Γ) (ω : Own) (p : PExpr Γ) (e : Term sig Γ) : Term sig Γ
   /-- `&r ω p[e₁..e₂]` -/
-  | borrowSlice {Γ : Ctx} (r : In .rgn Γ) (ω : Own) (p : PlaceExpr Γ) (e₁ e₂ : Term Γ) : Term Γ
+  | borrowSlice {Γ : Ctx} (r : In .rgn Γ) (ω : Own) (p : PExpr Γ) (e₁ e₂ : Term sig Γ) : Term sig Γ
   /-- `p[e]` -/
-  | index {Γ : Ctx} (p : PlaceExpr Γ) (e : Term Γ) : Term Γ
+  | index {Γ : Ctx} (p : PExpr Γ) (e : Term sig Γ) : Term sig Γ
   /-- `p := e` -/
-  | assign {Γ : Ctx} (p : PlaceExpr Γ) (e : Term Γ) : Term Γ
+  | assign {Γ : Ctx} (p : PExpr Γ) (e : Term sig Γ) : Term sig Γ
   /-- `letrgn<r> { e }` -/
-  | letrgn {Γ : Ctx} (e : Term (.rgn :: Γ)) : Term Γ
+  | letrgn {Γ : Ctx} (e : Term sig (.rgn :: Γ)) : Term sig Γ
   /-- `let x : τ = e₁; e₂` -/
-  | letE {Γ : Ctx} (τ : Ty Γ) (e₁ : Term Γ) (e₂ : Term (.var :: Γ)) : Term Γ
+  | letE {Γ : Ctx} (τ : Ty Γ) (e₁ : Term sig Γ) (e₂ : Term sig (.var :: Γ)) : Term sig Γ
   /-- `e₁; e₂` -/
-  | seq {Γ : Ctx} (e₁ e₂ : Term Γ) : Term Γ
-  /-- `|x₁ : τ₁, …, x_k : τ_k| → τ_r { e }`: the body sees the parameters on top of
-  the current frame (whose variables it captures) -/
-  | closure {Γ : Ctx} (k : Nat) (params : Fin k → Ty Γ) (ret : Ty Γ) (body : Term (vars k ++ Γ)) :
-      Term Γ
+  | seq {Γ : Ctx} (e₁ e₂ : Term sig Γ) : Term sig Γ
+  /-- `|x₁ : τ₁, …, x_k : τ_k| → τ_r { e }`, capturing the frame `f` given by `c`;
+  the body, the parameter types and the return type are written in the closure's
+  own scope, whose outer binders `o` stand for the entries `θ`. -/
+  | closure {Γ : Ctx} (f : Ctx) (c : Cap Γ f) (o : Ctx) (θ : Inst o Γ) (k : Nat)
+      (params : Fin k → Ty o) (ret : Ty o) (body : Term sig (vars k ++ (f ++ .frame :: o))) :
+      Term sig Γ
   /-- `e_f::<Φ̄, ρ̄, τ̄>(e₁, …, e_k)` -/
-  | app {Γ : Ctx} (f : Term Γ) (b : Binders) (Φs : Fin b.nφ → FrameExpr Γ)
-      (ρs : Fin b.nϱ → Region Γ) (τs : Fin b.nα → Ty Γ) (k : Nat) (args : Fin k → Term Γ) : Term Γ
+  | app {Γ : Ctx} (f : Term sig Γ) (b : Binders) (θ : TArgs b Γ) (k : Nat)
+      (args : Fin k → Term sig Γ) : Term sig Γ
   /-- `if e₁ { e₂ } else { e₃ }` -/
-  | ite {Γ : Ctx} (e₁ e₂ e₃ : Term Γ) : Term Γ
+  | ite {Γ : Ctx} (e₁ e₂ e₃ : Term sig Γ) : Term sig Γ
   /-- `(e₁, …, e_k)` -/
-  | tuple {Γ : Ctx} (k : Nat) (es : Fin k → Term Γ) : Term Γ
+  | tuple {Γ : Ctx} (k : Nat) (es : Fin k → Term sig Γ) : Term sig Γ
   /-- `[e₁, …, e_k]` -/
-  | array {Γ : Ctx} (k : Nat) (es : Fin k → Term Γ) : Term Γ
+  | array {Γ : Ctx} (k : Nat) (es : Fin k → Term sig Γ) : Term sig Γ
   /-- `for x in e₁ { e₂ }` -/
-  | forE {Γ : Ctx} (e₁ : Term Γ) (e₂ : Term (.var :: Γ)) : Term Γ
+  | forE {Γ : Ctx} (e₁ : Term sig Γ) (e₂ : Term sig (.var :: Γ)) : Term sig Γ
   /-- `while e₁ { e₂ }` -/
-  | whileE {Γ : Ctx} (e₁ e₂ : Term Γ) : Term Γ
+  | whileE {Γ : Ctx} (e₁ e₂ : Term sig Γ) : Term sig Γ
   /-- `abort!(str)` -/
-  | abort {Γ : Ctx} (msg : String) : Term Γ
+  | abort {Γ : Ctx} (msg : String) : Term sig Γ
   /-- `Left::<τ₁, τ₂>(e)` -/
-  | inl {Γ : Ctx} (τ₁ τ₂ : Ty Γ) (e : Term Γ) : Term Γ
+  | inl {Γ : Ctx} (τ₁ τ₂ : Ty Γ) (e : Term sig Γ) : Term sig Γ
   /-- `Right::<τ₁, τ₂>(e)` -/
-  | inr {Γ : Ctx} (τ₁ τ₂ : Ty Γ) (e : Term Γ) : Term Γ
+  | inr {Γ : Ctx} (τ₁ τ₂ : Ty Γ) (e : Term sig Γ) : Term sig Γ
   /-- `match e { Left(x₁) => e₁, Right(x₂) => e₂ }` -/
-  | matchE {Γ : Ctx} (e : Term Γ) (e₁ e₂ : Term (.var :: Γ)) : Term Γ
+  | matchE {Γ : Ctx} (e : Term sig Γ) (e₁ e₂ : Term sig (.var :: Γ)) : Term sig Γ
 /-- Values in scope `Γ`. -/
-inductive Value : Ctx → Type where
-  /-- constants -/
-  | prim {Γ : Ctx} (c : Prim) : Value Γ
-  /-- global function names `f` -/
-  | fn {Γ : Ctx} (f : String) : Value Γ
+inductive Value (sig : Sig) : Ctx → Type where
+  /-- constants, with their base type -/
+  | prim {Γ : Ctx} {b : BaseTy} (c : Prim b) : Value sig Γ
+  /-- global functions -/
+  | fn {Γ : Ctx} (f : FnIdx sig) : Value sig Γ
   /-- the dead value -/
-  | dead {Γ : Ctx} : Value Γ
+  | dead {Γ : Ctx} : Value sig Γ
   /-- tuples -/
-  | tuple {Γ : Ctx} (k : Nat) (vs : Fin k → Value Γ) : Value Γ
+  | tuple {Γ : Ctx} (k : Nat) (vs : Fin k → Value sig Γ) : Value sig Γ
   /-- arrays -/
-  | array {Γ : Ctx} (k : Nat) (vs : Fin k → Value Γ) : Value Γ
+  | array {Γ : Ctx} (k : Nat) (vs : Fin k → Value sig Γ) : Value sig Γ
   /-- dynamically sized slices `|v₁, …, v_k|` -/
-  | slice {Γ : Ctx} (k : Nat) (vs : Fin k → Value Γ) : Value Γ
+  | slice {Γ : Ctx} (k : Nat) (vs : Fin k → Value sig Γ) : Value sig Γ
   /-- `ptr 𝓡`: the root is a stack slot in scope -/
-  | ptr {Γ : Ctx} (R : Referent Γ) : Value Γ
-  /-- `⟨ς, |x̄ : τ̄| → τ_r { e }⟩`: the captured frame `env` has shape `f`; the
-  body runs in a new frame holding the parameters on top of `f`. -/
-  | closure {Γ : Ctx} (f : Ctx) (env : Env Γ f) (k : Nat) (params : Fin k → Ty Γ) (ret : Ty Γ)
-      (body : Term (vars k ++ (f ++ .frame :: Γ))) : Value Γ
+  | ptr {Γ : Ctx} (R : Referent Γ) : Value sig Γ
+  /-- `⟨ς, |x̄ : τ̄| → τ_r { e }⟩`: the captured frame `env` has shape `f`; the body
+  is written in the closure's own scope (as for closure terms). -/
+  | closure {Γ : Ctx} (f : Ctx) (env : Env sig Γ f) (o : Ctx) (θ : Inst o Γ) (k : Nat)
+      (params : Fin k → Ty o) (ret : Ty o) (body : Term sig (vars k ++ (f ++ .frame :: o))) :
+      Value sig Γ
   /-- left injection -/
-  | inl {Γ : Ctx} (τ₁ τ₂ : Ty Γ) (v : Value Γ) : Value Γ
+  | inl {Γ : Ctx} (τ₁ τ₂ : Ty Γ) (v : Value sig Γ) : Value sig Γ
   /-- right injection -/
-  | inr {Γ : Ctx} (τ₁ τ₂ : Ty Γ) (v : Value Γ) : Value Γ
+  | inr {Γ : Ctx} (τ₁ τ₂ : Ty Γ) (v : Value sig Γ) : Value sig Γ
 /-- `Env Γ f`: values for the `.var` slots of a frame of shape `f`, in scope `Γ`. -/
-inductive Env : Ctx → Ctx → Type where
-  | nil {Γ : Ctx} : Env Γ []
-  | var {Γ f : Ctx} (v : Value Γ) (ε : Env Γ f) : Env Γ (.var :: f)
-  | rgn {Γ f : Ctx} (ε : Env Γ f) : Env Γ (.rgn :: f)
+inductive Env (sig : Sig) : Ctx → Ctx → Type where
+  | nil {Γ : Ctx} : Env sig Γ []
+  | var {Γ f : Ctx} (v : Value sig Γ) (ε : Env sig Γ f) : Env sig Γ (.var :: f)
+  | rgn {Γ f : Ctx} (ε : Env sig Γ f) : Env sig Γ (.rgn :: f)
 end
 
-instance {Γ : Ctx} : Inhabited (Value Γ) := ⟨.prim .unit⟩
-instance {Γ : Ctx} : Inhabited (Term Γ) := ⟨.val default⟩
+variable {sig : Sig}
+
+instance {Γ : Ctx} : Inhabited (Value sig Γ) := ⟨.prim .unit⟩
+instance {Γ : Ctx} : Inhabited (Term sig Γ) := ⟨.val default⟩
 
 /-- Closed programs. -/
-abbrev Program := Term []
+abbrev Program (sig : Sig) := Term sig []
 
 namespace Value
-def unit {Γ : Ctx} : Value Γ := .prim .unit
-def num {Γ : Ctx} (k : Nat) : Value Γ := .prim (.num k)
-def tt {Γ : Ctx} : Value Γ := .prim (.bool true)
-def ff {Γ : Ctx} : Value Γ := .prim (.bool false)
+def unit {Γ : Ctx} : Value sig Γ := .prim .unit
+def num {Γ : Ctx} (n : UInt32) : Value sig Γ := .prim (.num n)
+def tt {Γ : Ctx} : Value sig Γ := .prim (.bool true)
+def ff {Γ : Ctx} : Value sig Γ := .prim (.bool false)
 end Value
 
 /-! ## Renaming -/
 
 mutual
-def Term.rename {Γ Δ : Ctx} (ρ : Ren Γ Δ) : Term Γ → Term Δ
+def Term.rename {Γ Δ : Ctx} (ρ : Ren Γ Δ) : Term sig Γ → Term sig Δ
   | .val v => .val (v.rename ρ.toTRen)
-  | .place p => .place (p.rename ρ)
+  | .move π => .move (π.rename ρ)
+  | .copy p => .copy (p.rename ρ)
   | .borrow r ω p => .borrow (ρ.ren r) ω (p.rename ρ)
   | .borrowIdx r ω p e => .borrowIdx (ρ.ren r) ω (p.rename ρ) (e.rename ρ)
   | .borrowSlice r ω p e₁ e₂ => .borrowSlice (ρ.ren r) ω (p.rename ρ) (e₁.rename ρ) (e₂.rename ρ)
@@ -141,12 +233,8 @@ def Term.rename {Γ Δ : Ctx} (ρ : Ren Γ Δ) : Term Γ → Term Δ
   | .letrgn e => .letrgn (e.rename (ρ.lift .rgn))
   | .letE τ e₁ e₂ => .letE (τ.rename ρ.toTRen) (e₁.rename ρ) (e₂.rename (ρ.lift .var))
   | .seq e₁ e₂ => .seq (e₁.rename ρ) (e₂.rename ρ)
-  | .closure k ps r body =>
-      .closure k (fun i => (ps i).rename ρ.toTRen) (r.rename ρ.toTRen)
-        (body.rename (ρ.liftN (vars k)))
-  | .app f b Φs ρs τs k args =>
-      .app (f.rename ρ) b (fun i => (Φs i).rename ρ.toTRen) (fun i => (ρs i).rename ρ.toTRen)
-        (fun i => (τs i).rename ρ.toTRen) k (fun i => (args i).rename ρ)
+  | .closure f c o θ k ps r body => .closure f (c.rename ρ) o (θ.rename ρ.toTRen) k ps r body
+  | .app f b θ k args => .app (f.rename ρ) b (θ.rename ρ.toTRen) k (fun i => (args i).rename ρ)
   | .ite e₁ e₂ e₃ => .ite (e₁.rename ρ) (e₂.rename ρ) (e₃.rename ρ)
   | .tuple k es => .tuple k fun i => (es i).rename ρ
   | .array k es => .array k fun i => (es i).rename ρ
@@ -156,7 +244,7 @@ def Term.rename {Γ Δ : Ctx} (ρ : Ren Γ Δ) : Term Γ → Term Δ
   | .inl τ₁ τ₂ e => .inl (τ₁.rename ρ.toTRen) (τ₂.rename ρ.toTRen) (e.rename ρ)
   | .inr τ₁ τ₂ e => .inr (τ₁.rename ρ.toTRen) (τ₂.rename ρ.toTRen) (e.rename ρ)
   | .matchE e e₁ e₂ => .matchE (e.rename ρ) (e₁.rename (ρ.lift .var)) (e₂.rename (ρ.lift .var))
-def Value.rename {Γ Δ : Ctx} (ρ : TRen Γ Δ) : Value Γ → Value Δ
+def Value.rename {Γ Δ : Ctx} (ρ : TRen Γ Δ) : Value sig Γ → Value sig Δ
   | .prim c => .prim c
   | .fn f => .fn f
   | .dead => .dead
@@ -164,26 +252,25 @@ def Value.rename {Γ Δ : Ctx} (ρ : TRen Γ Δ) : Value Γ → Value Δ
   | .array k vs => .array k fun i => (vs i).rename ρ
   | .slice k vs => .slice k fun i => (vs i).rename ρ
   | .ptr R => .ptr (R.rename ρ)
-  | .closure f env k ps r body =>
-      .closure f (env.rename ρ) k (fun i => (ps i).rename ρ) (r.rename ρ)
-        (body.rename ((ρ.enterFrame.liftN f).liftN (vars k)))
+  | .closure f env o θ k ps r body => .closure f (env.rename ρ) o (θ.rename ρ) k ps r body
   | .inl τ₁ τ₂ v => .inl (τ₁.rename ρ) (τ₂.rename ρ) (v.rename ρ)
   | .inr τ₁ τ₂ v => .inr (τ₁.rename ρ) (τ₂.rename ρ) (v.rename ρ)
-def Env.rename {Γ Δ : Ctx} (ρ : TRen Γ Δ) : {f : Ctx} → Env Γ f → Env Δ f
+def Env.rename {Γ Δ : Ctx} (ρ : TRen Γ Δ) : {f : Ctx} → Env sig Γ f → Env sig Δ f
   | _, .nil => .nil
   | _, .var v ε => .var (v.rename ρ) (ε.rename ρ)
   | _, .rgn ε => .rgn (ε.rename ρ)
 end
 
 /-- Weakening of a value by one binder. -/
-abbrev Value.wk {Γ : Ctx} (c : Bnd) (v : Value Γ) : Value (c :: Γ) := v.rename (TRen.wk Γ c)
+abbrev Value.wk {Γ : Ctx} (c : Bnd) (v : Value sig Γ) : Value sig (c :: Γ) := v.rename (TRen.wk Γ c)
 
 /-! ## Strengthening -/
 
 mutual
-def Term.prename {Γ Δ : Ctx} (ρ : PRenT Γ Δ) : Term Γ → Option (Term Δ)
+def Term.prename {Γ Δ : Ctx} (ρ : PRenT Γ Δ) : Term sig Γ → Option (Term sig Δ)
   | .val v => (v.prename ρ.toPRen).map .val
-  | .place p => (p.prename ρ).map .place
+  | .move π => (π.prename ρ).map .move
+  | .copy p => (p.prename ρ).map .copy
   | .borrow r ω p => do pure (.borrow (← ρ.ren r) ω (← p.prename ρ))
   | .borrowIdx r ω p e => do pure (.borrowIdx (← ρ.ren r) ω (← p.prename ρ) (← e.prename ρ))
   | .borrowSlice r ω p e₁ e₂ => do
@@ -194,13 +281,10 @@ def Term.prename {Γ Δ : Ctx} (ρ : PRenT Γ Δ) : Term Γ → Option (Term Δ)
   | .letE τ e₁ e₂ => do
       pure (.letE (← τ.prename ρ.toPRen) (← e₁.prename ρ) (← e₂.prename (ρ.lift .var)))
   | .seq e₁ e₂ => do pure (.seq (← e₁.prename ρ) (← e₂.prename ρ))
-  | .closure k ps r body => do
-      pure (.closure k (← optFin fun i => (ps i).prename ρ.toPRen) (← r.prename ρ.toPRen)
-        (← body.prename (ρ.liftN (vars k))))
-  | .app f b Φs ρs τs k args => do
-      pure (.app (← f.prename ρ) b (← optFin fun i => (Φs i).prename ρ.toPRen)
-        (← optFin fun i => (ρs i).prename ρ.toPRen) (← optFin fun i => (τs i).prename ρ.toPRen) k
-        (← optFin fun i => (args i).prename ρ))
+  | .closure f c o θ k ps r body => do
+      pure (.closure f (← c.prename ρ) o (← θ.prename ρ.toPRen) k ps r body)
+  | .app f b θ k args => do
+      pure (.app (← f.prename ρ) b (← θ.prename ρ.toPRen) k (← optFin fun i => (args i).prename ρ))
   | .ite e₁ e₂ e₃ => do pure (.ite (← e₁.prename ρ) (← e₂.prename ρ) (← e₃.prename ρ))
   | .tuple k es => (optFin fun i => (es i).prename ρ).map (.tuple k)
   | .array k es => (optFin fun i => (es i).prename ρ).map (.array k)
@@ -211,7 +295,7 @@ def Term.prename {Γ Δ : Ctx} (ρ : PRenT Γ Δ) : Term Γ → Option (Term Δ)
   | .inr τ₁ τ₂ e => do pure (.inr (← τ₁.prename ρ.toPRen) (← τ₂.prename ρ.toPRen) (← e.prename ρ))
   | .matchE e e₁ e₂ => do
       pure (.matchE (← e.prename ρ) (← e₁.prename (ρ.lift .var)) (← e₂.prename (ρ.lift .var)))
-def Value.prename {Γ Δ : Ctx} (ρ : PRen Γ Δ) : Value Γ → Option (Value Δ)
+def Value.prename {Γ Δ : Ctx} (ρ : PRen Γ Δ) : Value sig Γ → Option (Value sig Δ)
   | .prim c => some (.prim c)
   | .fn f => some (.fn f)
   | .dead => some .dead
@@ -219,12 +303,11 @@ def Value.prename {Γ Δ : Ctx} (ρ : PRen Γ Δ) : Value Γ → Option (Value �
   | .array k vs => (optFin fun i => (vs i).prename ρ).map (.array k)
   | .slice k vs => (optFin fun i => (vs i).prename ρ).map (.slice k)
   | .ptr R => (R.prename ρ).map .ptr
-  | .closure f env k ps r body => do
-      pure (.closure f (← env.prename ρ) k (← optFin fun i => (ps i).prename ρ) (← r.prename ρ)
-        (← body.prename ((ρ.enterFrame.liftN f).liftN (vars k))))
+  | .closure f env o θ k ps r body => do
+      pure (.closure f (← env.prename ρ) o (← θ.prename ρ) k ps r body)
   | .inl τ₁ τ₂ v => do pure (.inl (← τ₁.prename ρ) (← τ₂.prename ρ) (← v.prename ρ))
   | .inr τ₁ τ₂ v => do pure (.inr (← τ₁.prename ρ) (← τ₂.prename ρ) (← v.prename ρ))
-def Env.prename {Γ Δ : Ctx} (ρ : PRen Γ Δ) : {f : Ctx} → Env Γ f → Option (Env Δ f)
+def Env.prename {Γ Δ : Ctx} (ρ : PRen Γ Δ) : {f : Ctx} → Env sig Γ f → Option (Env sig Δ f)
   | _, .nil => some .nil
   | _, .var v ε => do pure (.var (← v.prename ρ) (← ε.prename ρ))
   | _, .rgn ε => (ε.prename ρ).map .rgn
@@ -234,7 +317,7 @@ end
 binder (pointers into it, closures mentioning it) are replaced by `dead`.  Used
 for the values left on the stack when a binder is popped: a slot whose type is
 (partially) dead may legitimately hold such garbage. -/
-def Value.prenameD {Γ Δ : Ctx} (ρ : PRen Γ Δ) : Value Γ → Value Δ
+def Value.prenameD {Γ Δ : Ctx} (ρ : PRen Γ Δ) : Value sig Γ → Value sig Δ
   | .prim c => .prim c
   | .fn f => .fn f
   | .dead => .dead
@@ -249,24 +332,29 @@ def Value.prenameD {Γ Δ : Ctx} (ρ : PRen Γ Δ) : Value Γ → Value Δ
     | _, _ => .dead
   | v => (v.prename ρ).getD .dead
 
-/-! ## Global functions -/
+/-! ## Global environments -/
 
-/-- Global function definitions `fn f<φ̄, ϱ̄, ᾱ>(x₁ : τ₁, …, x_k : τ_k) → τ_r
-where ϱᵢ : ϱⱼ { e }`.  The signature is closed except for its own binders; the
-body runs in its own frame holding the parameters. -/
-structure FnDef where
-  name : String
-  binders : Binders
-  k : Nat
-  params : Fin k → Ty binders.ctx
-  ret : Ty binders.ctx
-  bounds : List (Fin binders.nϱ × Fin binders.nϱ)
-  body : Term (vars k ++ .frame :: binders.ctx)
+/-- `Defs sig ss`: one body for each function of the list `ss`, each written in its
+own scope and typed against the whole signature `sig`. -/
+inductive Defs (sig : Sig) : Sig → Type where
+  | nil : Defs sig []
+  | cons {s : FnSig} {ss : Sig} (body : Term sig s.bodyCtx) (ds : Defs sig ss) : Defs sig (s :: ss)
 
-/-- Global environments `Σ`. -/
-abbrev GlobalEnv := List FnDef
+/-- Global environments `Σ`: exactly one body per declared function. -/
+abbrev GlobalEnv (sig : Sig) := Defs sig sig
 
-/-- Look up a global function. -/
-def GlobalEnv.lookup (G : GlobalEnv) (f : String) : Option FnDef := G.find? (·.name == f)
+/-- The body of a global function (total). -/
+def Defs.get : {ss : Sig} → Defs sig ss → (f : FnIdx ss) → Term sig f.get.bodyCtx
+  | _, .cons b _, .here => b
+  | _, .cons _ ds, .there f => ds.get f
+
+/-- The body of a global function (total). -/
+abbrev GlobalEnv.body (G : GlobalEnv sig) (f : FnIdx sig) : Term sig f.get.bodyCtx := G.get f
+
+/-- A global function definition: a signature and a body written against the
+global signature `sig`. -/
+structure FnDef (sig : Sig) where
+  fsig : FnSig
+  body : Term sig fsig.bodyCtx
 
 end Oxide

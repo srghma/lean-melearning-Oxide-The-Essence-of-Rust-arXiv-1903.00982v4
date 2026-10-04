@@ -5,6 +5,7 @@ public import RequestProject.Oxide.Syntax.Scopes
 -- §3.1–3.3 (appendix A): syntax
 public import RequestProject.Oxide.Syntax.Places
 public import RequestProject.Oxide.Syntax.Types
+public import RequestProject.Oxide.Syntax.TypeSubst
 public import RequestProject.Oxide.Syntax.Terms
 public import RequestProject.Oxide.Syntax.Environments
 public import RequestProject.Oxide.Syntax.Runtime
@@ -25,8 +26,9 @@ public import RequestProject.Oxide.Typechecking.Continuations
 public import RequestProject.Oxide.OperationalSemantics.Machine
 -- §3.7 (appendix E): metatheory
 public import RequestProject.Oxide.Metatheory.Statements
-public import RequestProject.Oxide.Metatheory.Counterexamples.TypeSafety
-public import RequestProject.Oxide.Metatheory.Counterexamples.Progress
+-- regressions: the former counterexamples are now ruled out
+public import RequestProject.Oxide.Metatheory.Regressions.MoveCopy
+public import RequestProject.Oxide.Metatheory.Regressions.ClosureScopes
 -- not in the paper: concrete `[OXIDE| … ]` syntax
 public import RequestProject.Oxide.ConcreteSyntax.Notation
 public import RequestProject.Oxide.ConcreteSyntax.Examples
@@ -36,5 +38,5 @@ public import RequestProject.Oxide.ConcreteSyntax.Examples
 
 Imports the whole formalization, grouped by the sections of the paper.  Every
 syntactic class is indexed by its scope (`Oxide.Ctx`); a closed program is an
-`Oxide.Term []`.  See `RequestProject/Oxide/READING_GUIDE.md` for a guided tour.
+`Oxide.Term sig []` (over a global signature `sig`).  See `RequestProject/Oxide/READING_GUIDE.md` for a guided tour.
 -/

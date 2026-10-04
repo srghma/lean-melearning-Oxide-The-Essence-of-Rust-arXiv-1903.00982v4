@@ -7,7 +7,7 @@ public import RequestProject.Oxide.Syntax.Runtime
 # Oxide: concrete syntax `[OXIDE| … ]`
 
 A concrete-syntax embedding of Oxide in Lean.  `[OXIDE| e ]` elaborates the
-Oxide expression `e` to a closed, scope-indexed term `Oxide.Term []`; named
+Oxide expression `e` to a closed, scope-indexed term `Oxide.Term sig []`; named
 variables, regions, type variables and frame variables are resolved to typed de
 Bruijn indices at macro-expansion time (`In.there (… In.here)` for any binder,
 `TVar.skipVar`/`TVar.skipRgn` chains for term variables).  An ill-scoped program
@@ -15,7 +15,24 @@ Bruijn indices at macro-expansion time (`In.there (… In.here)` for any binder,
 frame) is rejected at expansion time, or fails to elaborate.
 
 `[OXIDE_TY| τ ]` elaborates a closed type `Oxide.Ty []`, and
-`[OXIDE_FN| fn f<…>(…) -> τ { e } ]` a global function definition `Oxide.FnDef`.
+`[OXIDE_FN| fn f<…>(…) -> τ { e } ]` a global function definition `Oxide.FnDef sig`.
+
+Global functions are indices into the signature `sig` (`Oxide.FnIdx sig`): the
+names of the declared functions are listed, in signature order, as
+`[OXIDE{f, g, …}| e ]` and `[OXIDE_FN{f, g, …}| … ]`; any other identifier that
+is not a bound variable is rejected.
+
+Moves and copies: a bare place without dereference (`x`, `x.1`) elaborates to
+`Term.move` (which takes a `TPlace`, so it cannot dereference); a place through a
+dereference (`*r`, `(*r).0`) to `Term.copy`.  `copy!(p)` and `move!(p)` choose
+explicitly (`move!` rejects a place with a dereference).
+
+Closures are written in their own scope: the translation computes which
+variables and regions of the current frame the body uses (the captured frame,
+`Cap`), and which outer binders it uses (the outer scope `o` together with the
+entries `θ : Inst o Γ`).
+
+Number literals are `u32` constants (`UInt32`); a literal `≥ 2^32` is rejected.
 
 Since `'a` is lexed by Lean as the start of a character literal, regions are
 written as Lean name literals: `` `a `` stands for the region `'a`.
@@ -43,7 +60,9 @@ Grammar:
   `(e₁, …, eₙ)`, `[e₁, …]`, `for x in e { e' }`, `while e { e' }`,
   `abort!("msg")`, `Left::<τ₁, τ₂>(e)`, `Right::<τ₁, τ₂>(e)`,
   `match e { Left(x) => e₁, Right(y) => e₂ }` and blocks `{ e }`.
-  An identifier that is not a bound variable denotes a global function.
+  An identifier that is not a bound variable denotes a global function, which
+  must be listed in `[OXIDE{…}| … ]`.  `copy!(p)` and `move!(p)` mark a use of a
+  place explicitly.
 * values (as they appear at runtime): `val!(v)` where `v` is built from
   constants, function names, `dead!`, pointers `ptr!(x steps)` to a variable `x`
   in scope with steps `.n`, `[n]`, `[n₁..n₂]`, tuples `(v,)`/`(v₁, …)`, arrays
@@ -156,6 +175,8 @@ syntax "Left" "::<" oxide_ty "," oxide_ty ">" "(" oxide_val ")" : oxide_val
 syntax "Right" "::<" oxide_ty "," oxide_ty ">" "(" oxide_val ")" : oxide_val
 
 syntax "val!" "(" oxide_val ")" : oxide
+syntax "copy!" "(" oxide_place ")" : oxide
+syntax "move!" "(" oxide_place ")" : oxide
 
 syntax "fn " ident ("<" oxide_gbinder,* (";" ident,*)? ">")? "(" oxide_param,* ")" " -> " oxide_ty
   (" where " sepBy1(oxide_rgn " : " oxide_rgn, ","))? "{" oxide "}" : oxide_fn
@@ -175,19 +196,52 @@ inductive Sort' where
   | fvar | abs | tvar | var | rgn | frame
   deriving BEq, Inhabited
 
+/-- A named binder of the translation scope, with a unique identifier (so that the
+binders a closure body uses can be recorded). -/
+structure Bind where
+  name : Name
+  sort : Sort'
+  id : Nat
+  deriving Inhabited
+
 /-- The scope during the translation: named binders, most recent first (frame
 boundaries have the anonymous name). -/
-abbrev Scope := List (Name × Sort')
+abbrev Scope := List Bind
 
-abbrev TransM := ReaderT Scope MacroM
+/-- The state of the translation: a supply of identifiers, the identifiers of the
+binders used so far, and the names of the global functions. -/
+structure TState where
+  next : Nat := 0
+  used : List Nat := []
+  globals : List Name := []
 
-/-- The position of the most recent binder named `x` with a sort satisfying `p`. -/
-def lookup (s : Scope) (x : Name) (p : Sort' → Bool) : Option (Nat × Sort') :=
+abbrev TransM := ReaderT Scope (StateT TState MacroM)
+
+/-- Run a translation with the given global function names. -/
+def TransM.run' {α : Type} (m : TransM α) (globals : List Name) (s : Scope := []) : MacroM α :=
+  (m.run s).run' { globals }
+
+/-- Record the use of a binder. -/
+def use (b : Bind) : TransM Unit := modify fun st => { st with used := b.id :: st.used }
+
+/-- Push named binders (most recent first) with fresh identifiers. -/
+def withBinders {α : Type} (bs : List (Name × Sort')) (m : TransM α) : TransM α := do
+  let st ← get
+  let binds := bs.zipIdx.map fun ((x, b), i) => ({ name := x, sort := b, id := st.next + i } : Bind)
+  set { st with next := st.next + bs.length }
+  withReader (binds ++ ·) m
+
+/-- The position and the binder of the most recent binder named `x` with a sort
+satisfying `p`. -/
+def lookup (s : Scope) (x : Name) (p : Sort' → Bool) : Option (Nat × Bind) :=
   go s 0
 where
-  go : Scope → Nat → Option (Nat × Sort')
+  go : Scope → Nat → Option (Nat × Bind)
     | [], _ => none
-    | (y, b) :: s, n => if y == x && p b then some (n, b) else go s (n + 1)
+    | b :: s, n => if b.name == x && p b.sort then some (n, b) else go s (n + 1)
+
+/-- The position of the binder with identifier `i`. -/
+def posOf (s : Scope) (i : Nat) : Option Nat := s.findIdx? (·.id == i)
 
 /-- The typed de Bruijn index `In.there^n In.here`. -/
 def mkIn : Nat → MacroM Lean.Term
@@ -197,22 +251,38 @@ def mkIn : Nat → MacroM Lean.Term
 /-- The index of the binder named `x` of sort `b`. -/
 def inIdx (x : Ident) (b : Sort') (what : String) : TransM Lean.Term := do
   match lookup (← read) x.getId (· == b) with
-  | some (n, _) => mkIn n
+  | some (n, bd) => use bd; mkIn n
   | none => Macro.throwErrorAt x s!"unknown {what} {x.getId}"
 
-/-- A term variable of the top frame: a chain of `TVar.skipVar`/`TVar.skipRgn`
-ending in `TVar.here`. -/
-def tvarIdx (x : Ident) : TransM Lean.Term := do
-  let rec go : Scope → MacroM Lean.Term
-    | [] => Macro.throwErrorAt x s!"unknown variable {x.getId}"
-    | (y, b) :: s =>
-      if y == x.getId && b == .var then `(Oxide.TVar.here)
-      else match b with
+/-- A term variable of the top frame, given by its identifier: a chain of
+`TVar.skipVar`/`TVar.skipRgn` ending in `TVar.here`. -/
+def tvarOfId (ref : Syntax) (s : Scope) (i : Nat) : MacroM Lean.Term :=
+  go s
+where
+  go : Scope → MacroM Lean.Term
+    | [] => Macro.throwErrorAt ref "unknown variable"
+    | b :: s =>
+      if b.id == i then `(Oxide.TVar.here)
+      else match b.sort with
         | .var => do `(Oxide.TVar.skipVar $(← go s))
         | .rgn => do `(Oxide.TVar.skipRgn $(← go s))
-        | _ => Macro.throwErrorAt x
-            s!"variable {x.getId} is not a variable of the current frame"
-  go (← read)
+        | _ => Macro.throwErrorAt ref "not a variable of the current frame"
+
+/-- A term variable of the top frame. -/
+def tvarIdx (x : Ident) : TransM Lean.Term := do
+  let s ← read
+  match lookup s x.getId (· == .var) with
+  | some (_, b) =>
+      use b
+      let rec ok : Scope → Bool
+        | [] => false
+        | b' :: s => if b'.id == b.id then true
+          else match b'.sort with
+            | .var | .rgn => ok s
+            | _ => false
+      if ok s then tvarOfId x s b.id
+      else Macro.throwErrorAt x s!"variable {x.getId} is not a variable of the current frame"
+  | none => Macro.throwErrorAt x s!"unknown variable {x.getId}"
 
 def rgnName : TSyntax `oxide_rgn → MacroM Name
   | `(oxide_rgn| $n:name) => pure n.getName
@@ -223,16 +293,18 @@ abstract (signature). -/
 def transRgn (r : TSyntax `oxide_rgn) : TransM Lean.Term := do
   let x ← rgnName r
   match lookup (← read) x (fun b => b == .rgn || b == .abs) with
-  | some (n, .rgn) => `(Oxide.Region.conc $(← mkIn n))
-  | some (n, _) => `(Oxide.Region.abs $(← mkIn n))
+  | some (n, b) =>
+      use b
+      if b.sort == .rgn then `(Oxide.Region.conc $(← mkIn n)) else `(Oxide.Region.abs $(← mkIn n))
   | none => Macro.throwErrorAt r s!"unknown region {x}"
 
 /-- A concrete region (for borrows). -/
 def transConcRgn (r : TSyntax `oxide_rgn) : TransM Lean.Term := do
   let x ← rgnName r
   match lookup (← read) x (fun b => b == .rgn || b == .abs) with
-  | some (n, .rgn) => mkIn n
-  | some _ => Macro.throwErrorAt r s!"borrows need a concrete region, but {x} is abstract"
+  | some (n, b) =>
+      if b.sort == .rgn then do use b; mkIn n
+      else Macro.throwErrorAt r s!"borrows need a concrete region, but {x} is abstract"
   | none => Macro.throwErrorAt r s!"unknown region {x}"
 
 def transOwn (o : Ident) : TransM Lean.Term :=
@@ -243,6 +315,21 @@ def transOwn (o : Ident) : TransM Lean.Term :=
 
 /-- `![t₁, …, tₙ]`. -/
 def mkVec (ts : List Lean.Term) : MacroM Lean.Term := `(![$(ts.toArray),*])
+
+/-- A `u32` literal (rejected if it does not fit in 32 bits). -/
+def mkNum (n : TSyntax `num) : MacroM Lean.Term := do
+  if n.getNat < 2 ^ 32 then `(Oxide.Value.num $n)
+  else Macro.throwErrorAt n "u32 literal out of range"
+
+/-- A global function: its index in the signature. -/
+def transGlobal (x : Ident) : TransM Lean.Term := do
+  match (← get).globals.idxOf? x.getId with
+  | some i =>
+      let rec mk : Nat → MacroM Lean.Term
+        | 0 => `(Oxide.FnIdx.here)
+        | n + 1 => do `(Oxide.FnIdx.there $(← mk n))
+      mk i
+  | none => Macro.throwErrorAt x s!"unknown variable or global function {x.getId}"
 
 /-- Split generic binders `@φ, …, `a, …` into frame variables and abstract regions. -/
 def splitBinders (bs : List (TSyntax `oxide_gbinder)) : MacroM (List Name × List Name) := do
@@ -256,7 +343,7 @@ def splitBinders (bs : List (TSyntax `oxide_gbinder)) : MacroM (List Name × Lis
   pure (frms, rgns)
 
 /-- The scope extension made by signature binders (cf. `Oxide.Binders.ctx`). -/
-def binderScope (frms rgns αs : List Name) : Scope :=
+def binderScope (frms rgns αs : List Name) : List (Name × Sort') :=
   αs.map (·, .tvar) ++ rgns.map (·, .abs) ++ frms.map (·, .fvar)
 
 /-- The `Oxide.Binders` record. -/
@@ -282,6 +369,15 @@ def fentryInfo : TSyntax `oxide_fentry → MacroM (Name × Sort')
   | `(oxide_fentry| $x:ident : $_t:oxide_ty) => pure (x.getId, .var)
   | `(oxide_fentry| $r:oxide_rgn ↦ { }) => do pure (← rgnName r, .rgn)
   | stx => Macro.throwErrorAt stx "ill-formed frame entry"
+
+/-- The sort as an `Oxide.Bnd`. -/
+def mkBnd : Sort' → MacroM Lean.Term
+  | .fvar => `(Oxide.Bnd.fvar)
+  | .abs => `(Oxide.Bnd.abs)
+  | .tvar => `(Oxide.Bnd.tvar)
+  | .var => `(Oxide.Bnd.var)
+  | .rgn => `(Oxide.Bnd.rgn)
+  | .frame => `(Oxide.Bnd.frame)
 
 mutual
 partial def transTy : TSyntax `oxide_ty → TransM Lean.Term
@@ -312,8 +408,7 @@ partial def transTy : TSyntax `oxide_ty → TransM Lean.Term
       let αs : List Name := match αs with
         | some (some αs) => αs.getElems.toList.map (·.getId)
         | _ => []
-      let inner {β : Type} (m : TransM β) : TransM β :=
-        withReader (binderScope frms rgns αs ++ ·) m
+      let inner {β : Type} (m : TransM β) : TransM β := withBinders (binderScope frms rgns αs) m
       let ts ← inner (ts.getElems.toList.mapM transTy)
       let r ← inner (transTy r)
       let Φ ← match Φ with
@@ -332,10 +427,8 @@ partial def transFrm : TSyntax `oxide_frm → TransM Lean.Term
       let es := es.getElems.toList.reverse
       let infos ← es.mapM fun e => (fentryInfo e : MacroM _)
       let inner {β : Type} (m : TransM β) : TransM β :=
-        withReader (fun s => infos ++ (Name.anonymous, .frame) :: s) m
-      let shape ← infos.mapM fun (_, b) => match b with
-        | .var => `(Oxide.Bnd.var)
-        | _ => `(Oxide.Bnd.rgn)
+        withBinders (infos ++ [(Name.anonymous, .frame)]) m
+      let shape ← infos.mapM fun (_, b) => mkBnd b
       let mut acc ← `(Oxide.FrameTy.nil)
       for e in es.reverse do
         match e with
@@ -346,53 +439,102 @@ partial def transFrm : TSyntax `oxide_frm → TransM Lean.Term
   | stx => Macro.throwErrorAt stx "ill-formed frame expression"
 end
 
-/-- Translate a place expression to its root variable and operations (innermost
-first). -/
-partial def transPlace : TSyntax `oxide_place → TransM (Ident × List Lean.Term)
-  | `(oxide_place| $x:ident) => pure (x, [])
+/-- A place expression: its root, the projections applied to the root, and the
+groups "dereference, then projections" (innermost first). -/
+partial def transPlace : TSyntax `oxide_place → TransM (Ident × List Nat × List (List Nat))
+  | `(oxide_place| $x:ident) => pure (x, [], [])
   | `(oxide_place| ( $p:oxide_place )) => transPlace p
   | `(oxide_place| * $p:oxide_place) => do
-      let (x, ops) ← transPlace p
-      pure (x, ops ++ [← `(Oxide.POp.deref)])
+      let (x, q, gs) ← transPlace p
+      pure (x, q, gs ++ [[]])
   | `(oxide_place| $p:oxide_place.$i:num) => do
-      let (x, ops) ← transPlace p
-      pure (x, ops ++ [← `(Oxide.POp.proj $i)])
+      let (x, q, gs) ← transPlace p
+      match gs.getLast? with
+      | none => pure (x, q ++ [i.getNat], gs)
+      | some g => pure (x, q, gs.dropLast ++ [g ++ [i.getNat]])
   | stx => Macro.throwErrorAt stx "ill-formed place expression"
 
-def mkPlace (p : TSyntax `oxide_place) : TransM Lean.Term := do
-  let (x, ops) ← transPlace p
-  `(({ root := $(← tvarIdx x), ops := [$(ops.toArray),*] } : Oxide.PlaceExpr _))
+/-- A list of natural numbers as a term. -/
+def mkNats (q : List Nat) : MacroM Lean.Term := do
+  let xs : Array Lean.Term := (q.map fun n => (quote n : Lean.Term)).toArray
+  `([$xs,*])
 
-def withVar {α : Type} (x : Name) (m : TransM α) : TransM α :=
-  withReader ((x, .var) :: ·) m
+/-- The place expression `p` as an `Oxide.PExpr`. -/
+def mkPlace (p : TSyntax `oxide_place) : TransM Lean.Term := do
+  let (x, q, gs) ← transPlace p
+  let mut acc ← `(Oxide.PExpr.place ⟨$(← tvarIdx x), $(← mkNats q)⟩)
+  for g in gs do
+    acc ← `(Oxide.PExpr.deref $acc $(← mkNats g))
+  pure acc
+
+/-- The place `p` (no dereference) as an `Oxide.TPlace`. -/
+def mkTPlace (p : TSyntax `oxide_place) : TransM Lean.Term := do
+  let (x, q, gs) ← transPlace p
+  unless gs.isEmpty do Macro.throwErrorAt p "cannot move out of a dereference"
+  `((⟨$(← tvarIdx x), $(← mkNats q)⟩ : Oxide.TPlace _))
+
+/-- Whether a place expression contains a dereference. -/
+def hasDeref (p : TSyntax `oxide_place) : TransM Bool := do
+  let (_, _, gs) ← transPlace p
+  pure !gs.isEmpty
+
+def withVar {α : Type} (x : Name) (m : TransM α) : TransM α := withBinders [(x, .var)] m
 
 /-- Push parameters `x₁, …, x_k` (`x₁` most recent). -/
 def withParams {α : Type} (xs : List Name) (m : TransM α) : TransM α :=
-  withReader (xs.map (·, .var) ++ ·) m
+  withBinders (xs.map (·, .var)) m
 
-def transParam : TSyntax `oxide_param → TransM (Name × Lean.Term)
-  | `(oxide_param| $x:ident : $t:oxide_ty) => do pure (x.getId, ← transTy t)
+def transParam : TSyntax `oxide_param → TransM (Name × TSyntax `oxide_ty)
+  | `(oxide_param| $x:ident : $t:oxide_ty) => pure (x.getId, t)
   | stx => Macro.throwErrorAt stx "ill-formed parameter"
 
-/-- Referent steps `.n`, `[n]`, `[n₁..n₂]`. -/
-def transRStep : TSyntax `oxide_rstep → MacroM Lean.Term
-  | `(oxide_rstep| . $i:num) => `(Oxide.RStep.proj $i)
-  | `(oxide_rstep| [ $i:num ]) => `(Oxide.RStep.idx $i)
-  | `(oxide_rstep| [ $i:num .. $j:num ]) => `(Oxide.RStep.slice $i $j)
+/-- Referent steps. -/
+inductive RStep' where
+  | proj (n : Nat)
+  | idx (n : Nat)
+  | slice (a b : Nat)
+
+def rstepOf : TSyntax `oxide_rstep → MacroM RStep'
+  | `(oxide_rstep| . $i:num) => pure (.proj i.getNat)
+  | `(oxide_rstep| [ $i:num ]) => pure (.idx i.getNat)
+  | `(oxide_rstep| [ $i:num .. $j:num ]) => pure (.slice i.getNat j.getNat)
   | stx => Macro.throwErrorAt stx "ill-formed referent step"
+
+/-- Build a referent from its root and its steps: leading projections form the
+place; each index starts a new group of projections; `[a..b]` is the slice of
+length `b - a` starting at `a`. -/
+def mkReferent (root : Lean.Term) (steps : List RStep') : MacroM Lean.Term := do
+  let leading := steps.takeWhile fun | .proj _ => true | _ => false
+  let rest := steps.drop leading.length
+  let path := leading.filterMap fun | .proj n => some n | _ => none
+  let mut acc ← `(Oxide.Referent.place ⟨$root, $(← mkNats path)⟩)
+  let mut pending : Option (Nat × List Nat) := none
+  for st in rest do
+    match st, pending with
+    | .proj n, some (i, q) => pending := some (i, q ++ [n])
+    | .proj _, none => Macro.throwUnsupported
+    | .idx i, p => do
+        if let some (j, q) := p then acc ← `(Oxide.Referent.index $acc $(quote j) $(← mkNats q))
+        pending := some (i, [])
+    | .slice a b, p => do
+        if let some (j, q) := p then acc ← `(Oxide.Referent.index $acc $(quote j) $(← mkNats q))
+        pending := none
+        acc ← `(Oxide.Referent.slice $acc $(quote a) $(quote (b - a)))
+  if let some (j, q) := pending then acc ← `(Oxide.Referent.index $acc $(quote j) $(← mkNats q))
+  pure acc
 
 /-- Runtime values. -/
 partial def transVal : TSyntax `oxide_val → TransM Lean.Term
-  | `(oxide_val| $n:num) => `(Oxide.Value.num $n)
+  | `(oxide_val| $n:num) => mkNum n
   | `(oxide_val| ( )) => `(Oxide.Value.unit)
   | `(oxide_val| $x:ident) => match x.getId with
       | `true => `(Oxide.Value.tt)
       | `false => `(Oxide.Value.ff)
-      | f => `(Oxide.Value.fn $(quote f.toString))
+      | _ => do `(Oxide.Value.fn $(← transGlobal x))
   | `(oxide_val| dead!) => `(Oxide.Value.dead)
   | `(oxide_val| ptr!( $x:ident $steps:oxide_rstep* )) => do
-      let steps ← steps.toList.mapM fun st => (transRStep st : MacroM Lean.Term)
-      `(Oxide.Value.ptr { root := $(← inIdx x .var "variable"), steps := [$(steps.toArray),*] })
+      let steps ← steps.toList.mapM fun st => (rstepOf st : MacroM RStep')
+      `(Oxide.Value.ptr $(← mkReferent (← inIdx x .var "variable") steps))
   | `(oxide_val| ( $v:oxide_val , )) => do `(Oxide.Value.tuple 1 $(← mkVec [← transVal v]))
   | `(oxide_val| ( $v:oxide_val, $vs:oxide_val,* )) => do
       let vs ← (v :: vs.getElems.toList).mapM transVal
@@ -409,18 +551,82 @@ partial def transVal : TSyntax `oxide_val → TransM Lean.Term
       `(Oxide.Value.inr $(← transTy t₁) $(← transTy t₂) $(← transVal v))
   | stx => Macro.throwErrorAt stx "ill-formed Oxide value"
 
+/-- Run a translation, returning its result and the identifiers of the binders it
+used, without recording them in the enclosing translation. -/
+def collectUsed {α : Type} (m : TransM α) : TransM (α × List Nat) := do
+  let saved := (← get).used
+  modify fun st => { st with used := [] }
+  let a ← m
+  let used := (← get).used
+  modify fun st => { st with used := saved }
+  pure (a, used)
+
+/-- The entry of an outer binder of a closure, in the enclosing scope. -/
+def mkEntry (s : Scope) (b : Bind) : TransM Lean.Term := do
+  let some n := posOf s b.id | Macro.throwUnsupported
+  use b
+  let i ← mkIn n
+  match b.sort with
+  | .rgn => `(($i : Oxide.In Oxide.Bnd.rgn _))
+  | .abs => `(Oxide.Region.abs $i)
+  | .tvar => `(Oxide.Ty.tvar $i)
+  | .fvar => `(Oxide.FrameExpr.var $i)
+  | _ => Macro.throwUnsupported
+
+mutual
+/-- Closures `|x₁ : τ₁, …| -> τ { e }`: the captured frame consists of the
+variables of the current frame that the body uses; the outer binders of the
+closure are the regions, type variables, abstract regions and frame variables
+that the body or the signature use. -/
+partial def transClosure (ps : List (Name × TSyntax `oxide_ty)) (r : TSyntax `oxide_ty)
+    (e : TSyntax `oxide) : TransM Lean.Term := do
+  let s ← read
+  let (_, used) ← collectUsed do
+    let _ ← ps.mapM fun p => transTy p.2
+    let _ ← transTy r
+    withParams (ps.map (·.1)) (transExpr e)
+  let top := s.takeWhile fun b => b.sort == .var || b.sort == .rgn
+  let fBinds := top.filter fun b => b.sort == .var && used.contains b.id
+  let oBinds := s.filter fun b =>
+    (b.sort == .rgn || b.sort == .abs || b.sort == .tvar || b.sort == .fvar) && used.contains b.id
+  -- captures and entries, in the enclosing scope
+  let mut cap ← `(Oxide.Cap.nil)
+  for b in fBinds.reverse do
+    cap ← `(Oxide.Cap.var $(← tvarOfId e s b.id) $cap)
+  for b in fBinds do use b
+  let mut inst ← `(Oxide.Inst.nil)
+  for b in oBinds.reverse do
+    inst ← `(Oxide.Inst.cons (b := $(← mkBnd b.sort)) $(← mkEntry s b) $inst)
+  let fShape ← fBinds.mapM fun b => mkBnd b.sort
+  let oShape ← oBinds.mapM fun b => mkBnd b.sort
+  -- the closure's own scope
+  let oScope := oBinds.map fun b => (b.name, b.sort)
+  let fScope := fBinds.map fun b => (b.name, b.sort)
+  let (tys, ret, body) ← withReader (fun _ => []) <| withBinders oScope do
+    let tys ← ps.mapM fun p => transTy p.2
+    let ret ← transTy r
+    let body ← withBinders (fScope ++ [(Name.anonymous, .frame)]) <|
+      withParams (ps.map (·.1)) (transExpr e)
+    pure (tys, ret, body)
+  `(Oxide.Term.closure [$(fShape.toArray),*] $cap [$(oShape.toArray),*] $inst
+      $(quote ps.length) $(← mkVec tys) $ret $body)
+
 partial def transExpr : TSyntax `oxide → TransM Lean.Term
-  | `(oxide| $n:num) => `(Oxide.Term.val (Oxide.Value.num $n))
+  | `(oxide| $n:num) => do `(Oxide.Term.val $(← mkNum n))
   | `(oxide| ( )) => `(Oxide.Term.val Oxide.Value.unit)
   | `(oxide| $p:oxide_place) => do
       match p with
       | `(oxide_place| $x:ident) =>
-          if (lookup (← read) x.getId (· == .var)).isSome then `(Oxide.Term.place $(← mkPlace p))
+          if (lookup (← read) x.getId (· == .var)).isSome then `(Oxide.Term.move $(← mkTPlace p))
           else match x.getId with
             | `true => `(Oxide.Term.val Oxide.Value.tt)
             | `false => `(Oxide.Term.val Oxide.Value.ff)
-            | f => `(Oxide.Term.val (Oxide.Value.fn $(quote f.toString)))
-      | _ => `(Oxide.Term.place $(← mkPlace p))
+            | _ => do `(Oxide.Term.val (Oxide.Value.fn $(← transGlobal x)))
+      | _ =>
+          if ← hasDeref p then `(Oxide.Term.copy $(← mkPlace p))
+          else `(Oxide.Term.move $(← mkTPlace p))
+  | `(oxide| copy!( $p:oxide_place )) => do `(Oxide.Term.copy $(← mkPlace p))
+  | `(oxide| move!( $p:oxide_place )) => do `(Oxide.Term.move $(← mkTPlace p))
   | `(oxide| & $r:oxide_rgn $o:ident $p:oxide_place) => do
       `(Oxide.Term.borrow $(← transConcRgn r) $(← transOwn o) $(← mkPlace p))
   | `(oxide| & $r:oxide_rgn $o:ident $p:oxide_place [ $e:oxide ]) => do
@@ -434,7 +640,7 @@ partial def transExpr : TSyntax `oxide → TransM Lean.Term
       `(Oxide.Term.assign $(← mkPlace p) $(← transExpr e))
   | `(oxide| letrgn < $r:oxide_rgn > { $e:oxide }) => do
       let x ← rgnName r
-      `(Oxide.Term.letrgn $(← withReader ((x, .rgn) :: ·) (transExpr e)))
+      `(Oxide.Term.letrgn $(← withBinders [(x, .rgn)] (transExpr e)))
   | `(oxide| let $x:ident : $t:oxide_ty = $e₁:oxide; $e₂:oxide) => do
       let t ← transTy t
       let e₁ ← transExpr e₁
@@ -443,15 +649,11 @@ partial def transExpr : TSyntax `oxide → TransM Lean.Term
   | `(oxide| $e₁:oxide; $e₂:oxide) => do
       `(Oxide.Term.seq $(← transExpr e₁) $(← transExpr e₂))
   | `(oxide| | $ps:oxide_param,* | -> $r:oxide_ty { $e:oxide }) => do
-      let ps ← ps.getElems.toList.mapM transParam
-      let r ← transTy r
-      let body ← withParams (ps.map (·.1)) (transExpr e)
-      `(Oxide.Term.closure $(quote ps.length) $(← mkVec (ps.map (·.2))) $r $body)
-  | `(oxide| || -> $r:oxide_ty { $e:oxide }) => do
-      `(Oxide.Term.closure 0 ![] $(← transTy r) $(← transExpr e))
+      transClosure (← ps.getElems.toList.mapM transParam) r e
+  | `(oxide| || -> $r:oxide_ty { $e:oxide }) => transClosure [] r e
   | `(oxide| $f:oxide($args:oxide,*)) => do
       let args ← args.getElems.toList.mapM transExpr
-      `(Oxide.Term.app $(← transExpr f) {} ![] ![] ![] $(quote args.length) $(← mkVec args))
+      `(Oxide.Term.app $(← transExpr f) {} Oxide.TArgs.none $(quote args.length) $(← mkVec args))
   | `(oxide| $f:oxide::<$gs:oxide_garg,*; $ts:oxide_ty,*>($args:oxide,*)) => do
       let mut Φs : List Lean.Term := []
       let mut rs : List Lean.Term := []
@@ -465,7 +667,7 @@ partial def transExpr : TSyntax `oxide → TransM Lean.Term
       `(Oxide.Term.app $(← transExpr f)
           ({ nφ := $(quote Φs.length), nϱ := $(quote rs.length), nα := $(quote ts.length) } :
             Oxide.Binders)
-          $(← mkVec Φs) $(← mkVec rs) $(← mkVec ts) $(quote args.length) $(← mkVec args))
+          ⟨$(← mkVec Φs), $(← mkVec rs), $(← mkVec ts)⟩ $(quote args.length) $(← mkVec args))
   | `(oxide| if $c:oxide { $e₁:oxide } else { $e₂:oxide }) => do
       `(Oxide.Term.ite $(← transExpr c) $(← transExpr e₁) $(← transExpr e₂))
   | `(oxide| ( $e:oxide , )) => do
@@ -491,8 +693,9 @@ partial def transExpr : TSyntax `oxide → TransM Lean.Term
   | `(oxide| { $e:oxide }) => transExpr e
   | `(oxide| val!( $v:oxide_val )) => do `(Oxide.Term.val $(← transVal v))
   | stx => Macro.throwErrorAt stx "ill-formed Oxide expression"
+end
 
-def transFn : TSyntax `oxide_fn → MacroM Lean.Term
+def transFn (globals : List Name) : TSyntax `oxide_fn → MacroM Lean.Term
   | `(oxide_fn| fn $f:ident $[< $bs:oxide_gbinder,* $[; $αs:ident,*]? >]? ( $ps:oxide_param,* )
         -> $r:oxide_ty $[where $[$b₁:oxide_rgn : $b₂:oxide_rgn],*]? { $e:oxide }) => do
       let (frms, rs) ← match bs with
@@ -501,28 +704,45 @@ def transFn : TSyntax `oxide_fn → MacroM Lean.Term
       let αs : List Name := match αs with
         | some (some αs) => αs.getElems.toList.map (·.getId)
         | _ => []
-      let s : Scope := binderScope frms rs αs
-      let ps ← (ps.getElems.toList.mapM transParam).run s
-      let r ← (transTy r).run s
-      let body ← (withParams (ps.map (·.1)) (transExpr e)).run ((Name.anonymous, .frame) :: s)
-      `(({ name := $(quote f.getId.toString), binders := $(← mkBinders frms rs αs),
-           k := $(quote ps.length), params := $(← mkVec (ps.map (·.2))), ret := $r,
-           bounds := $(← mkBounds rs b₁ b₂), body := $body } : Oxide.FnDef))
+      let (ps, r, body) ← TransM.run' (globals := globals) <| withBinders (binderScope frms rs αs) do
+        let ps ← ps.getElems.toList.mapM transParam
+        let tys ← ps.mapM fun p => transTy p.2
+        let r ← transTy r
+        let body ← withBinders [(Name.anonymous, .frame)] <| withParams (ps.map (·.1)) (transExpr e)
+        pure (ps.map (·.1) |>.zip tys, r, body)
+      let bs ← mkBinders frms rs αs
+      let ps' ← mkVec (ps.map (·.2))
+      let bds ← mkBounds rs b₁ b₂
+      `((Oxide.FnDef.mk (Oxide.FnSig.mk $(quote f.getId.toString) $bs $(quote ps.length) $ps' $r
+          $bds) $body : Oxide.FnDef _))
   | stx => Macro.throwErrorAt stx "ill-formed Oxide function definition"
 
 end Oxide.Notation
 
-/-- `[OXIDE| e ]`: the closed Oxide expression `e` as a scoped term `Oxide.Term []`. -/
+/-- `[OXIDE| e ]`: the closed Oxide expression `e` as a scoped term `Oxide.Term sig []`
+(no global functions). -/
 macro "[OXIDE| " e:oxide " ]" : term => do
-  let t ← (Oxide.Notation.transExpr e).run []
-  `(($t : Oxide.Term []))
+  let t ← (Oxide.Notation.transExpr e).run' []
+  `(($t : Oxide.Term _ []))
+
+/-- `[OXIDE{f, g, …}| e ]`: the closed Oxide expression `e`, whose global
+functions are `f, g, …` (in this order in the signature). -/
+macro "[OXIDE{" gs:ident,* "}| " e:oxide " ]" : term => do
+  let t ← (Oxide.Notation.transExpr e).run' (gs.getElems.toList.map (·.getId))
+  `(($t : Oxide.Term _ []))
 
 /-- `[OXIDE_TY| τ ]`: a closed Oxide type `Oxide.Ty []`. -/
 macro "[OXIDE_TY| " t:oxide_ty " ]" : term => do
-  let t ← (Oxide.Notation.transTy t).run []
+  let t ← (Oxide.Notation.transTy t).run' []
   `(($t : Oxide.Ty []))
 
-/-- `[OXIDE_FN| fn f<…>(…) -> τ { e } ]`: a global function definition. -/
-macro "[OXIDE_FN| " d:oxide_fn " ]" : term => Oxide.Notation.transFn d
+/-- `[OXIDE_FN| fn f<…>(…) -> τ { e } ]`: a global function definition (calling no
+global function). -/
+macro "[OXIDE_FN| " d:oxide_fn " ]" : term => Oxide.Notation.transFn [] d
+
+/-- `[OXIDE_FN{f, g, …}| fn f<…>(…) -> τ { e } ]`: a global function definition
+whose body may call the global functions `f, g, …`. -/
+macro "[OXIDE_FN{" gs:ident,* "}| " d:oxide_fn " ]" : term =>
+  Oxide.Notation.transFn (gs.getElems.toList.map (·.getId)) d
 
 end

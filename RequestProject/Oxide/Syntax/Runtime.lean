@@ -27,74 +27,98 @@ around the expression in focus, including the bindings and frames to pop.
 namespace Oxide
 
 /-- `Slots Γ S`: the contents of stack slots of shape `S`, all values living in
-scope `Γ`.  Only `.var`, `.rgn` and `.frame` entries exist at runtime (a stack
-never contains unsubstituted type-level binders). -/
-inductive Slots (Γ : Ctx) : Ctx → Type where
-  | nil : Slots Γ []
-  | var {S : Ctx} (v : Value Γ) (σ : Slots Γ S) : Slots Γ (.var :: S)
-  | rgn {S : Ctx} (σ : Slots Γ S) : Slots Γ (.rgn :: S)
-  | frame {S : Ctx} (σ : Slots Γ S) : Slots Γ (.frame :: S)
+scope `Γ`.  Only `.var`, `.rgn` and `.frame` entries exist at runtime: there is no
+case for type-level binders, so a stack over a scope containing one is empty
+(`Slots.runtime`). -/
+inductive Slots (sig : Sig) (Γ : Ctx) : Ctx → Type where
+  | nil : Slots sig Γ []
+  | var {S : Ctx} (v : Value sig Γ) (σ : Slots sig Γ S) : Slots sig Γ (.var :: S)
+  | rgn {S : Ctx} (σ : Slots sig Γ S) : Slots sig Γ (.rgn :: S)
+  | frame {S : Ctx} (σ : Slots sig Γ S) : Slots sig Γ (.frame :: S)
 
 /-- Stacks `σ`. -/
-abbrev Stack (S : Ctx) := Slots S S
+abbrev Stack (sig : Sig) (S : Ctx) := Slots sig S S
+
+/-- Stacks only exist over runtime scopes (variables, concrete regions and frame
+boundaries). -/
+theorem Slots.runtime {sig : Sig} {Γ : Ctx} : {S : Ctx} → Slots sig Γ S → S.Runtime
+  | _, .nil => fun _ h => nomatch h
+  | _, .var _ σ => fun b h => by
+      rcases List.mem_cons.mp h with rfl | h
+      · trivial
+      · exact σ.runtime b h
+  | _, .rgn σ => fun b h => by
+      rcases List.mem_cons.mp h with rfl | h
+      · trivial
+      · exact σ.runtime b h
+  | _, .frame σ => fun b h => by
+      rcases List.mem_cons.mp h with rfl | h
+      · trivial
+      · exact σ.runtime b h
 
 /-- Continuations (the paper's evaluation contexts, made explicit, together with
-the pending pops of `shift`, `shiftprov` and `framed`). -/
-inductive Cont : Ctx → Type where
+the pending pops of `shift`, `shiftprov` and `framed`).  The partially evaluated
+components of a call, a tuple or an array are vectors: `i` values done, the hole,
+and `j` expressions left, for an arity `i + 1 + j`. -/
+inductive Cont (sig : Sig) : Ctx → Type where
   /-- the end of the program -/
-  | halt {S : Ctx} : Cont S
+  | halt {S : Ctx} : Cont sig S
   /-- `&r ω p[□]` -/
-  | borrowIdx {S : Ctx} (r : In .rgn S) (ω : Own) (p : PlaceExpr S) (κ : Cont S) : Cont S
+  | borrowIdx {S : Ctx} (r : In .rgn S) (ω : Own) (p : PExpr S) (κ : Cont sig S) : Cont sig S
   /-- `&r ω p[□..e₂]` -/
-  | borrowSlice₁ {S : Ctx} (r : In .rgn S) (ω : Own) (p : PlaceExpr S) (e₂ : Term S) (κ : Cont S) :
-      Cont S
+  | borrowSlice₁ {S : Ctx} (r : In .rgn S) (ω : Own) (p : PExpr S) (e₂ : Term sig S)
+      (κ : Cont sig S) : Cont sig S
   /-- `&r ω p[v..□]` -/
-  | borrowSlice₂ {S : Ctx} (r : In .rgn S) (ω : Own) (p : PlaceExpr S) (v : Value S) (κ : Cont S) :
-      Cont S
+  | borrowSlice₂ {S : Ctx} (r : In .rgn S) (ω : Own) (p : PExpr S) (v : Value sig S)
+      (κ : Cont sig S) : Cont sig S
   /-- `p[□]` -/
-  | index {S : Ctx} (p : PlaceExpr S) (κ : Cont S) : Cont S
+  | index {S : Ctx} (p : PExpr S) (κ : Cont sig S) : Cont sig S
   /-- `p := □` -/
-  | assign {S : Ctx} (p : PlaceExpr S) (κ : Cont S) : Cont S
+  | assign {S : Ctx} (p : PExpr S) (κ : Cont sig S) : Cont sig S
   /-- `let x : τ = □; e₂` -/
-  | letE {S : Ctx} (τ : Ty S) (e₂ : Term (.var :: S)) (κ : Cont S) : Cont S
+  | letE {S : Ctx} (τ : Ty S) (e₂ : Term sig (.var :: S)) (κ : Cont sig S) : Cont sig S
   /-- `□; e₂` -/
-  | seq {S : Ctx} (e₂ : Term S) (κ : Cont S) : Cont S
+  | seq {S : Ctx} (e₂ : Term sig S) (κ : Cont sig S) : Cont sig S
   /-- `□::<Φ̄, ρ̄, τ̄>(e₁, …, e_k)` -/
-  | appFn {S : Ctx} (b : Binders) (Φs : Fin b.nφ → FrameExpr S) (ρs : Fin b.nϱ → Region S)
-      (τs : Fin b.nα → Ty S) (k : Nat) (args : Fin k → Term S) (κ : Cont S) : Cont S
-  /-- `v_f::<Φ̄, ρ̄, τ̄>(v₁, …, vᵢ, □, eᵢ₊₂, …)` -/
-  | appArg {S : Ctx} (f : Value S) (b : Binders) (Φs : Fin b.nφ → FrameExpr S)
-      (ρs : Fin b.nϱ → Region S) (τs : Fin b.nα → Ty S) (done : List (Value S))
-      (rest : List (Term S)) (κ : Cont S) : Cont S
+  | appFn {S : Ctx} (b : Binders) (θ : TArgs b S) (k : Nat) (args : Fin k → Term sig S)
+      (κ : Cont sig S) : Cont sig S
+  /-- `v_f::<Φ̄, ρ̄, τ̄>(v₁, …, vᵢ, □, e₁, …, e_j)` -/
+  | appArg {S : Ctx} (f : Value sig S) (b : Binders) (θ : TArgs b S) (i j : Nat)
+      (done : Fin i → Value sig S) (rest : Fin j → Term sig S) (κ : Cont sig S) : Cont sig S
   /-- `if □ { e₂ } else { e₃ }` -/
-  | ite {S : Ctx} (e₂ e₃ : Term S) (κ : Cont S) : Cont S
+  | ite {S : Ctx} (e₂ e₃ : Term sig S) (κ : Cont sig S) : Cont sig S
   /-- `for x in □ { e₂ }` -/
-  | forE {S : Ctx} (e₂ : Term (.var :: S)) (κ : Cont S) : Cont S
-  /-- `(v₁, …, vᵢ, □, eᵢ₊₂, …)` -/
-  | tuple {S : Ctx} (done : List (Value S)) (rest : List (Term S)) (κ : Cont S) : Cont S
-  /-- `[v₁, …, vᵢ, □, eᵢ₊₂, …]` -/
-  | array {S : Ctx} (done : List (Value S)) (rest : List (Term S)) (κ : Cont S) : Cont S
+  | forE {S : Ctx} (e₂ : Term sig (.var :: S)) (κ : Cont sig S) : Cont sig S
+  /-- `(v₁, …, vᵢ, □, e₁, …, e_j)` -/
+  | tuple {S : Ctx} (i j : Nat) (done : Fin i → Value sig S) (rest : Fin j → Term sig S)
+      (κ : Cont sig S) : Cont sig S
+  /-- `[v₁, …, vᵢ, □, e₁, …, e_j]` -/
+  | array {S : Ctx} (i j : Nat) (done : Fin i → Value sig S) (rest : Fin j → Term sig S)
+      (κ : Cont sig S) : Cont sig S
   /-- `Left::<τ₁, τ₂>(□)` -/
-  | inl {S : Ctx} (τ₁ τ₂ : Ty S) (κ : Cont S) : Cont S
+  | inl {S : Ctx} (τ₁ τ₂ : Ty S) (κ : Cont sig S) : Cont sig S
   /-- `Right::<τ₁, τ₂>(□)` -/
-  | inr {S : Ctx} (τ₁ τ₂ : Ty S) (κ : Cont S) : Cont S
+  | inr {S : Ctx} (τ₁ τ₂ : Ty S) (κ : Cont sig S) : Cont sig S
   /-- `match □ { Left(x) => e₁, Right(y) => e₂ }` -/
-  | matchE {S : Ctx} (e₁ e₂ : Term (.var :: S)) (κ : Cont S) : Cont S
+  | matchE {S : Ctx} (e₁ e₂ : Term sig (.var :: S)) (κ : Cont sig S) : Cont sig S
   /-- `shift □`: pop the most recent variable -/
-  | popVar {S : Ctx} (κ : Cont S) : Cont (.var :: S)
+  | popVar {S : Ctx} (κ : Cont sig S) : Cont sig (.var :: S)
   /-- `shiftprov □`: pop the most recent region -/
-  | popRgn {S : Ctx} (κ : Cont S) : Cont (.rgn :: S)
+  | popRgn {S : Ctx} (κ : Cont sig S) : Cont sig (.rgn :: S)
   /-- `framed □`: pop a frame of shape `f` holding `k` parameters on top -/
-  | popFrame {S : Ctx} (k : Nat) (f : Ctx) (κ : Cont S) : Cont (vars k ++ (f ++ .frame :: S))
+  | popFrame {S : Ctx} (k : Nat) (f : Ctx) (κ : Cont sig S) : Cont sig (vars k ++ (f ++ .frame :: S))
 
 /-- Configurations `(σ; e)` of the abstract machine, with their continuation. -/
-structure Config where
+structure Config (sig : Sig) where
   S : Ctx
-  stack : Stack S
-  focus : Term S
-  cont : Cont S
+  stack : Stack sig S
+  focus : Term sig S
+  cont : Cont sig S
+
+/-- The scope of a configuration is a runtime scope. -/
+theorem Config.runtime {sig : Sig} (c : Config sig) : c.S.Runtime := c.stack.runtime
 
 /-- The initial configuration of a closed program. -/
-def Config.init (e : Program) : Config := ⟨[], .nil, e, .halt⟩
+def Config.init {sig : Sig} (e : Program sig) : Config sig := ⟨[], .nil, e, .halt⟩
 
 end Oxide

@@ -3,76 +3,31 @@ module
 public import RequestProject.Oxide.Syntax.Terms
 
 /-!
-# Oxide metafunctions, part 1: substitution of type-level binders
+# Oxide metafunctions, part 1: substitution in terms and values
 
 The instantiation `δ = [Φ̄/φ̄][ρ̄/ϱ̄][τ̄/ᾱ]` of a polymorphic signature (used by
-`T-AppFunction` and `E-AppFunction`).  A substitution `TSub Γ Δ` maps the frame
-variables, abstract regions and type variables of `Γ` to frame expressions,
-regions and types in scope `Δ`, and renames the variables and concrete regions.
-Substitutions on terms (`Sub`) also rename top-frame term variables.
+`T-AppFunction` and `E-AppFunction`) on terms and values.  Substitutions on terms
+(`Sub`) also rename top-frame term variables.  The type-level part (`TSub`,
+`Ty.subst`, `TArgs`, `Inst`) is in `Syntax/TypeSubst.lean`.
+
+A closure, term or value, is written in its own scope: substituting into it only
+substitutes into its captures and into the entries `θ : Inst o Γ` of its outer
+binders, never into its body.  The body is *opened* (`Term.openBody`) when the
+closure is called, by the substitution `θ.toTSub`, and a global function body by
+the substitution of its type arguments.
 -/
 
 @[expose] public section
 
 namespace Oxide
 
-/-- Type-level substitutions. -/
-structure TSub (Γ Δ : Ctx) where
-  fvar : In .fvar Γ → FrameExpr Δ
-  abs : In .abs Γ → Region Δ
-  tvar : In .tvar Γ → Ty Δ
-  var : In .var Γ → In .var Δ
-  rgn : In .rgn Γ → In .rgn Δ
-
 /-- Substitutions on terms. -/
 structure Sub (Γ Δ : Ctx) extends TSub Γ Δ where
   tv : TVar Γ → TVar Δ
 
-namespace TSub
-
-/-- The identity substitution. -/
-def id (Γ : Ctx) : TSub Γ Γ := ⟨.var, .abs, .tvar, fun i => i, fun i => i⟩
-
-/-- The substitution induced by a renaming. -/
-def ofRen {Γ Δ : Ctx} (ρ : TRen Γ Δ) : TSub Γ Δ :=
-  ⟨fun i => .var (ρ.ren i), fun i => .abs (ρ.ren i), fun i => .tvar (ρ.ren i), ρ.ren, ρ.ren⟩
-
-/-- Lift a substitution under one binder. -/
-def lift {Γ Δ : Ctx} (σ : TSub Γ Δ) (c : Bnd) : TSub (c :: Γ) (c :: Δ) where
-  fvar := fun
-    | .here => .var .here
-    | .there i => (σ.fvar i).rename (TRen.wk Δ c)
-  abs := fun
-    | .here => .abs .here
-    | .there i => (σ.abs i).rename (TRen.wk Δ c)
-  tvar := fun
-    | .here => .tvar .here
-    | .there i => (σ.tvar i).rename (TRen.wk Δ c)
-  var := fun
-    | .here => .here
-    | .there i => .there (σ.var i)
-  rgn := fun
-    | .here => .here
-    | .there i => .there (σ.rgn i)
-
-/-- Lift a substitution under a list of binders. -/
-def liftN {Γ Δ : Ctx} (σ : TSub Γ Δ) : (cs : Ctx) → TSub (cs ++ Γ) (cs ++ Δ)
-  | [] => σ
-  | c :: cs => (σ.liftN cs).lift c
-
 /-- Enter a new frame. -/
-def enterFrame {Γ Δ : Ctx} (σ : TSub Γ Δ) : Sub (.frame :: Γ) (.frame :: Δ) :=
+def TSub.enterFrame {Γ Δ : Ctx} (σ : TSub Γ Δ) : Sub (.frame :: Γ) (.frame :: Δ) :=
   { σ.lift .frame with tv := fun i => nomatch i }
-
-/-- Combine a substitution for a prefix `cs` with one for the rest of the scope. -/
-def append {cs Γ Δ : Ctx} (σ₁ : TSub cs Δ) (σ₂ : TSub Γ Δ) : TSub (cs ++ Γ) Δ where
-  fvar i := match In.split cs i with | .inl j => σ₁.fvar j | .inr j => σ₂.fvar j
-  abs i := match In.split cs i with | .inl j => σ₁.abs j | .inr j => σ₂.abs j
-  tvar i := match In.split cs i with | .inl j => σ₁.tvar j | .inr j => σ₂.tvar j
-  var i := match In.split cs i with | .inl j => σ₁.var j | .inr j => σ₂.var j
-  rgn i := match In.split cs i with | .inl j => σ₁.rgn j | .inr j => σ₂.rgn j
-
-end TSub
 
 namespace Sub
 
@@ -87,103 +42,50 @@ def liftN {Γ Δ : Ctx} (σ : Sub Γ Δ) : (cs : Ctx) → Sub (cs ++ Γ) (cs ++ 
 
 end Sub
 
-/-- An index of sort `b` into a block of binders of another sort does not exist. -/
-def In.skipRep {b c : Bnd} (h : b ≠ c) {k : Nat} {Γ : Ctx} (i : In b (List.replicate k c ++ Γ)) :
-    In b Γ :=
-  match In.split (List.replicate k c) i with
-  | .inl j => absurd (In.sort_of_replicate j) h
-  | .inr j => j
-
-/-- The position of an index into a block of binders of its own sort, or an index
-into the rest of the scope. -/
-def In.splitRep {b : Bnd} {k : Nat} {Γ : Ctx} (i : In b (List.replicate k b ++ Γ)) :
-    Fin k ⊕ In b Γ :=
-  (In.split (List.replicate k b) i).map In.toFin id
-
-/-- The substitution `[Φ̄/φ̄][ρ̄/ϱ̄][τ̄/ᾱ]` of the binders of a signature (there
-are no variables or concrete regions among them). -/
-def TSub.binders {Δ : Ctx} (b : Binders) (Φs : Fin b.nφ → FrameExpr Δ)
-    (ρs : Fin b.nϱ → Region Δ) (τs : Fin b.nα → Ty Δ) : TSub b.ctx Δ where
-  fvar i :=
-    let j := (In.skipRep (by decide) (In.skipRep (by decide) i) : In .fvar (List.replicate b.nφ .fvar))
-    Φs (In.toFin j)
-  abs i :=
-    match In.splitRep (In.skipRep (by decide) i : In .abs (List.replicate b.nϱ .abs ++ _)) with
-    | .inl j => ρs j
-    | .inr j => absurd (In.sort_of_replicate j) (by decide)
-  tvar i :=
-    match In.splitRep (i : In .tvar (List.replicate b.nα .tvar ++ _)) with
-    | .inl j => τs j
-    | .inr j => absurd (In.sort_of_replicate (In.skipRep (c := .abs) (by decide) j)) (by decide)
-  var i := absurd (In.sort_of_replicate (In.skipRep (c := .abs) (by decide)
-      (In.skipRep (c := .tvar) (by decide) i))) (by decide)
-  rgn i := absurd (In.sort_of_replicate (In.skipRep (c := .abs) (by decide)
-      (In.skipRep (c := .tvar) (by decide) i))) (by decide)
-
-/-- The instantiation of the binders of a function type at the scope `Γ` of the
-function type itself. -/
-def TSub.inst {Γ : Ctx} (b : Binders) (Φs : Fin b.nφ → FrameExpr Γ) (ρs : Fin b.nϱ → Region Γ)
-    (τs : Fin b.nα → Ty Γ) : TSub (b.ctx ++ Γ) Γ :=
-  (TSub.binders b Φs ρs τs).append (TSub.id Γ)
-
-/-- Embed a closed signature (in scope `b.ctx`) into any scope. -/
-def TRen.inlL (cs Γ : Ctx) : TRen cs (cs ++ Γ) := ⟨In.inlL⟩
+/-- The substitution opening a body written in the scope
+`vars k ++ (f ++ ‡ :: o)` (parameters, a frame of shape `f`, outer binders `o`)
+for a call in scope `S`, the outer binders standing for `σ`. -/
+def TSub.openBody {o S : Ctx} (σ : TSub o S) (k : Nat) (f : Ctx) :
+    Sub (vars k ++ (f ++ .frame :: o)) (vars k ++ (f ++ .frame :: S)) :=
+  (σ.enterFrame.liftN f).liftN (vars k)
 
 /-! ## Applying substitutions -/
 
-def Region.subst {Γ Δ : Ctx} (σ : TSub Γ Δ) : Region Γ → Region Δ
-  | .abs i => σ.abs i
-  | .conc r => .conc (σ.rgn r)
+def TPlace.subst {Γ Δ : Ctx} (σ : Sub Γ Δ) (π : TPlace Γ) : TPlace Δ := ⟨σ.tv π.root, π.path⟩
 
-def Loan.subst {Γ Δ : Ctx} (σ : TSub Γ Δ) (l : Loan Γ) : Loan Δ :=
-  ⟨l.own, ⟨σ.var l.pe.root, l.pe.ops⟩⟩
+def PExpr.subst {Γ Δ : Ctx} (σ : Sub Γ Δ) : PExpr Γ → PExpr Δ
+  | .place π => .place (π.subst σ)
+  | .deref p q => .deref (p.subst σ) q
 
-mutual
-def Ty.subst {Γ Δ : Ctx} (σ : TSub Γ Δ) : Ty Γ → Ty Δ
-  | .base b => .base b
-  | .tvar α => σ.tvar α
-  | .ref r ω τ => .ref (r.subst σ) ω (τ.subst σ)
-  | .array τ n => .array (τ.subst σ) n
-  | .tuple k τs => .tuple k fun i => (τs i).subst σ
-  | .sum τ₁ τ₂ => .sum (τ₁.subst σ) (τ₂.subst σ)
-  | .fn b k ps ret env bs =>
-      .fn b k (fun i => (ps i).subst (σ.liftN b.ctx)) (ret.subst (σ.liftN b.ctx))
-        (env.subst (σ.liftN b.ctx)) bs
-def XTy.subst {Γ Δ : Ctx} (σ : TSub Γ Δ) : XTy Γ → XTy Δ
-  | .sized τ => .sized (τ.subst σ)
-  | .slice τ => .slice (τ.subst σ)
-def FrameExpr.subst {Γ Δ : Ctx} (σ : TSub Γ Δ) : FrameExpr Γ → FrameExpr Δ
-  | .var φ => σ.fvar φ
-  | .frame f Φ => .frame f (Φ.subst ((σ.lift .frame).liftN f))
-def FrameTy.subst {Γ Δ : Ctx} (σ : TSub Γ Δ) : {f : Ctx} → FrameTy Γ f → FrameTy Δ f
+def APlace.subst {Γ Δ : Ctx} (σ : TSub Γ Δ) (π : APlace Γ) : APlace Δ := ⟨σ.var π.root, π.path⟩
+
+def Referent.subst {Γ Δ : Ctx} (σ : TSub Γ Δ) : Referent Γ → Referent Δ
+  | .place π => .place (π.subst σ)
+  | .index R i q => .index (R.subst σ) i q
+  | .slice R a l => .slice (R.subst σ) a l
+
+def Cap.subst {Γ Δ : Ctx} (σ : Sub Γ Δ) : {f : Ctx} → Cap Γ f → Cap Δ f
   | _, .nil => .nil
-  | _, .var τ Φ => .var (τ.subst σ) (Φ.subst σ)
-  | _, .rgn L Φ => .rgn (L.map (Loan.subst σ)) (Φ.subst σ)
-end
+  | _, .var x c => .var (σ.tv x) (c.subst σ)
+  | _, .rgn r c => .rgn (σ.rgn r) (c.subst σ)
 
-def MTy.subst {Γ Δ : Ctx} (σ : TSub Γ Δ) : MTy Γ → MTy Δ
-  | .init τ => .init (τ.subst σ)
-  | .dead τ => .dead (τ.subst σ)
-  | .tuple k τs => .tuple k fun i => (τs i).subst σ
+variable {sig : Sig}
 
 mutual
-def Term.subst {Γ Δ : Ctx} (σ : Sub Γ Δ) : Term Γ → Term Δ
+def Term.subst {Γ Δ : Ctx} (σ : Sub Γ Δ) : Term sig Γ → Term sig Δ
   | .val v => .val (v.subst σ.toTSub)
-  | .place p => .place ⟨σ.tv p.root, p.ops⟩
-  | .borrow r ω p => .borrow (σ.rgn r) ω ⟨σ.tv p.root, p.ops⟩
-  | .borrowIdx r ω p e => .borrowIdx (σ.rgn r) ω ⟨σ.tv p.root, p.ops⟩ (e.subst σ)
-  | .borrowSlice r ω p e₁ e₂ =>
-      .borrowSlice (σ.rgn r) ω ⟨σ.tv p.root, p.ops⟩ (e₁.subst σ) (e₂.subst σ)
-  | .index p e => .index ⟨σ.tv p.root, p.ops⟩ (e.subst σ)
-  | .assign p e => .assign ⟨σ.tv p.root, p.ops⟩ (e.subst σ)
+  | .move π => .move (π.subst σ)
+  | .copy p => .copy (p.subst σ)
+  | .borrow r ω p => .borrow (σ.rgn r) ω (p.subst σ)
+  | .borrowIdx r ω p e => .borrowIdx (σ.rgn r) ω (p.subst σ) (e.subst σ)
+  | .borrowSlice r ω p e₁ e₂ => .borrowSlice (σ.rgn r) ω (p.subst σ) (e₁.subst σ) (e₂.subst σ)
+  | .index p e => .index (p.subst σ) (e.subst σ)
+  | .assign p e => .assign (p.subst σ) (e.subst σ)
   | .letrgn e => .letrgn (e.subst (σ.lift .rgn))
   | .letE τ e₁ e₂ => .letE (τ.subst σ.toTSub) (e₁.subst σ) (e₂.subst (σ.lift .var))
   | .seq e₁ e₂ => .seq (e₁.subst σ) (e₂.subst σ)
-  | .closure k ps r body =>
-      .closure k (fun i => (ps i).subst σ.toTSub) (r.subst σ.toTSub) (body.subst (σ.liftN (vars k)))
-  | .app f b Φs ρs τs k args =>
-      .app (f.subst σ) b (fun i => (Φs i).subst σ.toTSub) (fun i => (ρs i).subst σ.toTSub)
-        (fun i => (τs i).subst σ.toTSub) k (fun i => (args i).subst σ)
+  | .closure f c o θ k ps r body => .closure f (c.subst σ) o (θ.subst σ.toTSub) k ps r body
+  | .app f b θ k args => .app (f.subst σ) b (θ.subst σ.toTSub) k (fun i => (args i).subst σ)
   | .ite e₁ e₂ e₃ => .ite (e₁.subst σ) (e₂.subst σ) (e₃.subst σ)
   | .tuple k es => .tuple k fun i => (es i).subst σ
   | .array k es => .array k fun i => (es i).subst σ
@@ -193,50 +95,40 @@ def Term.subst {Γ Δ : Ctx} (σ : Sub Γ Δ) : Term Γ → Term Δ
   | .inl τ₁ τ₂ e => .inl (τ₁.subst σ.toTSub) (τ₂.subst σ.toTSub) (e.subst σ)
   | .inr τ₁ τ₂ e => .inr (τ₁.subst σ.toTSub) (τ₂.subst σ.toTSub) (e.subst σ)
   | .matchE e e₁ e₂ => .matchE (e.subst σ) (e₁.subst (σ.lift .var)) (e₂.subst (σ.lift .var))
-def Value.subst {Γ Δ : Ctx} (σ : TSub Γ Δ) : Value Γ → Value Δ
+def Value.subst {Γ Δ : Ctx} (σ : TSub Γ Δ) : Value sig Γ → Value sig Δ
   | .prim c => .prim c
   | .fn f => .fn f
   | .dead => .dead
   | .tuple k vs => .tuple k fun i => (vs i).subst σ
   | .array k vs => .array k fun i => (vs i).subst σ
   | .slice k vs => .slice k fun i => (vs i).subst σ
-  | .ptr R => .ptr ⟨σ.var R.root, R.steps⟩
-  | .closure f env k ps r body =>
-      .closure f (env.subst σ) k (fun i => (ps i).subst σ) (r.subst σ)
-        (body.subst ((σ.enterFrame.liftN f).liftN (vars k)))
+  | .ptr R => .ptr (R.subst σ)
+  | .closure f env o θ k ps r body => .closure f (env.subst σ) o (θ.subst σ) k ps r body
   | .inl τ₁ τ₂ v => .inl (τ₁.subst σ) (τ₂.subst σ) (v.subst σ)
   | .inr τ₁ τ₂ v => .inr (τ₁.subst σ) (τ₂.subst σ) (v.subst σ)
-def Env.subst {Γ Δ : Ctx} (σ : TSub Γ Δ) : {f : Ctx} → Env Γ f → Env Δ f
+def Env.subst {Γ Δ : Ctx} (σ : TSub Γ Δ) : {f : Ctx} → Env sig Γ f → Env sig Δ f
   | _, .nil => .nil
   | _, .var v ε => .var (v.subst σ) (ε.subst σ)
   | _, .rgn ε => .rgn (ε.subst σ)
 end
 
-/-! ## Instantiating signatures -/
+/-! ## Opening bodies -/
 
-/-- Instantiate a type in the scope of a function type's binders. -/
-def Ty.inst {Γ : Ctx} (b : Binders) (Φs : Fin b.nφ → FrameExpr Γ) (ρs : Fin b.nϱ → Region Γ)
-    (τs : Fin b.nα → Ty Γ) (τ : Ty (b.ctx ++ Γ)) : Ty Γ :=
-  τ.subst (TSub.inst b Φs ρs τs)
+/-- Open a body written in the scope `vars k ++ (f ++ ‡ :: o)` for a call in scope
+`S`, the outer binders standing for `σ`. -/
+def Term.openBody {o S : Ctx} (σ : TSub o S) {k : Nat} {f : Ctx}
+    (body : Term sig (vars k ++ (f ++ .frame :: o))) : Term sig (vars k ++ (f ++ .frame :: S)) :=
+  body.subst (σ.openBody k f)
 
-/-- Instantiate a region in the scope of a function type's binders. -/
-def Region.inst {Γ : Ctx} (b : Binders) (Φs : Fin b.nφ → FrameExpr Γ) (ρs : Fin b.nϱ → Region Γ)
-    (τs : Fin b.nα → Ty Γ) (ρ : Region (b.ctx ++ Γ)) : Region Γ :=
-  ρ.subst (TSub.inst b Φs ρs τs)
-
-/-- The abstract region bound as the `i`-th region binder of a signature. -/
-def Binders.absAt {Γ : Ctx} (b : Binders) (i : Fin b.nϱ) : Region (b.ctx ++ Γ) :=
-  .abs (b.absIdx i)
-
-/-- The type of a global function (in any scope). -/
-def FnDef.ty {Γ : Ctx} (d : FnDef) : Ty Γ :=
-  .fn d.binders d.k (fun i => (d.params i).rename (TRen.inlL _ Γ))
-    ((d.ret).rename (TRen.inlL _ Γ)) .empty d.bounds
+/-- The type of a closure with captured frame `Φ`, whose parameter and return
+types `ps`, `ret` are written in its own scope `o`, with entries `θ`. -/
+def Inst.closureTy {o Γ : Ctx} (θ : Inst o Γ) {k : Nat} (ps : Fin k → Ty o) (ret : Ty o)
+    (Φ : FrameExpr Γ) : Ty Γ :=
+  Ty.closure k (fun i => (ps i).subst θ.toTSub) (ret.subst θ.toTSub) Φ
 
 /-- The body of a global function instantiated at a call in scope `Γ`. -/
-def FnDef.instBody {Γ : Ctx} (d : FnDef) (Φs : Fin d.binders.nφ → FrameExpr Γ)
-    (ρs : Fin d.binders.nϱ → Region Γ) (τs : Fin d.binders.nα → Ty Γ) :
-    Term (vars d.k ++ .frame :: Γ) :=
-  d.body.subst (((TSub.binders d.binders Φs ρs τs).enterFrame).liftN (vars d.k))
+def GlobalEnv.instBody (G : GlobalEnv sig) {Γ : Ctx} (f : FnIdx sig) (θ : TArgs f.get.binders Γ) :
+    Term sig (vars f.get.k ++ ([] ++ .frame :: Γ)) :=
+  (G.body f).openBody θ.toTSub
 
 end Oxide

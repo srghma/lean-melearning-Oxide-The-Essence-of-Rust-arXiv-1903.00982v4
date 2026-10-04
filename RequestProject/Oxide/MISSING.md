@@ -13,13 +13,15 @@ ported: the progress proof and the supporting lemmas of `proofs.tex`.
 | --- | --- |
 | Canonical forms | proved (`canonical_forms`) |
 | Type safety from progress and preservation | proved (`type_safety_of_progress_preservation`) |
-| Progress (as stated, for the machine) | **refuted** (`not_progress`): a closure value whose body mentions a region that its type does not mention blocks the pop of that region |
-| Preservation (as stated) | **refuted** (`not_preservation`) |
-| Type safety (as stated) | **refuted**, twice: `not_type_safety` (`E-Move` on a copyable place) and `not_type_safety_scope` (the closure of `not_progress`, reached from a well-typed closed program) |
-| A **repaired** Oxide with proved progress, preservation and type safety | **missing** |
+| Progress (for the machine) | **stated, open** (`Progress G`). The former counterexample (a closure whose body mentions a region missing from its type) is now ill typed (`tp_closure_untyped`, `tp_stuck_untyped`) |
+| Preservation | **stated, open** (`Preservation G`). The former counterexample (`E-Move` on a copyable place) cannot arise: `E-Move` only applies to `Term.move` (`Metatheory/Regressions/MoveCopy.lean`) |
+| Type safety | **stated, open** (`TypeSafety G`); both former counterexample programs are handled (`ts_runs`, `tp_prog_untyped`) |
 
-The repairs that the counterexamples call for are listed in `README.md`
-(§ Results). Whether they are enough is not established.
+The earlier refutations (`not_progress`, `not_preservation`, `not_type_safety`)
+were about the previous rules; with the refinements listed in `README.md`
+(§ The type-safety refinements) they no longer apply, and they have been
+replaced by the regression files in `Metatheory/Regressions/`. Whether progress
+and preservation now hold is not established.
 
 ## 2. Supporting lemmas of `proofs.tex`
 
@@ -28,7 +30,7 @@ preservation proof, the renaming and strengthening laws are needed:
 - `rename_id` and `rename_comp`;
 - `prename` after `rename`;
 - weakening and strengthening of `Typing`, `PlaceTy`, `OwnSafe` and `StoreValid`;
-- type-level substitution lemmas for `FnDef.instBody`.
+- type-level substitution lemmas for `GlobalEnv.instBody` and `Term.openBody`.
 
 ## 3. Language features not modelled
 
@@ -43,6 +45,8 @@ preservation proof, the renaming and strengthening laws are needed:
 ## 4. Infrastructure not in the paper
 
 * There is no executable type checker or interpreter. Typing and stepping are
-  relations, and the machine is nondeterministic in what a closure captures.
+  relations.
+* The coverage premise of `T-Closure`, `Inst.Covered`, is stated semantically
+  (via strengthening), not as a decidable syntactic check.
 * `DecidableEq` and `Repr` are not derived for `Ty` and `Term`, because of the
   `Fin k → _` fields. Equality of concrete terms is checked by `rfl`.

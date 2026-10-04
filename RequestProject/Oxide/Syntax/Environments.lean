@@ -53,15 +53,25 @@ abbrev TempTy (S : Ctx) := List (Ty S)
 
 namespace SlotTys
 
-/-- The empty stack typing entries for a scope without variables and regions. -/
-def markers : (S : Ctx) → {Γ : Ctx} → SlotTys Γ S
-  | [], _ => .nil
-  | .var :: S, _ => .var (.dead .unit) (markers S)
-  | .rgn :: S, _ => .rgn [] (markers S)
-  | .frame :: S, _ => .frame (markers S)
-  | .fvar :: S, _ => .fvar (markers S)
-  | .abs :: S, _ => .abs (markers S)
-  | .tvar :: S, _ => .tvar (markers S)
+/-- Markers `φ : FRM` for `n` frame variables. -/
+def fvars {Γ : Ctx} : (n : Nat) → SlotTys Γ (List.replicate n .fvar)
+  | 0 => .nil
+  | n + 1 => .fvar (fvars n)
+
+/-- Markers `ϱ : RGN` for `n` abstract regions. -/
+def abss {Γ S : Ctx} : (n : Nat) → SlotTys Γ S → SlotTys Γ (List.replicate n .abs ++ S)
+  | 0, Γs => Γs
+  | n + 1, Γs => .abs (abss n Γs)
+
+/-- Markers `α : TYPE` for `n` type variables. -/
+def tvars {Γ S : Ctx} : (n : Nat) → SlotTys Γ S → SlotTys Γ (List.replicate n .tvar ++ S)
+  | 0, Γs => Γs
+  | n + 1, Γs => .tvar (tvars n Γs)
+
+/-- The entries for the binders of a polymorphic signature: they are all
+type-level, so there is nothing to record but their sorts (no placeholder types
+are needed). -/
+def ofBinders {Γ : Ctx} (b : Binders) : SlotTys Γ b.ctx := tvars b.nα (abss b.nϱ (fvars b.nφ))
 
 /-- Transform all the types and loan sets. -/
 def map {Γ Δ : Ctx} (fτ : MTy Γ → MTy Δ) (fL : List (Loan Γ) → List (Loan Δ)) :
@@ -262,7 +272,7 @@ def popFrame (k : Nat) (f : Ctx) (Γ : StackTy (vars k ++ (f ++ .frame :: S))) :
 /-- The type environment of a polymorphic signature: markers for its binders and
 its bounds. -/
 def ofBinders (b : Binders) (bounds : List (Fin b.nϱ × Fin b.nϱ)) : StackTy b.ctx where
-  slots := SlotTys.markers b.ctx
+  slots := SlotTys.ofBinders b
   outlives := bounds.map fun p =>
     (In.weakenL (List.replicate b.nα .tvar) (In.ofFin p.1 (List.replicate b.nφ .fvar)),
      In.weakenL (List.replicate b.nα .tvar) (In.ofFin p.2 (List.replicate b.nφ .fvar)))
@@ -271,7 +281,7 @@ def ofBinders (b : Binders) (bounds : List (Fin b.nϱ × Fin b.nϱ)) : StackTy b
 binders and bounds of a polymorphic signature. -/
 def pushBinders (Γ : StackTy S) (b : Binders) (bs : List (Fin b.nϱ × Fin b.nϱ)) :
     StackTy (b.ctx ++ S) where
-  slots := (SlotTys.markers b.ctx).append (Γ.renameEntries (TRen.wkL S b.ctx))
+  slots := (SlotTys.ofBinders b).append (Γ.renameEntries (TRen.wkL S b.ctx))
   outlives := bs.map (fun p => (b.absIdx p.1, b.absIdx p.2)) ++
     Γ.outlives.map fun p => ((TRen.wkL S b.ctx).ren p.1, (TRen.wkL S b.ctx).ren p.2)
 

@@ -22,12 +22,13 @@ first.  The sorts are
 Variables are *typed* de Bruijn indices: `In b Γ` points at a binder of sort `b`
 in `Γ`, so an index can never be out of range or point at a binder of the wrong
 sort.  Term variables (`TVar Γ`) in addition can only reach the *top frame*: no
-constructor crosses a `.frame` boundary.  A closed program is a `Term []`, and
+constructor crosses a `.frame` boundary.  A closed program is a `Term sig []`, and
 the plain `Term n` of a calculus with only term variables is the special case
 `Γ = vars n`.
 
 Renamings (`TRen`, `Ren`) and partial renamings (`PRen`, `PRenT`, used to
-*strengthen*, i.e. pop binders) act on indices.  Frame boundaries are never
+*strengthen*, i.e. pop binders) act on indices.  Runtime scopes (`Ctx.Runtime`)
+contain only variables, concrete regions and frame boundaries.  Frame boundaries are never
 referred to, so renamings only have to act on the five *indexable* sorts
 (`Bnd.Idx`).
 -/
@@ -199,10 +200,6 @@ new frame does not see any outer term variable. -/
 def enterFrame {Γ Δ : Ctx} (ρ : TRen Γ Δ) : Ren (.frame :: Γ) (.frame :: Δ) :=
   { ρ.lift .frame with tvar := fun i => nomatch i }
 
-/-- Weakening below a frame of shape `f`: `f ++ ‡ :: Γ` becomes `f ++ ‡ :: c :: Γ`. -/
-def wkBelow (f : Ctx) (Γ : Ctx) (c : Bnd) : TRen (f ++ .frame :: Γ) (f ++ .frame :: c :: Γ) :=
-  ((TRen.wk Γ c).lift .frame).liftN f
-
 /-- Weakening by a pushed frame of shape `f`. -/
 def wkFrame (f S : Ctx) : TRen S (f ++ .frame :: S) := ⟨fun i => In.weakenL f (.there i)⟩
 
@@ -320,95 +317,20 @@ def optFin {α : Type} : {k : Nat} → (Fin k → Option α) → Option (Fin k �
     let r ← optFin fun i => f i.succ
     pure (Fin.cases a r)
 
-/-! ## Captures
+/-! ## Runtime scopes
 
-`Sel f Γ` selects some of the variable and region entries of the *top frame* of
-`Γ`; `f` is the shape of the selection, i.e. of the frame captured by a closure. -/
+At runtime a scope only contains term variables, concrete regions and frame
+boundaries: the type-level binders (`fvar`, `abs`, `tvar`) of a polymorphic
+signature are substituted away when a function is called. -/
 
-/-- Order-preserving selections of entries of the top frame. -/
-inductive Sel : Ctx → Ctx → Type where
-  | nil {Γ : Ctx} : Sel [] Γ
-  | keepVar {f Γ : Ctx} (s : Sel f Γ) : Sel (.var :: f) (.var :: Γ)
-  | keepRgn {f Γ : Ctx} (s : Sel f Γ) : Sel (.rgn :: f) (.rgn :: Γ)
-  | skipVar {f Γ : Ctx} (s : Sel f Γ) : Sel f (.var :: Γ)
-  | skipRgn {f Γ : Ctx} (s : Sel f Γ) : Sel f (.rgn :: Γ)
+/-- The sorts that exist at runtime. -/
+def Bnd.IsRuntime : Bnd → Prop
+  | .var | .rgn | .frame => True
+  | .fvar | .abs | .tvar => False
 
-namespace Sel
+instance : DecidablePred Bnd.IsRuntime := fun b => by cases b <;> unfold Bnd.IsRuntime <;> infer_instance
 
-/-- The original entry of an entry of the captured frame. -/
-def renF : {f Γ : Ctx} → Sel f Γ → {b : Bnd} → In b f → In b Γ
-  | _, _, .nil, _, i => nomatch i
-  | _, _, .keepVar _, _, .here => .here
-  | _, _, .keepVar s, _, .there i => .there (s.renF i)
-  | _, _, .keepRgn _, _, .here => .here
-  | _, _, .keepRgn s, _, .there i => .there (s.renF i)
-  | _, _, .skipVar s, _, i => .there (s.renF i)
-  | _, _, .skipRgn s, _, i => .there (s.renF i)
-
-/-- The original variable of a variable of the captured frame, as a top-frame
-variable. -/
-def renFT : {f Γ : Ctx} → Sel f Γ → In .var f → TVar Γ
-  | _, _, .nil, i => nomatch i
-  | _, _, .keepVar _, .here => .here
-  | _, _, .keepVar s, .there i => .skipVar (s.renFT i)
-  | _, _, .keepRgn s, .there i => .skipRgn (s.renFT i)
-  | _, _, .skipVar s, i => .skipVar (s.renFT i)
-  | _, _, .skipRgn s, i => .skipRgn (s.renFT i)
-
-/-- The map from a captured frame (pushed above `Γ`) back to the original
-entries: entries of `f` go to the entries they were selected from; entries past
-the frame boundary stay where they are. -/
-def renIn {f Γ : Ctx} (s : Sel f Γ) {b : Bnd} [Bnd.Idx b] (i : In b (f ++ .frame :: Γ)) :
-    In b Γ :=
-  match In.split f i with
-  | .inl j => s.renF j
-  | .inr k => k.dropFrame
-
-/-- The same map on top-frame variables (which all live in the captured frame). -/
-def renTVar {f Γ : Ctx} (s : Sel f Γ) (i : TVar (f ++ .frame :: Γ)) : TVar Γ :=
-  s.renFT (TVar.toInL f i)
-
-/-- The renaming from a closure body's scope back to the scope where the closure
-is written. -/
-def ren {f Γ : Ctx} (s : Sel f Γ) : Ren (f ++ .frame :: Γ) Γ := ⟨⟨s.renIn⟩, s.renTVar⟩
-
-/-- `inv` for a kept entry. -/
-def invKeep {f Γ : Ctx} (c : Bnd) (ρ : TRen Γ (f ++ .frame :: Γ)) :
-    TRen (c :: Γ) (c :: (f ++ .frame :: c :: Γ)) := ⟨fun
-  | .here => .here
-  | .there i => .there ((ρ.comp (TRen.wkBelow f Γ c)).ren i)⟩
-
-/-- `inv` for a skipped entry. -/
-def invSkip {f Γ : Ctx} (c : Bnd) (ρ : TRen Γ (f ++ .frame :: Γ)) :
-    TRen (c :: Γ) (f ++ .frame :: c :: Γ) := ⟨fun
-  | .here => In.weakenL f (.there .here)
-  | .there i => (ρ.comp (TRen.wkBelow f Γ c)).ren i⟩
-
-/-- The renaming sending each selected entry of `Γ` to its copy in `f`, and every
-other entry past the new frame boundary. -/
-def inv : {f Γ : Ctx} → Sel f Γ → TRen Γ (f ++ .frame :: Γ)
-  | _, Γ, .nil => TRen.wk Γ .frame
-  | _, _, .keepVar s => invKeep .var s.inv
-  | _, _, .keepRgn s => invKeep .rgn s.inv
-  | _, _, .skipVar s => invSkip .var s.inv
-  | _, _, .skipRgn s => invSkip .rgn s.inv
-
-/-- The selected variables, as indices of `Γ`. -/
-def selVars : {f Γ : Ctx} → Sel f Γ → List (In .var Γ)
-  | _, _, .nil => []
-  | _, _, .keepVar s => .here :: s.selVars.map .there
-  | _, _, .keepRgn s => s.selVars.map .there
-  | _, _, .skipVar s => s.selVars.map .there
-  | _, _, .skipRgn s => s.selVars.map .there
-
-/-- The selected regions, as indices of `Γ`. -/
-def selRgns : {f Γ : Ctx} → Sel f Γ → List (In .rgn Γ)
-  | _, _, .nil => []
-  | _, _, .keepVar s => s.selRgns.map .there
-  | _, _, .keepRgn s => .here :: s.selRgns.map .there
-  | _, _, .skipVar s => s.selRgns.map .there
-  | _, _, .skipRgn s => s.selRgns.map .there
-
-end Sel
+/-- A runtime scope: only variables, concrete regions and frame boundaries. -/
+def Ctx.Runtime (S : Ctx) : Prop := ∀ b ∈ S, b.IsRuntime
 
 end Oxide

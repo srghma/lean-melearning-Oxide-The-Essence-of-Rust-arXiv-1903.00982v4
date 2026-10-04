@@ -7,8 +7,8 @@ public import RequestProject.Oxide.Metafunctions.Substitution
 
 Appendix C ("Metafunctions") of the paper: free regions of types,
 (non)copyability, the function types and captured frames occurring in a type,
-initializedness of maybe-dead types, and decomposition of types along paths
-(`explode`, `τ.q ⇝ τ_□ ⊞ τ'`).
+and `explode`.  Decomposition of types along paths (`τ.q ⇝ τ_□ ⊞ τ'`) is done by
+typed paths (`TyPath`, `MTy.Of.get`, `MTy.Of.set` in `Syntax/Types.lean`).
 
 The sort predicates of the paper (`τ^SI`, `τ^XI`, `τ^SD`, `τ^SX`) are gone: they
 are the types `Ty`, `XTy` and `MTy` themselves.
@@ -63,11 +63,8 @@ def FrameTy.frgns {Γ : Ctx} : {f : Ctx} → FrameTy Γ f → List (In .rgn Γ)
   | _, .rgn _ Φ => Φ.frgns
 end
 
-/-- Concrete regions of a maybe-dead type. -/
-def MTy.frgns {Γ : Ctx} : MTy Γ → List (In .rgn Γ)
-  | .init τ => τ.frgns
-  | .dead τ => τ.frgns
-  | .tuple k τs => (List.finRange k).flatMap fun i => (τs i).frgns
+/-- Concrete regions of a maybe-dead type: those of its declared type. -/
+def MTy.frgns {Γ : Ctx} (m : MTy Γ) : List (In .rgn Γ) := m.ty.frgns
 
 /-- Concrete regions occurring in a type *outside of* any function type. -/
 def Ty.frgnsOut {Γ : Ctx} : Ty Γ → List (In .rgn Γ)
@@ -79,10 +76,7 @@ def Ty.frgnsOut {Γ : Ctx} : Ty Γ → List (In .rgn Γ)
   | _ => []
 
 /-- `frgnsOut` for maybe-dead types. -/
-def MTy.frgnsOut {Γ : Ctx} : MTy Γ → List (In .rgn Γ)
-  | .init τ => τ.frgnsOut
-  | .dead τ => τ.frgnsOut
-  | .tuple k τs => (List.finRange k).flatMap fun i => (τs i).frgnsOut
+def MTy.frgnsOut {Γ : Ctx} (m : MTy Γ) : List (In .rgn Γ) := m.ty.frgnsOut
 
 /-! ## Function types and captured frames occurring in types -/
 
@@ -134,16 +128,10 @@ def FrameTy.closureLoans {Γ : Ctx} : {f : Ctx} → FrameTy Γ f → List (List 
 end
 
 /-- `closureLoans` for maybe-dead types. -/
-def MTy.closureLoans {Γ : Ctx} : MTy Γ → List (List (Loan Γ))
-  | .init τ => τ.closureLoans
-  | .dead τ => τ.closureLoans
-  | .tuple k τs => (List.finRange k).flatMap fun i => (τs i).closureLoans
+def MTy.closureLoans {Γ : Ctx} (m : MTy Γ) : List (List (Loan Γ)) := m.ty.closureLoans
 
 /-- `sigRgns` for maybe-dead types. -/
-def MTy.sigRgns {Γ : Ctx} : MTy Γ → List (List (In .rgn Γ))
-  | .init τ => τ.sigRgns
-  | .dead τ => τ.sigRgns
-  | .tuple k τs => (List.finRange k).flatMap fun i => (τs i).sigRgns
+def MTy.sigRgns {Γ : Ctx} (m : MTy Γ) : List (List (In .rgn Γ)) := m.ty.sigRgns
 
 /-! ## Copyability -/
 
@@ -161,51 +149,20 @@ def Ty.noncopyable {Γ : Ctx} : Ty Γ → Bool
 /-- `copyable τ = ¬ noncopyable τ`. -/
 def Ty.copyable {Γ : Ctx} (τ : Ty Γ) : Bool := !τ.noncopyable
 
-/-! ## Maybe-dead types -/
-
-/-- A maybe-dead type that is fully initialized. -/
-def MTy.toTy? {Γ : Ctx} : MTy Γ → Option (Ty Γ)
-  | .init τ => some τ
-  | .dead _ => none
-  | .tuple k τs => (optFin fun i => (τs i).toTy?).map (.tuple k)
-
-/-- `τ^SD`: a type all of whose parts are dead. -/
-def MTy.IsDead {Γ : Ctx} : MTy Γ → Prop
-  | .init _ => False
-  | .dead _ => True
-  | .tuple k τs => ∀ i : Fin k, (τs i).IsDead
-
-/-- `τ.q ⇝ τ_□ ⊞ τ'` (`D-End`, `D-Projection`): the component of a maybe-dead type
-at path `q`. -/
-def MTy.atPath {Γ : Ctx} : MTy Γ → List Nat → Option (MTy Γ)
-  | m, [] => some m
-  | .init (.tuple k τs), i :: q => if h : i < k then (MTy.init (τs ⟨i, h⟩)).atPath q else none
-  | .tuple k ms, i :: q => if h : i < k then (ms ⟨i, h⟩).atPath q else none
-  | _, _ :: _ => none
-
-/-- Replace the component of a maybe-dead type at path `q` (i.e. `τ_□[τ']`). -/
-def MTy.setPath {Γ : Ctx} : MTy Γ → List Nat → MTy Γ → Option (MTy Γ)
-  | _, [], m' => some m'
-  | .init (.tuple k τs), i :: q, m' =>
-      if h : i < k then
-        ((MTy.init (τs ⟨i, h⟩)).setPath q m').map fun mi =>
-          .tuple k fun j => if j = ⟨i, h⟩ then mi else .init (τs j)
-      else none
-  | .tuple k ms, i :: q, m' =>
-      if h : i < k then
-        ((ms ⟨i, h⟩).setPath q m').map fun mi => .tuple k fun j => if j = ⟨i, h⟩ then mi else ms j
-      else none
-  | _, _ :: _, _ => none
+/-! ## Explosion -/
 
 /-- `explode(π : τ)`: tuples are split into their components. -/
 def Ty.explode {Γ : Ctx} (π : APlace Γ) : Ty Γ → List (APlace Γ × Ty Γ)
-  | .tuple k τs => (List.finRange k).flatMap fun i => (τs i).explode ⟨π.root, π.path ++ [i.val]⟩
+  | .tuple k τs => (List.finRange k).flatMap fun i => (τs i).explode (π.append [i.val])
   | τ => [(π, τ)]
 
 /-- `explode` for maybe-dead types: the initialized leaves. -/
-def MTy.explode {Γ : Ctx} (π : APlace Γ) : MTy Γ → List (APlace Γ × Ty Γ)
-  | .init τ => τ.explode π
-  | .dead _ => []
-  | .tuple k τs => (List.finRange k).flatMap fun i => (τs i).explode ⟨π.root, π.path ++ [i.val]⟩
+def MTy.Of.explode {Γ : Ctx} (π : APlace Γ) : {τ : Ty Γ} → MTy.Of τ → List (APlace Γ × Ty Γ)
+  | τ, .init => τ.explode π
+  | _, .dead => []
+  | _, .tuple (k := k) ms => (List.finRange k).flatMap fun i => (ms i).explode (π.append [i.val])
+
+/-- `explode` for maybe-dead types. -/
+def MTy.explode {Γ : Ctx} (π : APlace Γ) (m : MTy Γ) : List (APlace Γ × Ty Γ) := m.st.explode π
 
 end Oxide

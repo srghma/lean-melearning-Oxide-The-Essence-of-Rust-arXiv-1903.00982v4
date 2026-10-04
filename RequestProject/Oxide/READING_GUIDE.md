@@ -9,6 +9,8 @@ Other documents in this directory:
 - `GAPS_AND_GRAMMAR_DIFFERENCES.md`: the paper's grammar side by side with ours.
 - `MISSING.md`: what is not formalized.
 - `Proposal/PROPOSAL.md`: the design that this development implements.
+- `README.md`, section "The type-safety refinements": where each
+  correct-by-construction refinement lives.
 
 ---
 
@@ -33,7 +35,8 @@ The indices are typed:
 For example:
 - `let x : τ = e₁; e₂` is `Term.letE τ e₁ e₂` with `e₂ : Term (.var :: Γ)`;
 - `letrgn<r> { e }` is `Term.letrgn e` with `e : Term (.rgn :: Γ)`;
-- a closed program is a `Term []`.
+- terms are also indexed by a global signature `sig` (the declared functions), and
+  a closed program is a `Term sig []`.
 
 The stack typing and the stack use the same scope as the term in focus, so the
 same index works for all three.
@@ -48,17 +51,18 @@ term it denotes.
 
 | Paper | File | Main declarations |
 | --- | --- | --- |
-| (scopes; the paper uses names) | `Syntax/Scopes.lean` | `Bnd`, `Ctx`, `In`, `TVar`, renamings `TRen`/`Ren`, partial renamings (strengthening) `PRen`/`PRenT`, capture selections `Sel` |
-| §3.1 "Places and Place Expressions", "Annotations for References"; referents from §3.6 | `Syntax/Places.lean` | `Own`, `PlaceExpr` (root `TVar`), `APlaceExpr`, `APlace`, `Loan`, `Prim`, `RStep`, `Referent` |
-| §3.2 *Types in Oxide*; frame expressions from §3.3 | `Syntax/Types.lean` | `Region`, `Binders`, `Ty`/`XTy`/`FrameExpr`/`FrameTy` (mutual), `MTy` |
-| §3.1 "Expressions"; values from §3.6 | `Syntax/Terms.lean` | `Term`, `Value`, `Env`, `Program`, `FnDef`, `GlobalEnv` |
+| (scopes; the paper uses names) | `Syntax/Scopes.lean` | `Bnd`, `Ctx`, `In`, `TVar`, renamings `TRen`/`Ren`, partial renamings (strengthening) `PRen`/`PRenT`, runtime scopes `Ctx.Runtime` |
+| §3.1 "Places and Place Expressions", "Annotations for References"; referents from §3.6 | `Syntax/Places.lean` | `Own`, `APlace`/`TPlace` (root and projection path), `APExpr`/`PExpr` (`place π` or `deref p q`), `PCtx`, `Loan`, `BaseTy`, `Prim`, `Referent` |
+| §3.2 *Types in Oxide*; frame expressions from §3.3 | `Syntax/Types.lean` | `Region`, `Binders`, `Ty`/`XTy`/`FrameExpr`/`FrameTy` (mutual), `TyPath`, `MTy.Of`, `MTy` |
+| §3.1 "Expressions"; values from §3.6 | `Syntax/Terms.lean` | `FnSig`, `Sig`, `FnIdx`, `Cap`, `Term`, `Value`, `Env`, `Program`, `Defs`, `GlobalEnv`, `FnDef` |
 | §3.3 *Environments* (Γ with Δ folded in, Θ) | `Syntax/Environments.lean` | `SlotTys`, `StackTy`, `TempTy`, total lookups, `push*`/`pop*` |
 | §3.6 runtime stacks; the machine's continuations | `Syntax/Runtime.lean` | `Slots`, `Stack`, `Cont`, `Config`, `Config.init` |
-| (type-level instantiation at a call) | `Metafunctions/Substitution.lean` | `TSub`, `Sub`, `Ty.inst`, `FnDef.ty`, `FnDef.instBody` |
-| App. C, metafunctions on types | `Metafunctions/Types.lean` | `Ty.frgns`, `Ty.noncopyable`, `MTy.toTy?`, `MTy.atPath`, `MTy.setPath`, `explode` |
-| App. C, places | `Metafunctions/Places.lean` | `APlace.IsPrefix`, `APlace.Disjoint`, `APlaceExpr.splitDeref` |
-| App. C, stack typings | `Metafunctions/StackTypings.lean` | `placeTy`, `setPlaceTy`, `gcLoans`, `NotReborrowed`, `NotInClosure`, `capturedFrame`, `killNC` |
-| App. C, stacks | `Metafunctions/Stacks.lean` | `Stack.read`, `Stack.write`, `Stack.evalPlace`, `Stack.push*`, `Stack.popL`, `Stack.popFrame` |
+| (type-level substitutions, call type arguments, closure entries) | `Syntax/TypeSubst.lean` | `TSub`, `TArgs`, `Ty.inst`, `Entry`, `Inst` |
+| (instantiating bodies) | `Metafunctions/Substitution.lean` | `Sub`, `Term.subst`, `Term.openBody`, `Inst.closureTy`, `GlobalEnv.instBody` |
+| App. C, metafunctions on types | `Metafunctions/Types.lean` | `Ty.frgns`, `Ty.noncopyable`, `Ty.copyable`, `MTy.explode` |
+| App. C, places | `Metafunctions/Places.lean` | `APExpr.base`, `APlace.IsPrefix`, `APlace.Disjoint`, `APExpr.splitDeref` |
+| App. C, stack typings | `Metafunctions/StackTypings.lean` | `resolve` (to a `TyPath`), `placeTy`, `setPlaceTy`, `gcLoans`, `NotReborrowed`, `NotInClosure`, `capturedFrame`, `killNC` |
+| App. C, stacks | `Metafunctions/Stacks.lean` | `VPath` (total `get`/`set`), `Referent.resolve`, `Env.ofCap`, `Stack.read`, `Stack.write`, `Stack.evalPlace`, `Stack.push*`, `Stack.popL`, `Stack.popFrame` |
 | §3.4 *Region-Based Alias Management*; App. B.3 | `AliasManagement/OwnershipSafety.lean` | `PlaceTy` (`TC-*`), `OwnSafe` (`O-*`) |
 | §3.5 "Region Rewriting and Outlives"; App. B.2 | `Typechecking/RegionRewriting.lean` | `Mode`, `OutlivesJ`/`Outlives`, `RewriteJ`/`Rewrite` |
 | §3.5 *Typechecking Oxide Programs*; App. B.1, B.4, B.5 | `Typechecking/Typing.lean` | `RefTy`, `TyWF`, `EnvWF`, `StackWF`, **`Typing`**, `HasType`, `HasTypeV` |
@@ -66,8 +70,8 @@ term it denotes.
 | (typing the machine's continuations) | `Typechecking/Continuations.lean` | `ContOK`, `ConfigTyped` |
 | §3.6 *Operational Semantics*; App. D | `OperationalSemantics/Machine.lean` | `Call`, **`Step`**, `Steps`, `Config.IsFinal` |
 | §3.7; App. E (statements) | `Metatheory/Statements.lean` | `canonical_forms`, `Progress`, `Preservation`, `TypeSafety`, `type_safety_of_progress_preservation` |
-| counterexamples | `Metatheory/Counterexamples/TypeSafety.lean` | `ts_typed`, `ts_steps`, `ts_stuck`, `not_type_safety`, `not_preservation` |
-| | `Metatheory/Counterexamples/Progress.lean` | `tp_typed`, `tp_stuck`, `not_progress`, `tp_prog_typed`, `tp_steps`, `not_type_safety_scope` |
+| regressions (former counterexamples) | `Metatheory/Regressions/MoveCopy.lean` | `ts_typed`, `Step.copy_inv`, `ts_runs`, `ts_final` |
+| | `Metatheory/Regressions/ClosureScopes.lean` | `tp_not_covered`, `tp_closure_untyped`, `tp_prog_untyped`, `tp_closure_value_untyped`, `tp_stuck_untyped` |
 | (not in the paper) | `ConcreteSyntax/Notation.lean`, `ConcreteSyntax/Examples.lean` | `[OXIDE| … ]`, `[OXIDE_TY| … ]`, `[OXIDE_FN| … ]` |
 
 ---
@@ -87,7 +91,8 @@ term it denotes.
    checks at the end of a binder's scope.
 5. `Typechecking/Continuations.lean` and `Metatheory/Statements.lean`: how the
    paper's theorems are stated for the machine.
-6. The two counterexample files.
+6. The two regression files, which show how the former counterexamples are
+   now ruled out.
 
 ---
 

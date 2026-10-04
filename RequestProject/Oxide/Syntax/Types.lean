@@ -16,7 +16,12 @@ types are separate families instead of predicates on one datatype:
 * `Ty Γ`  — sized, initialized types `τ^SI`;
 * `XTy Γ` — maybe-unsized types `τ^XI` (what a reference may point to);
 * `MTy Γ` — maybe-dead types `τ^SX` (what the stack typing records for a
-  variable, possibly partially moved).
+  variable, possibly partially moved): a declared type `τ` together with an
+  initialization state `MTy.Of τ` *indexed by* `τ`.
+
+Projection paths into a type are `TyPath τ`, indexed by the type, so a path
+never names a missing field; untyped `List Nat` paths are converted once
+(`TyPath.ofList`).
 
 So an array of slices `[[τ]; n]`, a dead `let` annotation or a slice as a
 closure parameter cannot even be written.
@@ -25,13 +30,6 @@ closure parameter cannot even be written.
 @[expose] public section
 
 namespace Oxide
-
-/-- Base types `bool | u32 | unit`. -/
-inductive BaseTy where
-  | bool
-  | u32
-  | unit
-  deriving DecidableEq, Repr, Inhabited
 
 /-- The binders of a polymorphic signature `<φ̄, ϱ̄, ᾱ>`. -/
 structure Binders where
@@ -95,16 +93,6 @@ inductive FrameTy : Ctx → Ctx → Type where
   | rgn {Γ f : Ctx} (loans : List (Loan Γ)) (Φ : FrameTy Γ f) : FrameTy Γ (.rgn :: f)
 end
 
-/-- Maybe-dead types `τ^SX`: what the stack typing records for a variable.  As
-in the paper's grammar, a fully initialized tuple has two representations
-(`init (tuple …)` and `tuple (init …)`); `MTy.toTy?` identifies them. -/
-inductive MTy (Γ : Ctx) where
-  | init (τ : Ty Γ)
-  /-- `τ†` -/
-  | dead (τ : Ty Γ)
-  /-- partially moved tuples -/
-  | tuple (k : Nat) (τs : Fin k → MTy Γ)
-
 instance {Γ : Ctx} : Inhabited (Ty Γ) := ⟨.base .unit⟩
 
 namespace Ty
@@ -149,11 +137,6 @@ def FrameTy.rename {Γ Δ : Ctx} (ρ : TRen Γ Δ) : {f : Ctx} → FrameTy Γ f 
   | _, .rgn L Φ => .rgn (L.map (Loan.rename ρ)) (Φ.rename ρ)
 end
 
-def MTy.rename {Γ Δ : Ctx} (ρ : TRen Γ Δ) : MTy Γ → MTy Δ
-  | .init τ => .init (τ.rename ρ)
-  | .dead τ => .dead (τ.rename ρ)
-  | .tuple k τs => .tuple k fun i => (τs i).rename ρ
-
 /-- Weakening of a type by one binder. -/
 abbrev Ty.wk {Γ : Ctx} (c : Bnd) (τ : Ty Γ) : Ty (c :: Γ) := τ.rename (TRen.wk Γ c)
 
@@ -189,9 +172,146 @@ def FrameTy.prename {Γ Δ : Ctx} (ρ : PRen Γ Δ) : {f : Ctx} → FrameTy Γ f
   | _, .rgn L Φ => do pure (.rgn (← L.mapM (Loan.prename ρ)) (← Φ.prename ρ))
 end
 
-def MTy.prename {Γ Δ : Ctx} (ρ : PRen Γ Δ) : MTy Γ → Option (MTy Δ)
-  | .init τ => (τ.prename ρ).map .init
-  | .dead τ => (τ.prename ρ).map .dead
-  | .tuple k τs => (optFin fun i => (τs i).prename ρ).map (.tuple k)
+/-! ## Paths into types -/
+
+/-- Projection paths into a type: `proj i p` can only be applied to a tuple with
+a field `i`. -/
+inductive TyPath {Γ : Ctx} : Ty Γ → Type where
+  | here {τ : Ty Γ} : TyPath τ
+  | proj {k : Nat} {τs : Fin k → Ty Γ} (i : Fin k) (p : TyPath (τs i)) : TyPath (.tuple k τs)
+
+namespace TyPath
+variable {Γ : Ctx}
+
+/-- The type at the end of a path. -/
+def target : {τ : Ty Γ} → TyPath τ → Ty Γ
+  | τ, .here => τ
+  | _, .proj _ p => p.target
+
+/-- The path as a list of field indices. -/
+def toList : {τ : Ty Γ} → TyPath τ → List Nat
+  | _, .here => []
+  | _, .proj i p => i.val :: p.toList
+
+/-- Convert an untyped path of projections into a typed one (the only place where
+an out-of-range projection is detected). -/
+def ofList : (τ : Ty Γ) → List Nat → Option (TyPath τ)
+  | _, [] => some .here
+  | .tuple k τs, i :: q => if h : i < k then (ofList (τs ⟨i, h⟩) q).map (.proj ⟨i, h⟩) else none
+  | _, _ :: _ => none
+
+/-- `τ` with the component at the end of the path replaced by `τ'`. -/
+def replace : {τ : Ty Γ} → TyPath τ → Ty Γ → Ty Γ
+  | _, .here, τ' => τ'
+  | .tuple k τs, .proj i p, τ' => .tuple k fun j => if j = i then p.replace τ' else τs j
+
+end TyPath
+
+/-! ## Maybe-dead types -/
+
+/-- The initialization state of a value of declared type `τ`: initialized, dead, or
+(for a tuple) one state per field.  Since the state is indexed by the declared
+type, a partially moved variable always keeps its declared type. -/
+inductive MTy.Of {Γ : Ctx} : Ty Γ → Type where
+  | init {τ : Ty Γ} : MTy.Of τ
+  /-- `τ†` -/
+  | dead {τ : Ty Γ} : MTy.Of τ
+  /-- partially moved tuples -/
+  | tuple {k : Nat} {τs : Fin k → Ty Γ} (ms : (i : Fin k) → MTy.Of (τs i)) : MTy.Of (.tuple k τs)
+
+/-- Maybe-dead types `τ^SX`: a declared type and its initialization state. -/
+structure MTy (Γ : Ctx) where
+  ty : Ty Γ
+  st : MTy.Of ty
+
+namespace MTy.Of
+variable {Γ : Ctx}
+
+/-- The state of field `i` of a tuple. -/
+def comp : {k : Nat} → {τs : Fin k → Ty Γ} → MTy.Of (.tuple k τs) → (i : Fin k) → MTy.Of (τs i)
+  | _, _, .init, _ => .init
+  | _, _, .dead, _ => .dead
+  | _, _, .tuple ms, i => ms i
+
+/-- Fully initialized. -/
+def full : {τ : Ty Γ} → MTy.Of τ → Bool
+  | _, .init => true
+  | _, .dead => false
+  | _, .tuple (k := k) ms => (List.finRange k).all fun i => (ms i).full
+
+/-- Entirely dead (`τ^SD`). -/
+def allDead : {τ : Ty Γ} → MTy.Of τ → Bool
+  | _, .init => false
+  | _, .dead => true
+  | _, .tuple (k := k) ms => (List.finRange k).all fun i => (ms i).allDead
+
+/-- Is literally `init`. -/
+def isInit {τ : Ty Γ} : MTy.Of τ → Bool
+  | .init => true
+  | _ => false
+
+/-- Is literally `dead`. -/
+def isDead {τ : Ty Γ} : MTy.Of τ → Bool
+  | .dead => true
+  | _ => false
+
+/-- The normalizing tuple constructor: a tuple all of whose fields are
+initialized (resp. dead) is `init` (resp. `dead`).  Updates only produce
+normalized states, so the duplicate encodings of the paper's grammar do not
+arise. -/
+def mkTuple {k : Nat} {τs : Fin k → Ty Γ} (ms : (i : Fin k) → MTy.Of (τs i)) : MTy.Of (.tuple k τs) :=
+  if (List.finRange k).all fun i => (ms i).isInit then .init
+  else if (List.finRange k).all fun i => (ms i).isDead then .dead
+  else .tuple ms
+
+/-- The (maybe-dead) type at the end of a path (total). -/
+def get : {τ : Ty Γ} → MTy.Of τ → (p : TyPath τ) → MTy Γ
+  | τ, m, .here => ⟨τ, m⟩
+  | _, m, .proj i p => (m.comp i).get p
+
+/-- Replace the component at the end of a path (total); the declared type of
+that component becomes the type of the new component. -/
+def set : {τ : Ty Γ} → MTy.Of τ → TyPath τ → MTy Γ → MTy Γ
+  | _, _, .here, m' => m'
+  | .tuple k τs, m, .proj i p, m' =>
+      let ms : Fin k → MTy Γ := fun j => if j = i then (m.comp i).set p m' else ⟨τs j, m.comp j⟩
+      ⟨.tuple k fun j => (ms j).ty, mkTuple fun j => (ms j).st⟩
+
+end MTy.Of
+
+namespace MTy
+variable {Γ : Ctx}
+
+/-- An initialized type. -/
+def init (τ : Ty Γ) : MTy Γ := ⟨τ, .init⟩
+
+/-- `τ†` -/
+def dead (τ : Ty Γ) : MTy Γ := ⟨τ, .dead⟩
+
+/-- A tuple of maybe-dead types. -/
+def tuple (k : Nat) (ms : Fin k → MTy Γ) : MTy Γ :=
+  ⟨.tuple k fun i => (ms i).ty, .tuple fun i => (ms i).st⟩
+
+/-- A maybe-dead type that is fully initialized: its declared type. -/
+def toTy? (m : MTy Γ) : Option (Ty Γ) := if m.st.full then some m.ty else none
+
+/-- `τ^SD`: a type all of whose parts are dead. -/
+def IsDead (m : MTy Γ) : Prop := m.st.allDead = true
+
+end MTy
+
+def MTy.Of.rename {Γ Δ : Ctx} (ρ : TRen Γ Δ) : {τ : Ty Γ} → MTy.Of τ → MTy Δ
+  | τ, .init => .init (τ.rename ρ)
+  | τ, .dead => .dead (τ.rename ρ)
+  | _, .tuple (k := k) ms => .tuple k fun i => (ms i).rename ρ
+
+def MTy.rename {Γ Δ : Ctx} (ρ : TRen Γ Δ) (m : MTy Γ) : MTy Δ := m.st.rename ρ
+
+def MTy.Of.prename {Γ Δ : Ctx} (ρ : PRen Γ Δ) : {τ : Ty Γ} → MTy.Of τ → Option (MTy Δ)
+  | τ, .init => (τ.prename ρ).map .init
+  | τ, .dead => (τ.prename ρ).map .dead
+  | _, .tuple (k := k) ms => (optFin fun i => (ms i).prename ρ).map (.tuple k)
+
+def MTy.prename {Γ Δ : Ctx} (ρ : PRen Γ Δ) (m : MTy Γ) : Option (MTy Δ) := m.st.prename ρ
 
 end Oxide

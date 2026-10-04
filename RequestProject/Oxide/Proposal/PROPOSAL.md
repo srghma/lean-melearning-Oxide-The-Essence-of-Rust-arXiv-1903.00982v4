@@ -24,13 +24,21 @@ This proposal answers four questions:
 >   strengthened leniently, becoming `dead`.
 > * The typing rules require the result type and the remaining stack typing to
 >   be strengthenable at the end of every binder's scope (§3.3).
-> * Closure capture is an explicit selection `Sel f Γ`.
+> * Closures are written in their own scope: a capture list `Cap Γ f`, outer
+>   binders `o` with explicit entries `Inst o Γ`, and a body in
+>   `vars k ++ (f ++ .frame :: o)`.
 > * `framedPop_dangling`/`framedPop_ok` are subsumed by the machine's `popFrame`.
+> * Global functions are indices into a signature (§4.3 was adopted).
 >
-> The question raised in §3.3 has been answered negatively: progress does not
-> hold for these rules (`not_progress`, `Metatheory/Counterexamples/Progress.lean`),
-> because a closure body may mention a region that does not occur in the
-> closure's type. See `../README.md` for the results.
+> The question raised in §3.3 was first answered negatively for the earlier
+> rules: a closure body could mention a region missing from the closure's
+> type, which refuted progress. A later round of refinements (place
+> expressions grouped by dereferences, explicit move/copy, closures in their own
+> scope with a coverage premise, typed paths, `MTy` indexed by its declared
+> type, signature-indexed global functions, and others; see
+> `../README.md`, § The type-safety refinements) rules out both earlier
+> counterexamples; see `Metatheory/Regressions/`. Progress and preservation for
+> the refined rules are stated but not proved.
 >
 > The rest of this document is the original proposal. It refers to files of the
 > removed development.

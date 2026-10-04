@@ -1,3 +1,43 @@
+# Summary of changes for run 856f2a90-5ca8-45f1-9d94-2418b8a76242
+I implemented the main type-safety proposals in the Oxide formalization. `lake build` succeeds (8051 jobs, no warnings). The project has no `sorry`, `axiom` or `@[implemented_by]`, and the key theorems use only `propext`, `Classical.choice` and `Quot.sound`. Progress, preservation and type safety are still stated but not proved for the new rules.
+
+**What changed** (the full table is under "The type-safety refinements" in `RequestProject/Oxide/README.md`):
+- **Place expressions grouped by dereferences** (`Syntax/Places.lean`): a place is a root plus a projection path (`APlace`/`TPlace`), and a place expression is `PExpr.place π | PExpr.deref p q`. `base`, `splitDeref`, `IsPlace` and plugging into a context are now plain pattern matches. `Referent` has the same shape (`place | index R i q | slice R start len`).
+- **Move vs. copy:** `Term.move (π : TPlace)` and `Term.copy (p : PExpr)`. Because `move` takes a place with no dereference, the old `hplace` premise of `E-Move` is gone. `T-Copy` requires a copyable type, and `E-Move` only applies to `move`.
+- **Closures in their own scope:** a closure lists what it captures (`Cap Γ f`) and its outer binders (`θ : Inst o Γ`), and its body is typed in that smaller scope. `T-Closure` and `T-ClosureValue` require the premise `Inst.Covered`. `E-Closure` is now deterministic.
+- **Typed paths:** `TyPath τ` (with `Fin k` projections) makes type lookup and update total. `VPath v` makes value read and write total once a path is resolved. Plain `Nat` paths are converted once, by `TyPath.ofList` and `Referent.resolve`.
+- **`MTy` indexed by its declared type:** `MTy.Of τ` is `init`, `dead`, or a tuple with one state per field. `mkTuple` turns an all-`init` tuple into `init`, so there is one encoding.
+- **Global functions by signature:** terms are `Term sig Γ`, `Value.fn` holds an index `FnIdx sig`, and `GlobalEnv sig` has exactly one body per declared function, so lookup always succeeds. `GlobalWF` checks every body against the signature, and the metatheory statements assume it.
+- **Smaller items:**
+  - continuations store `Fin i → Value` / `Fin j → Term` for the done and remaining elements;
+  - slices are stored as a start and a length;
+  - literals are `Prim b` with `UInt32` numbers;
+  - call type arguments are one `TArgs` bundle, reused by substitution;
+  - `Slots.runtime` proves that stacks only exist over runtime scopes;
+  - the placeholder `dead unit` entries for type-level binders are gone.
+
+**Former counterexamples, now regression files** (all proved):
+- `Metatheory/Regressions/MoveCopy.lean`: `let x : bool = true; copy x; if copy x {…} else {…}` is well typed (`ts_typed`), a copy step never changes the stack (`Step.copy_inv`), and the program runs to `()` (`ts_runs`, `ts_final`).
+- `Metatheory/Regressions/ClosureScopes.lean`: the program with a closure that mentions `r` in its body but not in its type is ill typed (`tp_closure_untyped`, `tp_prog_untyped`). The closure value and the configuration that used to get stuck are ill typed too (`tp_closure_value_untyped`, `tp_stuck_untyped`).
+
+The old refutation theorems (`not_progress`, `not_preservation`, `not_type_safety`, `not_type_safety_scope`) were about the previous rules and have been removed.
+
+**Concrete syntax** (`ConcreteSyntax/Notation.lean`, `Examples.lean`):
+- A bare place without a dereference becomes a move, and a place through a dereference becomes a copy. `copy!(p)` and `move!(p)` choose explicitly.
+- Global functions must be listed in signature order: `[OXIDE{f, g}| … ]`.
+- A closure's captures and outer binders are computed from what its body uses.
+- Number literals of \(2^{32}\) or more are rejected.
+
+All examples are checked by `rfl`, including the two regression programs. One machine run is included.
+
+**Where the code departs from the proposals:**
+- `T-Move` also accepts copyable types, unlike the paper.
+- `Inst.Covered` is a semantic condition (stated via strengthening), not a decidable syntactic check.
+- Projection indices in the surface syntax stay `Nat`, as the proposal suggested.
+- Writing through a slice referent only changes the elements when the written value is a slice of the same length.
+
+README, READING_GUIDE, MISSING, GAPS_AND_GRAMMAR_DIFFERENCES and the status note in PROPOSAL are updated, and the Properties table matches the final code. All work is committed.
+
 # Summary of changes for run b0f50c89-b356-4d9c-8dfa-fef1d8b651c2
 As you asked, I changed no files. Everything below comes from reading the current sources (mainly `Syntax/Places.lean`, `Types.lean`, `Terms.lean`, `Runtime.lean`, `Environments.lean`, and the place helpers in `Metafunctions/Places.lean` and `Metafunctions/Stacks.lean`). None of it has been built or checked in Lean.
 
