@@ -1,0 +1,628 @@
+%%%%%%%%%%%%%%%%%%%%%
+%% Grammar Symbols %%
+%%%%%%%%%%%%%%%%%%%%%
+
+%% Numbers
+\newcommand{\oxnum}{n}
+
+%% Strings
+\newcommand{\oxstring}{\texttt{str}}
+
+%% Identifiers
+\newcommand{\oxid}{x}
+
+%% Function Names
+\newcommand{\oxfnname}{f}
+
+%% Provenances
+\newcommand{\oxprov}{\rho}
+\newcommand{\oxabsprov}{\varrho}
+\newcommand{\oxcprov}{r}
+
+%% Environments
+\newcommand{\oxenv}{\Phi}
+\newcommand{\oxenvvar}{\varphi}
+
+%% Struct Names
+\newcommand{\oxdatatype}{\mathrm{S}}
+
+%% Enum Variant Names
+\newcommand{\oxvariant}{\mathrm{E}}
+
+%% Enum Variants
+\newcommand{\oxenumvar}{ev}
+
+%% Ownership Qualifiers
+\newcommand{\oxmuta}{\omega}
+
+%% Place Contexts
+\newcommand{\oxplacectx}{\oxplace_\oxhole}
+\newcommand{\oxplaceexprctx}{\oxplaceexpr^\oxhole}
+
+%% Place Expressions
+\newcommand{\oxplaceexpr}{p}
+
+%% Places
+\newcommand{\oxplace}{\pi}
+\newcommand{\oxemptypath}{\epsilon}
+\newcommand{\oxpathcons}[2]{#1.#2}
+
+%% Paths
+\newcommand{\oxpath}{q}
+
+%% Expressions
+\newcommand{\oxexpr}{e}
+
+%% Expressions minus sequencing
+\newcommand{\oxnoseqexpr}{\hat{e}}
+
+%% Primitives
+\newcommand{\oxprim}{c}
+
+%% Patterns
+\newcommand{\oxpat}{pat}
+
+%% Loans 
+\newcommand{\oxloan}{\ell}
+
+%% Loans 
+\newcommand{\oxloans}{\overline{\oxloan}}
+
+%% Effects
+\newcommand{\oxeff}{\varepsilon}
+
+%% Types
+\newcommand{\oxtype}{\tau}
+\newcommand{\oxsitype}{\tau^\textsc{si}} %% sized, init
+\newcommand{\oxsidtype}{\oxtype^{\textsc{si}^\dagger}}
+\newcommand{\oxxitype}{\tau^\textsc{xi}} %% maybe sized, init
+\newcommand{\oxsdtype}{\tau^\textsc{sd}} %% sized, dead
+\newcommand{\oxsxtype}{\tau^\textsc{sx}} %% sized, maybe dead
+
+%% Merge Modes
+\newcommand{\oxrewritemode}{\mu}
+\newcommand{\oxcombine}{+}
+\newcommand{\oxnoop}{=}
+\newcommand{\oxcombineunrest}{\boxplus}
+\newcommand{\oxreplace}{-}
+
+%% Type Contexts
+\newcommand{\oxtypectx}{\tau_\oxhole}
+
+%% Base Types
+\newcommand{\oxbasetype}{\oxtype^\textsc{b}}
+
+%% Unsized Types
+\newcommand{\oxunsizedtype}{\oxtype^\textsc{u}}
+
+%% Sized Types
+\newcommand{\oxuninittype}{\oxtype^\textsc{d}}
+\newcommand{\oxsizedtype}{\oxtype^\textsc{s}}
+\newcommand{\oxuninitsizedtype}{\oxtype^{\textsc{s}^\dagger}}
+
+%% Kinds
+\newcommand{\oxkind}{\kappa}
+
+%% Evaluation Contexts
+\newcommand{\oxevalctx}{\mathcal{C}}
+\newcommand{\oxvaluectx}{\mathcal{V}}
+
+%% Substitutions
+\newcommand{\oxsub}{\delta}
+\newcommand{\oxsubentry}[2]{#1 \mapsto #2}
+\newcommand{\oxsubextend}[2]{#1 [#2]}
+
+%% Referents
+\newcommand{\oxreferent}{\mathcal{R}}
+\newcommand{\oxreferentctx}{\oxreferent^\oxhole}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Dynamics Grammar Symbols %%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%% Shapes
+\newcommand{\oxshape}{w}
+
+%% Shape Hole
+\newcommand{\oxshapehole}{\square}
+
+%% Values
+\newcommand{\oxvalue}{v}
+
+%% Uninitialized Memory
+\newcommand{\oxuninit}{\oxkey{dead}}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Grammar Definitions %%
+%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\newcommand{\oxnamegrammar}{
+  \begin{displaymath}
+    \begin{array}{lrclrclrclr}
+      \bnflabel{Variables} & \oxid &&
+      \bnflabel{Functions} & \oxfnname &&
+      \bnflabel{Type Vars.} & \oxtvar &&
+      \bnflabel{Frame Vars.} & \oxenvvar \\
+      \bnflabel{Concrete Regions} & \oxcprov &&
+      \bnflabel{Abstract Regions} & \oxabsprov &&
+      \bnflabel{Strings} & \oxstring &&
+      \bnflabel{Naturals} & m, \oxnum, k \\
+    \end{array}
+  \end{displaymath}
+}
+
+\newcommand{\oxmutagrammar}{
+  \bnflabel{Ownership Qualifiers} & \oxmuta & \bnfdef &
+  \oximm \bnfalt \oxmut
+}
+
+\newcommand{\oxrewritemodegrammar}{
+  \bnflabel{Region Rewriting Modes} & \oxrewritemode & \bnfdef &
+  \oxcombine \bnfalt \oxcombineunrest \bnfalt \oxnoop
+}
+
+\newcommand{\oxplacectxgrammar}{
+  \bnflabel{Place Contexts} & \oxplacectx & \bnfdef &
+  \oxhole  \bnfalt
+  \oxpathcons{\oxplacectx}{\oxpath}
+}
+
+\newcommand{\oxplaceexprctxgrammar}{
+  \bnflabel{Place Expr. Contexts} & \oxplaceexprctx & \bnfdef &
+  \oxhole  \bnfalt
+  \oxderef{\oxplaceexprctx} \bnfalt
+  \oxproj{\oxplaceexprctx}{\oxnum}
+}
+
+\newcommand{\oxplaceexprgrammar}{
+  \bnflabel{Place Exprs.} & \oxplaceexpr & \bnfdef &
+  \oxid \bnfalt
+  \oxderef{\oxplaceexpr} \bnfalt
+  \oxproj{\oxplaceexpr}{\oxnum}
+}
+
+\newcommand{\oxplacegrammar}{
+  \bnflabel{Places} & \oxplace & \bnfdef & \oxpathcons{\oxid}{\oxpath}
+}
+
+\newcommand{\oxreferentgrammar}{
+  \bnflabel{Referent} & \oxreferent & \bnfdef &
+  \oxid \bnfalt
+  \oxproj{\oxreferent}{\oxnum} \bnfalt
+  \oxindex{\oxreferent}{\oxnum} \bnfalt
+  \oxslice{\oxreferent}{\oxnum_1}{\oxnum_2}
+}
+
+\newcommand{\oxreferentctxgrammar}{
+  \bnflabel{Referent Context} & \oxreferentctx & \bnfdef &
+  \oxhole \bnfalt
+  \oxproj{\oxreferentctx}{\oxnum} \bnfalt
+  \oxindex{\oxreferentctx}{\oxnum} \bnfalt
+  \oxslice{\oxreferentctx}{\oxnum_1}{\oxnum_2}
+}
+
+\newcommand{\oxpathgrammar}{
+  \bnflabel{Path} & \oxpath & \bnfdef &
+  \oxemptypath \bnfalt \oxpathcons{\oxnum}{\oxpath}
+}
+
+\newcommand{\oxloangrammar}{
+  \bnflabel{Loans} & \oxloan & \bnfdef &
+  \oxloanpkg{\oxmuta}{\oxplaceexpr}
+}
+
+\newcommand{\oxprovgrammar}{
+  \bnflabel{Regions} & \oxprov & \bnfdef &
+  \oxabsprov \bnfalt \oxcprov
+}
+
+\newcommand{\oxkindgrammar}{
+  \bnflabel{Kinds} & \oxkind & \bnfdef &
+  \oxktype \bnfalt \oxkprov \bnfalt \oxkenv
+}
+
+\newcommand{\oxbasetypegrammar}{
+  \bnflabel{Base Types} & \oxbasetype & \bnfdef &
+  \oxtbool \bnfalt \oxtnum \bnfalt \oxtunit
+}
+
+\newcommand{\oxxitypegrammar}{
+  \bnflabel{Maybe Unsized Types} & \oxxitype & \bnfdef &
+  \oxsitype \bnfalt \oxtslice{\oxsitype}
+}
+
+\newcommand{\oxsitypegrammar}{
+  \bnflabel{Sized Types} & \oxsitype & \bnfdef &
+  \oxbasetype \bnfalt \oxtvar \bnfalt \oxtref{\oxprov}{\oxmuta}{\oxxitype} 
+  \bnfalt \oxtarr{\oxsitype}{\oxnum} \bnfalt \oxtprod{\oxsitype_1 \oxdotsc \oxsitype_n} \bnfalt \oxtsum{\oxsitype_1}{\oxsitype_2}
+  \\ && \bnfalt &
+  \oxtfunext{
+    \overline{\oxenvvar} \oxcomma \overline{\oxabsprov} \oxcomma \overline{\oxtvar}
+  }{
+    \oxsitype_1 \oxdotsc \oxsitype_n
+  }{\oxsitype_r}{\oxenv}{\overline{\oxabsprov_1: \oxabsprov_2}}
+}
+
+\newcommand{\oxsdtypegrammar}{
+  \bnflabel{Dead Types} & \oxsdtype & \bnfdef &
+  \oxsidtype \bnfalt \oxtprod{\oxsdtype_1 \oxdotsc \oxsdtype_n}
+}
+
+\newcommand{\oxsxtypegrammar}{
+  \bnflabel{Maybe Dead Types} & \oxsxtype & \bnfdef &
+  \oxsitype \bnfalt \oxsdtype \bnfalt \oxtprod{\oxsxtype_1 \oxdotsc \oxsxtype_n}
+}
+
+\newcommand{\oxtypegrammar}{
+  \bnflabel{Types} & \oxtype & \bnfdef &
+  \oxxitype \bnfalt \oxsxtype
+}
+
+\newcommand{\oxprimitivegrammar}{
+  \bnflabel{Constants} & \oxprim & \bnfdef &
+  \oxunit \bnfalt \oxnum \bnfalt \oxtrue \bnfalt \oxfalse
+}
+
+\newcommand{\oxenvgrammar}{
+  \bnflabel{Frame Expressions} & \oxenv & \bnfdef &
+  \oxenvvar \bnfalt \oxframe
+}
+
+\newcommand{\oxexpressiongrammar}{
+  \bnflabel{Expressions} & \oxexpr & \bnfdef &
+  \oxprim \bnfalt \oxplaceexpr \bnfalt
+%  \\ && \bnfalt &
+  \oxref{\oxcprov}{\oxmuta}{\oxplaceexpr} \bnfalt
+  \oxref{\oxcprov}{\oxmuta}{\oxindex{\oxplaceexpr}{\oxexpr}} \bnfalt
+  \oxref{\oxcprov}{\oxmuta}{\oxslice{\oxplaceexpr}{\oxexpr_1}{\oxexpr_2}}
+  \bnfalt \oxassign{\oxplaceexpr}{\oxexpr} 
+  \\ && \bnfalt &
+  \oxletrgn{\oxcprov}{\oxexpr} \bnfalt
+%  \\ && \bnfalt &
+  \oxlet{\oxid}{\oxsitype}{\oxexpr_1}{\oxexpr_2} \bnfalt 
+  \oxseq{\oxexpr_1}{\oxexpr_2}
+  \\ && \bnfalt &
+  \oxclosure{
+    \oxascribe{\oxid_1}{\oxsitype_1} \oxdotsc
+    \oxascribe{\oxid_n}{\oxsitype_n}
+  }{\oxsitype_r}{
+    \oxexpr
+  } \bnfalt
+%  \\ && \bnfalt &
+  \oxapp{\oxexpr_f}{
+    \overline{\oxenv} \oxcomma \overline{\oxprov} \oxcomma \overline{\oxsitype}
+  }{
+    \oxexpr_1 \oxdotsc \oxexpr_n
+  }
+  \\ && \bnfalt &
+  \oxbranch{\oxexpr_1}{\oxexpr_2}{\oxexpr_3} \bnfalt
+  \oxprod{\oxexpr_1 \oxdotsc \oxexpr_n} \bnfalt
+  \oxarr{\oxexpr_1 \oxdotsc \oxexpr_n}
+  \\ && \bnfalt &
+  \oxindex{\oxplaceexpr}{\oxexpr} \bnfalt
+  \oxfor{\oxid}{\oxexpr_1}{\oxexpr_2} \bnfalt
+  \oxwhile{\oxexpr_1}{\oxexpr_2} \bnfalt
+  \oxabort{\oxstring}
+  \\ && \bnfalt &
+  \oxinl{\oxsitype_1}{\oxsitype_2}{\oxexpr} \bnfalt \oxinr{\oxsitype_1}{\oxsitype_2}{\oxexpr}
+  \\ && \bnfalt &
+  \oxmatch{\oxexpr}{\oxid_1}{\oxexpr_1}{\oxid_2}{\oxexpr_2}
+}
+
+\newcommand{\oxstructexpressionextension}{
+  \\ && \bnfalt &
+  \oxrecstruct{
+    \oxdatatype \oxsep \oxangle{
+      \overline{\oxprov} \oxcomma \overline{\oxsitype}
+    }
+  }{
+    \oxid_1 \oxcolon \oxexpr_1 \oxdotsc \oxid_n \oxcolon \oxexpr_n
+  }
+  \\ && \bnfalt &
+  \oxtupstruct{
+    \oxdatatype \oxsep \oxangle{
+      \overline{\oxprov} \oxcomma \overline{\oxsitype}
+    }
+  }{\oxexpr_1 \oxdotsc \oxexpr_n}
+}
+
+\newcommand{\oxenumexpressionextension}{
+  \\ && \bnfalt &
+  \oxmatch{\oxexpr_d}{
+    \oxmatcharm{\oxpat_1}{\oxexpr_1} \oxdotsc \oxmatcharm{\oxpat_n}{\oxexpr_n}
+  }
+  \\ && \bnfalt &
+  \oxrecvariant{
+    \oxdatatype \oxsep \oxangle{
+      \overline{\oxprov} \oxcomma \overline{\oxsitype}
+    }
+  }{\oxvariant}{
+    \oxid_1 \oxcolon \oxexpr_1 \oxdotsc \oxid_n \oxcolon \oxexpr_n
+  }
+  \\ && \bnfalt &
+  \oxtupvariant{
+    \oxdatatype \oxsep \oxangle{
+      \overline{\oxprov} \oxcomma \overline{\oxsitype}
+    }
+  }{\oxvariant}{\oxexpr_1 \oxdotsc \oxexpr_n}
+}
+
+\newcommand{\oxpatterngrammar}{
+  \bnflabel{Patterns} & \oxpat & \bnfdef & \oxpwild
+  \\ && \bnfalt &
+  \oxptup{\oxid_1 \oxdotsc \oxid_n}
+  \\ && \bnfalt &
+  \oxptupstruct{\oxdatatype}{\oxid_1 \oxdotsc \oxid_n}
+  \\ && \bnfalt &
+  \oxprecstruct{\oxdatatype}{
+    \oxid_{f_1} \oxcolon \oxid_1 \oxdotsc \oxid_{f_n} \oxcolon \oxid_n
+  }
+  \\ && \bnfalt &
+  \oxptupvariant{\oxdatatype}{\oxvariant}{\oxid_1 \oxdotsc \oxid_n}
+  \\ && \bnfalt &
+  \oxprecvariant{\oxdatatype}{\oxvariant}{
+    \oxid_{f_1} \oxcolon \oxid_1 \oxdotsc \oxid_{f_n} \oxcolon \oxid_n
+  }
+}
+
+\newcommand{\oxglobalentrygrammar}{
+  \bnflabel{Global Entries} & \oxglobalentry & \bnfdef &
+    \oxfuncdef{\oxfnname}{
+      \overline{\oxenvvar} \oxcomma \overline{\oxabsprov} \oxcomma
+      \overline{\oxtvar}
+    }{
+      \oxascribe{\oxid_1}{\oxsitype_1} \oxdotsc
+      \oxascribe{\oxid_n}{\oxsitype_n}
+    }{\oxsitype_r}{\overline{\oxabsprov_1 : \oxabsprov_2}}{\oxexpr}
+  % TODO: structs
+  % \\ && \bnfalt &
+  %   \oxtupstructdef{\oxdatatype}{
+  %     \overline{\oxabsprov} \oxcomma \overline{\oxtvar}
+  %   }{\oxsitype_1 \oxdotsc \oxsitype_n}
+  % \\ && \bnfalt &
+  %   \oxrecstructdef{\oxdatatype}{
+  %     \overline{\oxabsprov} \oxcomma \overline{\oxtvar}
+  %   }{
+  %     \oxascribe{\oxid_1}{\oxsitype_1} \oxdotsc
+  %     \oxascribe{\oxid_n}{\oxsitype_n}
+  %   }
+}
+
+\newcommand{\oxglobalctxgrammar}{
+  \bnflabel{Global Environment} & \oxglobalctx & \bnfdef &
+  \oxemptyctx \bnfalt \oxextendctx{\oxglobalctx}{\oxglobalentry}
+}
+
+\newcommand{\oxenumglobalentryextension}{
+  \\ && \bnfalt &
+  \oxenumdef{\oxdatatype}{
+    \overline{\oxabsprov} \oxcomma \overline{\oxtvar}
+  }{
+    \oxenumvar_1 \oxdotsc \oxenumvar_n
+  }
+}
+
+\newcommand{\oxtvarctxgrammar}{
+  \bnflabel{Type Environment} & \oxtvarctx & \bnfdef &
+  \oxemptyctx \bnfalt
+  \oxextendctx{\oxtvarctx}{
+    \oxtvarctxentry{
+      \oxtvar
+    }{
+      \oxktype
+    }
+  } \bnfalt
+  \oxextendctx{\oxtvarctx}{
+    \oxtvarctxentry{
+      \oxabsprov
+    }{
+      \oxkprov
+    }
+  } \bnfalt
+  \oxextendctx{\oxtvarctx}{
+    \oxtvarctxentry{
+      \oxenvvar
+    }{
+      \oxkenv
+    }
+  } \bnfalt
+  \oxextendctx{\oxtvarctx}{
+    \oxabsprov \oxoutlives \oxabsprov^\prime
+  }
+}
+
+\newcommand{\oxloanctxgrammar}{
+  \bnflabel{Loan Environment} & \oxloanctx & \bnfdef &
+  \oxemptyctx \bnfalt
+  \oxextendctx{\oxloanctx}{
+    \oxloanctxentry{\oxcprov}{\oxset{\overline{\oxloan}}}
+  }
+}
+
+\newcommand{\oxvarctxgrammar}{
+  \bnflabel{Stack Typing} & \oxvarctx & \bnfdef &
+  \oxemptyctx \bnfalt
+  \oxnewframe{\oxvarctx}{\oxframe}
+}
+
+\newcommand{\oxframegrammar}{
+  \bnflabel{Frame Typing} & \oxframe & \bnfdef &
+  \oxemptyctx \bnfalt
+  \oxextendctx{\oxframe}{
+    \oxvarctxentry{\oxid}{\oxsxtype}
+  } \bnfalt
+  \oxextendctx{\oxframe}{
+    \oxloanctxentry{\oxcprov}{\oxset{\overline{\oxloan}}}
+  }
+}
+
+\newcommand{\oxkontctxgrammar}{
+  \bnflabel{Continuation Typing} & \oxkontctx & \bnfdef &
+  \oxemptyctx \bnfalt
+  \oxextendctx{\oxkontctx}{
+    \oxkontctxentry{\oxsitype}
+  }
+}
+
+\newcommand{\oxvaluegrammar}{
+  \bnflabel{Values} & \oxvalue & \bnfdef &
+  \oxprim \bnfalt
+  \oxprod{\oxvalue_1 \oxdotsc \oxvalue_n} \bnfalt
+  \oxarr{\oxvalue_1 \oxdotsc \oxvalue_n} \bnfalt
+  \oxsliceval{\oxvalue_1 \oxdotsc \oxvalue_n} \bnfalt \oxfnname \bnfalt
+%  \\ && \bnfalt &
+  \oxuninit
+}
+
+\newcommand{\oxenumvalueextension}{
+  \\ && \bnfalt &
+  \oxrecstruct{
+    \oxturbofish{\oxdatatype}{
+      \oxprov_1 \oxdotsc \oxprov_m \oxcomma \oxsitype_1 \oxdots \oxsitype_n
+    }
+  }{
+    \oxid_1 \oxcolon \oxvalue_1 \oxdotsc \oxid_k \oxcolon \oxvalue_k
+  }
+  \\ && \bnfalt &
+  \oxtupstruct{
+    \oxturbofish{\oxdatatype}{
+      \oxprov_1 \oxdotsc \oxprov_m \oxcomma \oxsitype_1 \oxdots \oxsitype_n
+    }
+  }{\oxvalue_1 \oxdotsc \oxvalue_k}
+  \\ && \bnfalt &
+  \oxrecvariant{
+    \oxturbofish{\oxdatatype}{
+      \oxprov_1 \oxdotsc \oxprov_m \oxcomma \oxsitype_1 \oxdots \oxsitype_n
+    }
+  }{\oxvariant}{
+    \oxid_1 \oxcolon \oxvalue_1 \oxdotsc \oxid_k \oxcolon \oxvalue_k
+  }
+  \\ && \bnfalt &
+  \oxtupvariant{
+    \oxturbofish{\oxdatatype}{
+      \oxprov_1 \oxdotsc \oxprov_m \oxcomma \oxsitype_1 \oxdots \oxsitype_n
+    }
+  }{\oxvariant}{\oxvalue_1 \oxdotsc \oxvalue_k}
+}
+
+\newcommand{\oxenumvargrammar}{
+  \bnflabel{Enum Variants} & \oxenumvar & \bnfdef &
+  \oxtupstruct{\oxvariant}{\oxsitype_1 \oxdotsc \oxsitype_n} \bnfalt
+  \oxrecstruct{\oxvariant}{
+    \oxascribe{\oxid_1}{\oxsitype_1} \oxdotsc
+    \oxascribe{\oxid_n}{\oxsitype_n}
+  }
+}
+
+\newcommand{\oxptrextension}{
+%  \\ && \bnfalt &
+  \bnfalt
+  \oxptr{\oxreferent}
+  \\ && \bnfalt &
+  \oxclosureval{\oxstackframe}{
+    \oxascribe{\oxid_1}{\oxsitype_1} \oxdotsc
+    \oxascribe{\oxid_n}{\oxsitype_n}
+  }{\oxsitype_r}{\oxexpr}
+}
+
+\newcommand{\oxptrexprgrammar}{
+  \bnflabel{Expressions} & \oxexpr & \bnfdef &
+  \oxdots \bnfalt \oxframed{\oxexpr} \bnfalt \oxshift{\oxexpr}
+  \bnfalt \oxsliceval{\oxvalue_1 \oxdotsc \oxvalue_n} \bnfalt \oxuninit
+  \oxptrextension
+}
+
+\newcommand{\oxptrvaluegrammar}{
+  \bnflabel{Value} & \oxvalue & \bnfdef &
+  \oxdots
+  \oxptrextension
+}
+
+\newcommand{\oxptrshapegrammar}{
+  \bnflabel{Shape} & \oxshape & \bnfdef &
+  \oxdots
+  \oxptrextension
+}
+
+\newcommand{\oxevalctxgrammar}{
+  \bnflabel{Eval. Contexts} & \oxevalctx & \bnfdef &
+  \oxhole
+  \\ && \bnfalt &
+  \oxref{\oxprov}{\oxmuta}{\oxindex{\oxplaceexpr}{\oxevalctx}} \bnfalt
+  \oxref{\oxprov}{\oxmuta}{\oxslice{\oxplaceexpr}{\oxevalctx}{\oxnoseqexpr}} \bnfalt
+  \oxref{\oxprov}{\oxmuta}{\oxslice{\oxplaceexpr}{\oxvalue}{\oxevalctx}}
+  \\ && \bnfalt &
+  \oxlet{\oxid}{\oxsitype}{\oxevalctx}{\oxexpr} \bnfalt
+  \oxletrgn{\oxcprov}{\oxevalctx}
+  \\ && \bnfalt &
+  \oxassign{\oxplaceexpr}{\oxevalctx} \bnfalt
+  \oxseq{\oxevalctx}{\oxexpr} \bnfalt
+  \oxframed{\oxevalctx} 
+  \\ && \bnfalt &
+  \oxshift{\oxevalctx} \bnfalt
+  \oxshiftprov{\oxevalctx}
+  \\ && \bnfalt &
+  \oxapp{\oxevalctx}{\overline{\oxenv} \oxcomma \overline{\oxprov} \oxcomma  \overline{\oxsitype}}{
+    \oxnoseqexpr_1 \oxdotsc \oxnoseqexpr_n
+  }
+  \\ && \bnfalt &
+  \oxapp{\oxvalue}{\overline{\oxenv} \oxcomma \overline{\oxprov} \oxcomma \overline{\oxsitype}}{
+    \oxvalue_1 \oxdotsc \oxvalue_m \oxcomma \oxevalctx \oxcomma
+    \oxnoseqexpr_1 \oxdotsc \oxnoseqexpr_n
+  }
+  \\ && \bnfalt &
+  \oxindex{\oxplaceexpr}{\oxevalctx} \bnfalt
+  \oxbranch{\oxevalctx}{\oxexpr_1}{\oxexpr_2}
+  \\ && \bnfalt &
+  \oxfor{\oxid}{\oxevalctx}{\oxexpr}
+  \\ && \bnfalt &
+  \oxprod{
+    \oxvalue_1 \oxdotsc \oxvalue_m \oxcomma \oxevalctx \oxcomma
+    \oxnoseqexpr_1 \oxdotsc \oxnoseqexpr_n
+  }
+  \\ && \bnfalt &
+  \oxarr{
+    \oxvalue_1 \oxdotsc \oxvalue_m \oxcomma \oxevalctx \oxcomma
+    \oxnoseqexpr_1 \oxdotsc \oxnoseqexpr_n
+  }
+  \\ && \bnfalt &
+  \oxinl{\oxsitype_1}{\oxsitype_2}{\oxevalctx} \bnfalt
+  \oxinr{\oxsitype_1}{\oxsitype_2}{\oxevalctx}
+  \\ && \bnfalt &
+  \oxmatch{\oxevalctx}{\oxid_1}{\oxexpr_1}{\oxid_2}{\oxexpr_2}
+  % \\ && \bnfalt &
+  % \oxrecstruct{
+  %   \oxturbofish{\oxdatatype}{\overline{\oxprov} \oxcomma \overline{\oxsitype}}
+  % }{
+  %   \oxascribe{\oxid_1}{\oxvalue_1} \oxdotsc \oxascribe{\oxid_m}{\oxvalue_m}
+  %   \oxcomma  \oxascribe{\oxid_{m+1}}{\oxevalctx} \oxcomma
+  %   \oxascribe{\oxid_{m+2}}{\oxexpr_1} \oxdotsc \oxascribe{\oxid_{m+n+1}}{\oxexpr_n}
+  % }
+  % \\ && \bnfalt &
+  % \oxtupstruct{
+  %   \oxturbofish{\oxdatatype}{\overline{\oxprov} \oxcomma \overline{\oxsitype}}
+  % }{
+  %   \oxvalue_1 \oxdotsc \oxvalue_m
+  %   \oxcomma \oxevalctx \oxcomma
+  %   \oxexpr_{1} \oxdotsc \oxexpr_n
+  % }
+}
+
+\newcommand{\oxvaluectxgrammar}{
+  \bnflabel{Value Contexts} & \oxvaluectx & \bnfdef &
+  \oxhole \bnfalt
+  \oxprod{\oxvalue_1 \oxdotsc \oxvaluectx \oxdotsc \oxvalue_n} \bnfalt
+  \oxarr{\oxvalue_1 \oxdotsc \oxvaluectx_1 \oxdotsc \oxvaluectx_m \oxdotsc \oxvalue_n}
+}
+
+\newcommand{\oxstoregrammar}{
+  \bnflabel{Stacks} & \oxstore & \bnfdef &
+  \oxemptyctx \bnfalt
+  \oxnewframe{\oxstore}{\oxstackframe}
+}
+
+\newcommand{\oxstackframegrammar}{
+  \bnflabel{Stack Frame} & \oxstackframe & \bnfdef &
+  \oxemptyctx \bnfalt
+  \oxextendctx{\oxstackframe}{\oxstoreentry{\oxid}{\oxvalue}}
+}

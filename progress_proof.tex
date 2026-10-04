@@ -1,0 +1,538 @@
+\begin{oxlemma}{Progress}{lemma:progress-app}
+  If
+  \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{\oxvarctx}{\oxexpr}
+  {\oxsitype}{\oxvarctx^\prime} and
+  \oxstorevalidity{\oxglobalctx}{\oxvarctx}{\oxstore}, then either
+  $\oxexpr$ is a value, $\oxexpr$ is an \oxabort{\,\dots\,}, or $\oxexists
+  \oxstore^\prime, \oxexpr^\prime. \;
+  \oxreduce{\oxglobalctx}{\oxstore}{\oxexpr}{\oxstore^\prime}{\oxexpr^\prime}$.
+\end{oxlemma}
+
+\paragraph{Proof} We proceed by induction on the derivation
+\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{\oxvarctx}{\oxexpr}
+{\oxtype}{\oxvarctx^\prime}. \\
+
+\oxprogresscase{T-Move}{\TMove}{\EMove}{
+  Applying \Lemma{lemma:place-exprs-reduce} to
+  $\oxmusafety{\oxtvarctx}{\oxvarctx}{\oxmut}{\oxplace}{\oxset{
+      \oxloanpkg{\oxmut}{\oxplace}
+  }}$, $\oxcomputetynoprov{\oxtvarctx}{\oxvarctx}{\oxmut}{\oxplace}{\oxsitype}$
+  (from $\oxlookup{\oxvarctx}{\oxplace}{\oxsitype}$ by \oxname{TC-Place}), and
+  $\oxstorevalidity{\oxglobalctx}{\oxvarctx}{\oxstore}$ to conclude that
+  $\oxnorm{\oxstore}{\oxplace}{\_}{\_}{\oxvalue}$. Thus, we can step
+  with \oxname{E-Move}.
+}
+
+\oxprogresscase{T-Copy}{\TCopy}{\ECopy}{
+  Applying \Lemma{lemma:place-exprs-reduce} to
+  $\oxmusafety{\oxtvarctx}{\oxvarctx}{\oximm}{\oxplaceexpr}{\oxset{
+      \overline{\oxloan}
+  }}$, $\oxcomputetynoprov{\oxtvarctx}{\oxvarctx}{\oximm}{\oxplaceexpr}
+  {\oxsitype}$, and $\oxstorevalidity{\oxglobalctx}{\oxvarctx}{\oxstore}$ to
+  conclude that $\oxnorm{\oxstore}{\oxplaceexpr}{\_}{\_}{\oxvalue}$. Thus, we can
+  step with \oxname{E-Copy}.
+}
+
+\oxprogresscasewide{T-Borrow}{\TBorrow}{\EBorrow}{
+  Applying \Lemma{lemma:place-exprs-reduce} to
+  $\oxmusafety{\oxtvarctx}{\oxvarctx}{\oxmuta}{\oxplaceexpr}{\oxset{
+      \overline{\oxloan}
+    }}$, $\oxcomputetynoprov{\oxtvarctx}{\oxvarctx}{\oxmuta}{\oxplaceexpr}
+  {\oxxitype}$, and $\oxstorevalidity{\oxglobalctx}{\oxvarctx}{\oxstore}$ to
+  conclude that $\oxnorm{\oxstore}{\oxplaceexpr}{\oxreferent}{\_}{\_}$. Thus, we can
+  step with \oxname{E-Borrow}.
+}
+
+\oxprogresscaseinductive{T-BorrowIndex}{\TBorrowIndex}{
+  We proceed based on  whether or not $\oxexpr$ is a value. If it is not, we can
+  decompose our expression into the evaluation context
+  $\oxref{\oxprov}{\oxmuta}{\oxindex{\oxplaceexpr}{\oxhole}}$ and redex
+  $\oxexpr$. Then, by applying our induction hypothesis to the typing derivation
+  for $\oxexpr$, we know either that $\oxexpr$ is an $\oxkey{abort!}$ expression
+  or it $\oxexpr$ steps to some $\oxexpr^\prime$.  In the former case, we can
+  step with \oxname{E-EvalCtxAbort}.  In the latter case, we can plug
+  $\oxexpr^\prime$ back into our evaluation context and step with
+  \oxname{E-EvalCtx}.
+}{
+  If $\oxexpr$ is a value, we would like to step with one of:
+}{\EBorrowIndex \and \EBorrowIndexOOB}{
+  Since $\oxexpr$ is a value, we can apply \Lemma{lemma:values-dont-change} to
+  get $\oxsubtypectx{\oxglobalctx}{\oxemptyctx}{\oxvarctx}{\oxvarctx^\prime}$.
+  Applying \Lemma{lemma:stack-validity-related-envs}, then gives us
+  $\oxstorevalidity{\oxglobalctx}{\oxvarctx^\prime}{\oxstore}$.
+
+  Then, we can apply \Lemma{lemma:place-exprs-reduce} to
+  $\oxmusafety{\oxtvarctx}{\oxvarctx^\prime}{\oxmuta}{\oxplaceexpr}{
+    \oxset{\overline{\oxloan}}
+  }$, $\oxcomputetynoprov{\oxtvarctx}{\oxvarctx^\prime}{\oxmuta}{\oxplaceexpr}
+  {\oxxitype}$, and $\oxstorevalidity{\oxglobalctx}{\oxvarctx^\prime}{\oxstore}$
+  to get $\oxnorm{\oxstore}{\oxplaceexpr}{\oxreferent}{\_}{\oxvalue}$. By
+  \Lemma{lemma:canonical-forms}, we know that
+  $\oxvalue =  \oxarr{\oxvalue_0 \oxdotsc \oxvalue_n}$ since the type tells us
+  the shape of the resultant value.
+
+  Since we wish to step with one of \oxname{E-BorrowIndex} and
+  \oxname{E-BorrowIndexOOB}, we should observe that we now have
+  their shared requirement: $\oxnorm{\oxstore}{\oxplaceexpr}{\oxreferent}{\_}{
+    \oxarr{\oxvalue_0 \oxdotsc \oxvalue_n}
+  }$. Their other obligations are a bounds check which together are a tautology
+  (i.e. one of them must hold). Thus, we can step with the appropriate rule
+  based on whether or not the bounds check succeeds.
+}
+
+\oxprogresscaseinductive{T-BorrowSlice}{\TBorrowSlice}{
+  The proof proceeds along similar lines as for \oxname{T-BorrowIndex}. We
+  proceed based on whether or not $\oxexpr_1$ and $\oxexpr_2$ are values.
+
+  If $\oxexpr_1$ is not a value, then we can decompose our whole expression into
+  the evaluation context
+  $\oxref{\oxprov}{\oxmuta}{\oxslice{\oxplaceexpr}{\oxhole}{\oxexpr_2}}$ and
+  redex $\oxexpr_1$. Then, by applying our induction hypothesis to $\oxexpr_1$,
+  we know either that $\oxexpr_1$ steps to some $\oxexpr_1^\prime$ or is an
+  $\oxkey{abort!}$ expression. In the former case, this satisfies our
+  requirement since we can plug $\oxexpr^\prime$ back into our evaluation
+  context. In the latter case, we can step with \oxname{E-EvalCtxAbort}.
+
+
+  If $\oxexpr_1$ is a value and $\oxexpr_2$ is not a value, then we can
+  decompose our whole expression into the evaluation context
+  $\oxref{\oxprov}{\oxmuta}{\oxslice{\oxplaceexpr}{\oxvalue_1}{\oxhole}}$ and
+  redex $\oxexpr_2$. Then, by applying our induction hypothesis to $\oxexpr_2$,
+  we know either that $\oxexpr_2$ steps to some $\oxexpr_2^\prime$ or is an
+  $\oxkey{abort!}$ expression. In the former case, this satisfies our
+  requirement since we can plug $\oxexpr^\prime$ back into our evaluation
+  context. In the latter case, we can step with \oxname{E-EvalCtxAbort}.
+}{
+  If $\oxexpr_1$ and $\oxexpr_2$ are values, we would like to step with one of:
+}{\EBorrowSlice \and \EBorrowSliceOOB}{
+  Since $\oxexpr_1$ is a value, we can apply \Lemma{lemma:values-dont-change} to
+  get $\oxsubtypectx{\oxglobalctx}{\oxemptyctx}{\oxvarctx}{\oxvarctx_1}$.
+  Then, since $\oxexpr_2$ is also a value, we can apply
+  \Lemma{lemma:values-dont-change} to get
+  $\oxsubtypectx{\oxglobalctx}{\oxemptyctx}{\oxvarctx_1}{\oxvarctx_2}$. Then, by
+  transitivity, we get
+  $\oxsubtypectx{\oxglobalctx}{\oxemptyctx}{\oxvarctx}{\oxvarctx_2}$.
+  Then, applying \Lemma{lemma:stack-validity-related-envs} gives us
+  $\oxstorevalidity{\oxglobalctx}{\oxvarctx_2}{\oxstore}$.
+
+  Then, we can apply \Lemma{lemma:place-exprs-reduce} to
+  $\oxmusafety{\oxtvarctx}{\oxvarctx_2}{\oxmuta}{\oxplaceexpr}{
+    \oxset{\overline{\oxloan}}
+  }$, $\oxcomputetynoprov{\oxtvarctx}{\oxvarctx_2}{\oxmuta}{\oxplaceexpr}
+  {\oxtslice{\oxsitype}}$, and $\oxstorevalidity{\oxglobalctx}{\oxvarctx_2}{
+    \oxstore
+  }$ to get $\oxnorm{\oxstore}{\oxplaceexpr}{\oxreferent}{\_}{\oxvalue}$. By
+  \Lemma{lemma:canonical-forms}, we know that
+  $\oxvalue =  \oxarr{\oxvalue_0 \oxdotsc \oxvalue_n}$ since the type tells us
+  the shape of the resultant value.
+
+  Since we wish to step with one of \oxname{E-BorrowSlice} and
+  \oxname{E-BorrowSliceOOB}, we should observe that we now have
+  their shared requirement: $\oxnorm{\oxstore}{\oxplaceexpr}{\oxreferent}{\_}{
+    \oxarr{\oxvalue_0 \oxdotsc \oxvalue_n}
+  }$. Their other obligations are a bounds check which together are a tautology
+  (i.e. one of them must hold). Thus, we can step with the appropriate rule
+  based on whether or not the bounds check succeeds.
+}
+
+\oxprogresscaseinductive{T-IndexCopy}{\TIndexCopy}{
+  We proceed based on whether or not $\oxexpr$ is a value. If it is not, we can
+  decompose our expression into the evaluation context
+  $\oxindex{\oxplaceexpr}{\oxhole}$ and redex $\oxexpr$. Then, by applying our
+  induction hypothesis to $\oxexpr$, we know either that $\oxexpr$ steps to
+  some $\oxexpr^\prime$ or is an $\oxkey{abort!}$ expression. In the former
+  case, this satisfies our requirement since we can plug $\oxexpr^\prime$ back
+  into our evaluation context. In the latter case, we can step with
+  \oxname{E-EvalCtxAbort}.
+}{If $\oxexpr$ is a value, we would like to step with one of:}{
+  \EIndexCopy \and \EIndexCopyOOB
+}{
+  Since $\oxexpr$ is a value, we can apply \Lemma{lemma:values-dont-change} to
+  get $\oxsubtypectx{\oxglobalctx}{\oxemptyctx}{\oxvarctx}{\oxvarctx^\prime}$.
+  Applying \Lemma{lemma:stack-validity-related-envs}, then gives us
+  $\oxstorevalidity{\oxglobalctx}{\oxvarctx^\prime}{\oxstore}$.
+
+  Then, we can apply \Lemma{lemma:place-exprs-reduce} to
+  $\oxmusafety{\oxtvarctx}{\oxvarctx^\prime}{\oxmuta}{\oxplaceexpr}{
+    \oxset{\overline{\oxloan}}
+  }$, $\oxcomputetynoprov{\oxtvarctx}{\oxvarctx^\prime}{\oxmuta}{\oxplaceexpr}
+  {\oxxitype}$, and $\oxstorevalidity{\oxglobalctx}{\oxvarctx^\prime}{\oxstore}$
+  to get $\oxnorm{\oxstore}{\oxplaceexpr}{\_}{\_}{\oxvalue}$. By
+  \Lemma{lemma:canonical-forms}, we know that
+  $\oxvalue =  \oxarr{\oxvalue_0 \oxdotsc \oxvalue_n}$ since the type tells us
+  the shape of the resultant value.
+
+  Since we wish to step with one of \oxname{E-IndexCopy} and
+  \oxname{E-IndexCopyOOB}, we should observe that we now have
+  their shared requirement: $\oxnorm{\oxstore}{\oxplaceexpr}{\_}{\_}{
+    \oxarr{\oxvalue_0 \oxdotsc \oxvalue_n}
+  }$. Their other obligations are a bounds check which together are a tautology
+  (i.e. one of them must hold). Thus, we can step with the appropriate rule
+  based on whether or not the bounds check succeeds.
+}
+
+\oxprogresscaseinductive{T-Seq}{\TSeq}{
+  We proceed based on whether or not $\oxexpr_1$ is a value. If it is not, we can
+  decompose our expression into the evaluation context
+  $\oxseq{\oxhole}{\oxexpr_2}$ and redex $\oxexpr_1$. Then, by applying our
+  induction hypothesis to $\oxexpr_1$, we know either that $\oxexpr_1$ steps to
+  some $\oxexpr_1^\prime$ or is an $\oxkey{abort!}$ expression. In the former
+  case, this satisfies our requirement since we can plug $\oxexpr_1^\prime$ back
+  into our evaluation context. In the latter case, we can step with
+  \oxname{E-EvalCtxAbort}.
+}{If $\oxexpr_1$ is a value, we can step with:}{\ESeq}{}
+
+\oxprogresscaseinductive{T-Branch}{\TBranch}{
+  We proceed based on whether or not $\oxexpr_1$ is a value. If it is not, we can
+  decompose our expression into the evaluation context
+  $\oxbranch{\oxhole}{\oxexpr_2}{\oxexpr_3}$ and redex $\oxexpr_1$. Then, by
+  applying our induction hypothesis to $\oxexpr_1$, we know either that
+  $\oxexpr_1$ steps to some $\oxexpr_1^\prime$ or is an $\oxkey{abort!}$
+  expression. In the former case, this satisfies our requirement since we can
+  plug $\oxexpr_1^\prime$ back into our evaluation context. In the latter case,
+  we can step with \oxname{E-EvalCtxAbort}.
+}{If $\oxexpr_1$ is a value, we would like to step with one of:}{
+  \EIfTrue \and \EIfFalse
+}{
+  Since $\oxexpr_1$ is a value, applying \Lemma{lemma:canonical-forms} tells us
+  that $\oxexpr_1$ is either $\oxtrue$ or $\oxfalse$. In the former case, we can
+  step with \oxname{E-IfTrue} and in the latter case, we can step with
+  \oxname{E-IfFalse}
+}
+
+\oxprogresscaseinductive{T-Let}{\TLet}{
+  We proceed based on whether or not $\oxexpr_1$ is a value. If it is not, we can
+  decompose our expression into the evaluation context
+  $\oxlet{\oxid}{\oxsitype_a}{\oxhole}{\oxexpr_2}$ and redex $\oxexpr_1$. Then,
+  by applying our induction hypothesis to $\oxexpr_1$, we know either that
+  $\oxexpr_1$ steps to some $\oxexpr_1^\prime$ or is an $\oxkey{abort!}$
+  expression. In the former case, this satisfies our requirement since we can
+  plug $\oxexpr_1^\prime$ back into our evaluation context. In the latter case,
+  we can step with \oxname{E-EvalCtxAbort}.
+}{If $\oxexpr_1$ is a value, we can step with:}{\ELet}{}
+
+\oxprogresscaseinductive{T-LetRegion}{\TLetProv}{
+  We proceed based on whether or not $\oxexpr$ is a value. If it is not, we can
+  decompose our expression into the evaluation context
+  $\oxletrgn{\oxcprov}{\oxhole}$ and redex $\oxexpr$. Then, by applying our
+  induction hypothesis to $\oxexpr$, we know either that $\oxexpr$ steps to some
+  $\oxexpr^\prime$ or is an $\oxkey{abort!}$ expression. In the former case,
+  this satisfies our requirement since we can plug $\oxexpr^\prime$ back into
+  our evaluation context. In the latter case, we can step with
+  \oxname{E-EvalCtxAbort}.
+}{If $\oxexpr$ is a value, we can step with:}{\ELetProv}{}
+
+\oxprogresscaseinductive{T-Assign}{\TAssign}{
+  We proceed based on whether or not $\oxexpr$ is a value. If it is not, we can
+  decompose our expression into the evaluation context
+  $\oxassign{\oxplaceexpr}{\oxhole}$ and redex $\oxexpr$. Then, by applying our
+  induction hypothesis to $\oxexpr$, we know either that $\oxexpr$ steps to some
+  $\oxexpr^\prime$ or is an $\oxkey{abort!}$ expression. In the former case,
+  this satisfies our requirement since we can plug $\oxexpr^\prime$ back into
+  our evaluation context. In the latter case, we can step with
+  \oxname{E-EvalCtxAbort}.
+}{
+  If $\oxexpr$ is a value, we would like to step with:
+}{\EAssign}{
+  Since $\oxexpr$ is a value, we can apply \Lemma{lemma:values-dont-change} to
+  get $\oxsubtypectx{\oxglobalctx}{\oxemptyctx}{\oxvarctx}{\oxvarctx^\prime}$.
+  Applying \Lemma{lemma:stack-validity-related-envs}, then gives us
+  $\oxstorevalidity{\oxglobalctx}{\oxvarctx^\prime}{\oxstore}$.
+
+  Then, we can apply \Lemma{lemma:place-exprs-reduce} to
+  $\oxmusafety{\oxtvarctx}{\oxvarctx^\prime}{\oxmuta}{\oxplaceexpr}{
+    \oxset{\overline{\oxloan}}
+  }$, $\oxcomputetynoprov{\oxtvarctx}{\oxvarctx^\prime}{\oxmuta}{\oxplaceexpr}
+  {\oxxitype}$, and $\oxstorevalidity{\oxglobalctx}{\oxvarctx^\prime}{\oxstore}$
+  to get $\oxnorm{\oxstore}{\oxplaceexpr}{\oxreferent}{\oxvaluectx}{\_}$.
+}
+
+\oxprogresscaseinductive{T-ForArray}{\TForArray}{
+  We proceed based on whether or not $\oxexpr_1$ is a value. If it is not, we can
+  decompose our expression into the evaluation context
+  $\oxfor{\oxid}{\oxhole}{\oxexpr_2}$ and redex $\oxexpr_1$. Then, by applying our
+  induction hypothesis to $\oxexpr_1$, we know either that $\oxexpr_1$ steps to
+  some $\oxexpr_1^\prime$ or is an $\oxkey{abort!}$ expression. In the former
+  case, this satisfies our requirement since we can plug $\oxexpr_1^\prime$ back
+  into our evaluation context. In the latter case, we can step with
+  \oxname{E-EvalCtxAbort}.
+}{If $\oxexpr_1$ is a value, we would like to step with one of:}{
+  \EForArray \and \EForEmptyArray
+}{
+  Since $\oxexpr_1$ is a value, then by \Lemma{lemma:canonical-forms}, we know
+  that $\oxexpr_1$ is of the form $\oxarr{\oxvalue_1 \oxdotsc \oxvalue_n}$. If
+  $n > 0$, then we can step with \oxname{E-ForArray}, and if $n = 0$, then we
+  can step with \oxname{E-ForEmptyArray}.
+}
+
+\oxprogresscaseinductive{T-ForSlice}{\TForSlice}{
+  We proceed based on whether or not $\oxexpr_1$ is a value. If it is not, we can
+  decompose our expression into the evaluation context
+  $\oxfor{\oxid}{\oxhole}{\oxexpr_2}$ and redex $\oxexpr_1$. Then, by applying our
+  induction hypothesis to $\oxexpr_1$, we know either that $\oxexpr_1$ steps to
+  some $\oxexpr_1^\prime$ or is an $\oxkey{abort!}$ expression. In the former
+  case, this satisfies our requirement since we can plug $\oxexpr_1^\prime$ back
+  into our evaluation context. In the latter case, we can step with
+  \oxname{E-EvalCtxAbort}.
+}{If $\oxexpr_1$ is a value, we would like to step with one of:}{
+  \EForSlice \and \EForEmptySlice
+}{
+  If $\oxexpr_1$ is a value, then by \Lemma{lemma:canonical-forms}, we know that
+  $\oxexpr_1$ is of the form $\oxsliceptr{\oxreferent}{\oxnum_1}{\oxnum_2}$.
+  Further, by inversion of \oxname{T-Pointer} for the typing derivation of
+  $\oxexpr_1$, we get $\oxreferentvalidity{\oxglobalctx}{\oxvarctx}{
+    \oxslice{\oxreferent}{i}{j}
+  }{\oxtslice{\oxsitype}}$. By inversion of \oxname{WF-RefSliceArray} or
+  \oxname{WF-RefSliceSlice} (one of which must apply since the referent ends in
+  a slice), we know that $i \leq j$. If $i < j$, we step with
+  \oxname{E-ForSlice} and if $i = j$, we step with \oxname{E-ForEmptySlice}.
+}
+
+\oxprogresscasewide{T-Closure}{\TClosure}{\EClosure}{
+  Since $\oxfvars{\cdot}$ and $\oxfncvars{\oxstore}{\cdot}$ are total, we can
+  always step with \oxname{E-Closure}.
+}
+
+\oxprogresscaseinductive{T-AppClosure}{\TAppClosure}{
+  We proceed based on whether or not $\oxexpr_f$ is a value. If it is not, we can
+  decompose our expression into the evaluation context
+  $\oxapply{\oxhole}{\oxexpr_1 \oxdotsc \oxexpr_n}$ and redex
+  $\oxexpr_f$. Then, by applying our induction hypothesis to $\oxexpr_f$, we
+  know either that $\oxexpr_f$ steps to some $\oxexpr_f^\prime$ or is an
+  $\oxkey{abort!}$ expression. In the former case, this satisfies our
+  requirement since we can plug $\oxexpr_f^\prime$ back into our evaluation
+  context. In the latter case, we can step with \oxname{E-EvalCtxAbort}.
+
+  Next, we'll proceed based on whether or not each expression $\oxexpr_i$ is a
+  value. If any of them are not, we can decompose our expression into the
+  evaluation context $\oxapply{\oxvalue_f}{\oxvalue_1 \oxdotsc \oxvalue_m
+    \oxcomma \oxhole \oxcomma \oxexpr_1 \oxdotsc \oxexpr_{n^\prime}}$ and redex
+  $\oxexpr_i$. Then, by applying our induction hypothesis to $\oxexpr_i$, we
+  know either that $\oxexpr_i$ steps to some $\oxexpr_i^\prime$ or is an
+  $\oxkey{abort!}$ expression. In the former case, this satisfies our
+  requirement since we can plug $\oxexpr_i^\prime$ back into our evaluation
+  context. In the latter case, we can step with \oxname{E-EvalCtxAbort}.
+}{
+  If $\oxexpr_f$ is a value and every $\oxexpr_i$ is a value, we would like to
+  step with one of:
+}{\EApp}{
+  Since $\oxexpr_f$ is a value, then by \Lemma{lemma:canonical-forms}, we know
+  that it has the form
+  $\oxclosureval{\oxstore_c}{ \oxascribe{\oxid_1}{\oxsitype_1} \oxdotsc
+    \oxascribe{\oxid_n}{\oxsitype_n} }{\oxsitype_r}{\oxexpr}$.
+  Then, since all of the $e_i$ are values, then we can step using
+  \oxname{E-AppClosure}.
+}
+
+\oxprogresscaseinductive{T-AppFunction}{\TApp}{
+  We proceed based on whether or not $\oxexpr_f$ is a value. If it is not, we can
+  decompose our expression into the evaluation context
+  $\oxapp{\oxhole}{\overline{\oxenv} \oxcomma \overline{\oxprov} \oxcomma
+    \overline{\oxsitype}}{\oxexpr_1 \oxdotsc \oxexpr_n}$ and redex
+  $\oxexpr_f$. Then, by applying our induction hypothesis to $\oxexpr_f$, we
+  know either that $\oxexpr_f$ steps to some $\oxexpr_f^\prime$ or is an
+  $\oxkey{abort!}$ expression. In the former case, this satisfies our
+  requirement since we can plug $\oxexpr_f^\prime$ back into our evaluation
+  context. In the latter case, we can step with \oxname{E-EvalCtxAbort}.
+
+  Next, we'll proceed based on whether or not each expression $\oxexpr_i$ is a
+  value. If any of them are not, we can decompose our expression into the
+  evaluation context
+  $\oxapp{\oxvalue_f}{\overline{\oxenv} \oxcomma \overline{\oxprov} \oxcomma \overline{\oxsitype} }{\oxvalue_1 \oxdotsc \oxvalue_m \oxcomma \oxhole \oxcomma \oxexpr_1 \oxdotsc \oxexpr_{n^\prime}}$
+  and redex $\oxexpr_i$. Then, by applying our induction hypothesis to
+  $\oxexpr_i$, we know either that $\oxexpr_i$ steps to some $\oxexpr_i^\prime$
+  or is an $\oxkey{abort!}$ expression. In the former case, this satisfies our
+  requirement since we can plug $\oxexpr_i^\prime$ back into our evaluation
+  context. In the latter case, we can step with \oxname{E-EvalCtxAbort}. }{ If
+  $\oxexpr_f$ is a value and every $\oxexpr_i$ is a value, we would like to step
+  with one of: }{\EAppFun}{ Since $\oxexpr_f$ is a value, then by
+  \Lemma{lemma:canonical-forms}, we know that it has the form
+  $\oxfnname$.
+  Then, since all of the $e_i$ are values, then we can step using
+  \oxname{E-AppFunction}.
+}
+
+\oxprogresscasevalue{T-Unit}{\TUnit}{
+  By inspection of the value grammar, we know that $\oxunit$ is already a value.
+}
+
+\oxprogresscasevalue{T-u32}{\TuThreeTwo}{
+  By inspection of the value grammar, we know that $\oxnum$ is already a value.
+}
+
+\oxprogresscasevalue{T-True}{\TTrue}{
+  By inspection of the value grammar, we know that $\oxtrue$ is already a value.
+}
+
+\oxprogresscasevalue{T-False}{\TFalse}{
+  By inspection of the value grammar, we know that $\oxfalse$ is already a
+  value.
+}
+
+\oxprogresscasevalue{T-Tuple}{\TTuple}{
+  We'll proceed based on whether or not each expression $\oxexpr_i$ is a
+  value. If any of them are not, we can decompose our expression into the
+  evaluation context $\oxprod{\oxvalue_1 \oxdotsc \oxvalue_m \oxcomma \oxhole
+    \oxcomma \oxexpr_1 \oxdotsc \oxexpr_{n^\prime}}$ and redex
+  $\oxexpr_i$. Then, by applying our induction hypothesis to $\oxexpr_i$, we
+  know either that $\oxexpr_i$ steps to some $\oxexpr_i^\prime$ or to an
+  $\oxkey{abort!}$ expression. In either case, this satisfies our requirement,
+  since we can plug $\oxexpr_i^\prime$ back into our evaluation context.
+
+  If every expression $e_i$ is a value, then the whole expression is a value by
+  the definition of values.
+}
+
+\oxprogresscasevalue{T-Array}{\TArray}{
+  We'll proceed based on whether or not each expression $\oxexpr_i$ is a
+  value. If any of them are not, we can decompose our expression into the
+  evaluation context $\oxarr{\oxvalue_1 \oxdotsc \oxvalue_m \oxcomma \oxhole
+    \oxcomma \oxexpr_1 \oxdotsc \oxexpr_{n^\prime}}$ and redex
+  $\oxexpr_i$. Then, by applying our induction hypothesis to $\oxexpr_i$, we
+  know either that $\oxexpr_i$ steps to some $\oxexpr_i^\prime$ or to an
+  $\oxkey{abort!}$ expression. In either case, this satisfies our requirement,
+  since we can plug $\oxexpr_i^\prime$ back into our evaluation context.
+
+  If every expression $e_i$ is a value, then the whole expression is a value by
+  the definition of values.
+}
+
+\oxprogresscasevalue{T-Abort}{\TAbort}{
+  By definition, $\oxabort{\oxdots}$ is an $\oxkey{abort!}$ expression.
+}
+
+% \oxprogresscasevalue{T-TupleStruct}{\TTupleStruct}{
+%   We'll proceed based on whether or not each expression $\oxexpr_i$ is a
+%   value. If any of them are not, we can decompose our expression into the
+%   evaluation context $\oxtupstruct{
+%     \oxturbofish{\oxdatatype}{\overline{\oxprov} \oxcomma \overline{\oxsitype}}
+%   }{\oxvalue_1 \oxdotsc \oxvalue_m \oxcomma \oxhole
+%     \oxcomma \oxexpr_1 \oxdotsc \oxexpr_{n^\prime}}$ and redex
+%   $\oxexpr_i$. Then, by applying our induction hypothesis to $\oxexpr_i$, we
+%   know either that $\oxexpr_i$ steps to some $\oxexpr_i^\prime$ or to an
+%   $\oxkey{abort!}$ expression. In either case, this satisfies our requirement,
+%   since we can plug $\oxexpr_i^\prime$ back into our evaluation context.
+
+%   If every expression $e_i$ is a value, then the whole expression is a value by
+%   the definition of values.
+% }
+
+% \oxprogresscasevalue{T-RecordStruct}{\TRecordStruct}{
+%   We'll proceed based on whether or not each expression $\oxexpr_i$ is a
+%   value. If any of them are not, we can decompose our expression into the
+%   following evaluation context:
+%   \begin{center}
+%     $\oxrecstruct{
+%       \oxturbofish{\oxdatatype}{\overline{\oxprov} \oxcomma \overline{\oxsitype}}
+%     }{\oxid_1 \oxcolon \; \oxvalue_1 \oxdotsc \oxid_m \oxcolon \; \oxvalue_m \oxcomma
+%       \oxid_{m+1} \oxcolon \; \oxhole
+%       \oxcomma \oxid_{m+2} \oxcolon \; \oxexpr_1 \oxdotsc \oxid_n \oxcolon \;
+%       \oxexpr_{n^\prime}}$
+%   \end{center}
+%   and the redex $\oxexpr_i$. Then, by applying our induction hypothesis to
+%   $\oxexpr_i$, we know either that $\oxexpr_i$ steps to some $\oxexpr_i^\prime$
+%   or to an $\oxkey{abort!}$ expression. In either case, this satisfies our
+%   requirement, since we can plug $\oxexpr_i^\prime$ back into our evaluation
+%   context.
+
+%   If every expression $e_i$ is a value, then the whole expression is a value by
+%   the definition of values.
+% }
+
+\oxprogresscaseinductive{T-Framed}{\TFramed}{
+  We proceed based on whether or not $\oxexpr$ is a value. If it is not, we can
+  decompose our expression into the evaluation context
+  $\oxframed{\oxhole}$ and redex $\oxexpr$. Then, by applying our
+  induction hypothesis to $\oxexpr$, we know either that $\oxexpr$ steps to some
+  $\oxexpr^\prime$ or to an $\oxkey{abort!}$ expression. In either case, this
+  satisfies our requirement, since we can plug $\oxexpr^\prime$ back into our
+  evaluation context.
+}{If $\oxexpr$ is a value, then we would like to step with:}{\EFramed}{
+  In order to do so, we need to know $\oxid \in \oxdomain{\oxstore}$.
+  Fortunately, we know from our assumption that
+  \oxstorevalidity{\oxglobalctx}{\oxvarctx}{\oxstore} (via
+  \oxname{WF-Stack}). The premise of \oxname{WF-Stack} tells us that
+  $\oxdomain{\oxstore} = \oxdomain{\oxvarctx}$, and thus the $\oxid \in
+  \oxdomain{\oxvarctx}$ from the premise of \oxname{T-Framed} is sufficient to
+  tell us that $\oxid \in \oxdomain{\oxstore}$. Thus, we can step with
+  \oxname{E-Framed}.
+}
+
+\oxprogresscasevalue{T-Pointer}{\TPointer}{
+  By inspection of the value grammar, we know that
+  $\oxptr{\oxplace}$ is already a value.
+}
+
+\oxprogresscasevalue{T-ClosureValue}{\TClosureVal}{
+  By inspection of the value grammar, we know that
+  $\oxclosureval{\oxstore}{ \oxascribe{\oxid_1}{\oxsitype_1} \oxdotsc
+    \oxascribe{\oxid_n}{\oxsitype_n} }{\oxsitype_r}{\oxexpr}$ is already a
+  value.
+}
+
+\oxprogresscasevalue{T-Dead}{\TUninit}{
+  The type $\oxsidtype$ is not in the grammar of $\oxsitype$. Thus, we have a
+  contradiction.
+}
+
+\oxprogresscasevalue{T-Drop}{\TDrop}{
+  By \oxname{R-Env}, we have that $\oxsubtypectx{\oxglobalctx}{\oxemptyctx}
+  {\oxvarctx}{\oxtupdate{\oxvarctx}{\oxplace}{\oxsidtype_\oxplace}}$. Then,
+  applying \Lemma{lemma:stack-validity-related-envs} with
+  $\oxstorevalidity{\oxglobalctx}{\oxvarctx}{\oxstore}$ (from our premise) gives
+  us $\oxstorevalidity{\oxglobalctx}{
+    \oxtupdate{\oxvarctx}{\oxplace}{\oxsidtype_\oxplace}
+  }{\oxstore}$. We can then apply our induction hypothesis to this and
+  $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{
+    \oxtupdate{\oxvarctx}{\oxplace}{\oxsidtype_\oxplace}
+  }{\oxexpr}{\oxsxtype}{\oxvarctx_f}$ to reach our goal.
+}
+
+\oxprogresscasevalue{T-Left}{\TInl}{
+  We proceed based on whether or not $\oxexpr$ is a value. If it is not, we can
+  decompose our expression into the evaluation context
+  $\oxinl{\oxsitype_1}{\oxsitype_2}{\oxhole}$ and redex $\oxexpr$. Then, by
+  applying our induction hypothesis to $\oxexpr$, we know either that $\oxexpr$
+  steps to some $\oxexpr^\prime$ or to an $\oxkey{abort!}$ expression. In either
+  case, this satisfies our requirement, since we can plug $\oxexpr^\prime$ back
+  into our evaluation context.
+
+  If $\oxexpr$ is a value, then we know that the whole expression
+  $\oxinl{\oxsitype_1}{\oxsitype_2}{\oxvalue}$ is a value and thus we are done.
+}
+
+\oxprogresscasevalue{T-Right}{\TInr}{
+  We proceed based on whether or not $\oxexpr$ is a value. If it is not, we can
+  decompose our expression into the evaluation context
+  $\oxinr{\oxsitype_1}{\oxsitype_2}{\oxhole}$ and redex $\oxexpr$. Then, by
+  applying our induction hypothesis to $\oxexpr$, we know either that $\oxexpr$
+  steps to some $\oxexpr^\prime$ or to an $\oxkey{abort!}$ expression. In either
+  case, this satisfies our requirement, since we can plug $\oxexpr^\prime$ back
+  into our evaluation context.
+
+  If $\oxexpr$ is a value, then we know that the whole expression
+  $\oxinr{\oxsitype_1}{\oxsitype_2}{\oxvalue}$ is a value and thus we are done.
+}
+
+\oxprogresscaseinductive{T-Match}{\TMatch}{
+  We proceed based on whether or not $\oxexpr$ is a value. If it is not, we can
+  decompose our expression into the evaluation context
+  $\oxmatch{\oxhole}{\oxid_1}{\oxexpr_1}{\oxid_2}{\oxexpr_2}$ and redex
+  $\oxexpr$. Then, by applying our induction hypothesis to $\oxexpr$, we know
+  either that $\oxexpr$ steps to some $\oxexpr^\prime$ or to an $\oxkey{abort!}$
+  expression. In either case, this satisfies our requirement, since we can plug
+  $\oxexpr^\prime$ back into our evaluation context.
+}{If $\oxexpr$ is a value, then we would like to step with either:}{
+  \EMatchLeft \and \EMatchRight
+}{
+  Since $\oxexpr$ is a value, applying \Lemma{lemma:canonical-forms} tells us
+  that $\oxexpr$ is either of the form $\oxinl{\oxsitype_1}{\oxsitype_2}{\oxvalue}$ or
+  $\oxinr{\oxsitype_1}{\oxsitype_2}{\oxvalue}$. In the former case, we can
+  step with \oxname{E-MatchLeft} and in the latter case, we can step with
+  \oxname{E-MatchRight}.
+}
+
+%%% Local Variables:
+%%% mode: latex
+%%% fill-column: 80
+%%% End:

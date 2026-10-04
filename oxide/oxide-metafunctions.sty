@@ -1,0 +1,509 @@
+%%%%%%%%%%%%%%%%%%%
+%% Metafunctions %%
+%%%%%%%%%%%%%%%%%%%
+
+\newcommand{\oxfplaces}[1]{\ensuremath{\textrm{free-places}(#1)}}
+\newcommand{\oxfncplaces}[2]{\ensuremath{\textrm{free-nc-places}_{#1}(#2)}}
+\newcommand{\oxfvars}[1]{\ensuremath{\textrm{free-vars}(#1)}}
+\newcommand{\oxfncvars}[2]{\ensuremath{\textrm{free-nc-vars}_{#1}(#2)}}
+\newcommand{\oxfprovs}[1]{\ensuremath{\textrm{free-regions}(#1)}}
+\newcommand{\oxdomain}[1]{\ensuremath{\textrm{dom}(#1)}}
+\newcommand{\oxcodomain}[1]{\ensuremath{\textrm{cod}(#1)}}
+\newcommand{\oxexplode}[1]{\ensuremath{\textrm{explode}(#1)}}
+\newcommand{\oxmerge}[2]{\ensuremath{\texttt{merge}(#1 \oxcomma #2)}}
+\newcommand{\oxroot}[1]{\ensuremath{\texttt{root}(#1)}}
+\newcommand{\oxprefixof}[2]{\ensuremath{#1 \texttt{ is a prefix of } #2}}
+\newcommand{\oxnotprefixof}[2]{\ensuremath{#1 \texttt{ is not a prefix of } #2}}
+\newcommand{\oxplaces}[1]{\ensuremath{\texttt{places}(#1)}}
+\newcommand{\oxplacest}[3]{\ensuremath{\texttt{places-typ}_{#1}(#2 \oxcomma #3)}}
+\newcommand{\oxplacesv}[3]{\ensuremath{\texttt{places-val}_{#1}(#2 \oxcomma #3)}}
+\newcommand{\oxvaluify}[2]{\ensuremath{#1(#2)}}
+\newcommand{\oxswap}[3]{\ensuremath{\texttt{swap}(#1 \oxcomma #2) \oxspace \oxkey{in} \oxspace (#3)}}
+\newcommand{\oxrelevant}[2]{\ensuremath{#1 \, \# \, #2}}
+\newcommand{\oxintersect}{\, \Cup \,}
+\newcommand{\oxcomplement}{\, \setminus \,}
+\newcommand{\oxdecompose}[4]{\ensuremath{#1 . #2 \rightsquigarrow #3 \boxplus #4}}
+\newcommand{\oxrestrict}[2]{\ensuremath{#1 \; |_{\; #2}}}
+\newcommand{\oxrsub}[2]{\ensuremath{#1 \rsub #2}}
+
+\newcommand{\oxsigmu}[2]{\ensuremath{#1 \thicksim #2}}
+\newcommand{\oxsigmuform}{\framebox{\oxsigmu{\oxmuta_1}{\oxmuta_2}}}
+
+\newcommand{\oxreachable}[3]{\ensuremath{\oxkey{reachable}_{#1}(#2, \; #3)}}
+\newcommand{\oxreachableform}{
+  \framebox{
+    $\oxreachable{\oxglobalctx}{\oxstore}{\oxset{\overline{\oxplace}}} = \oxstore^\prime$
+  }
+}
+
+\newcommand{\oxmaxroot}[1]{\ensuremath{\texttt{plc-root}(#1)}}
+\newcommand{\oxmaxrootform}{
+  \framebox{
+    $\oxmaxroot{\oxplaceexpr}$
+  }
+}
+
+\newcommand{\oxmaxroots}[1]{\ensuremath{\texttt{plc-roots}(#1)}}
+\newcommand{\oxmaxrootsform}{
+  \framebox{
+    $\oxmaxroots{\oxplaceexpr_1 \oxdotsc \oxplaceexpr_n}$
+  }
+}
+
+\newcommand{\oxtycontains}[2]{#1 \ \texttt{occurs in} \ #2}
+
+%% the REGION is unique to PLACE in CONTEXT
+\newcommand{\oxrgnuniqueto}[3]{
+  \ensuremath{#1 \textrm{ is unique to } #2 \textrm{ in } #3}
+}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Definition max roots of place expression %%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+
+\newcommand{\DefMaxRoot}{
+  \ensuremath{
+    \begin{array}{l}
+      \oxmaxroot{\oxid{(.\oxnum)}^*} = \oxid{(.\oxnum)}^*.\oxemptypath \\
+      \oxmaxroot{\oxplaceexprctx[\oxderef{\oxid{(.\oxnum)}^*}]} = \oxid{(.\oxnum)}^*.\oxemptypath \\
+    \end{array}
+  }
+}
+
+\newcommand{\DefMaxRoots}{
+  \ensuremath{
+    \begin{array}{l}
+      \oxmaxroots{\oxplaceexpr_1 \oxdotsc \oxplaceexpr_n} = \oxset{
+        \oxmaxroot{\oxplaceexpr_i} $ | $ i \in \oxset{1 \oxdots n}
+      } \\
+    \end{array}
+  }
+}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+%% Definition of in rightmost frame %%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+\newcommand{\oxinrightmost}[2]{#1 \texttt{ in rightmost frame of }#2}
+
+\newcommand{\oxinrightmostform}{\framebox{
+    $\oxinrightmost{\oxid}{\oxvarctx}$
+  }}
+
+\newcommand{\RMPlace}{
+  \inferrule[RM-Place]{
+    %% premises
+    \oxvarctx = \oxnewframe{\oxvarctx_1}{\oxnewframe{\oxframe}{\oxvarctx_2}} \\
+    \oxid \in \oxframe \\
+    \oxid \not \in \oxvarctx_2
+  }{
+    %% conclusions
+    \oxinrightmost{\oxid.q}{\oxvarctx}
+  }
+}
+
+\newcommand{\RMPlaceExpression}{
+  \inferrule[RM-PlaceExpression]{
+    %% premises
+    \forall \oxid \in \oxplaceexpr. \; \oxvarctx = \oxnewframe{\oxvarctx_1}{\oxnewframe{\oxframe}{\oxvarctx_2}} \wedge
+    \oxid \in \oxframe \wedge
+    \oxid \not \in \oxvarctx_2
+  }{
+    %% conclusions
+    \oxinrightmost{\oxplaceexpr}{\oxvarctx}
+  }
+}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+%% Definition of significant in context %%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+
+\newcommand{\SIGUniq}{
+  \oxsigmu{\oxmut}{\oxmuta}
+}
+
+\newcommand{\SIGShrdUniq}{
+  \oxsigmu{\oximm}{\oxmut}
+}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Definition of intersection %%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\newcommand{\InLoanCtx}[3]{
+  (#1 \in \oxdomain{#2} \implies
+    \oxlookup{#2}{#1}{\oxset{#3}})
+}
+
+\newcommand{\InLoanCtxAbs}[2]{
+  (#1 \in \oxdomain{#2} \implies
+  \oxlookup{#2}{#1}{\oxabsloan})
+}
+
+\newcommand{\oxintersectform}{
+  \framebox{$\oxvarctx_1 \oxintersect \oxvarctx_2$}
+}
+
+\newcommand{\DefIntersect}{
+  \ensuremath{
+    \begin{array}{lcl}
+      (\oxvarctx_1 \oxframesep \oxframe_1) \oxintersect
+      (\oxvarctx_2 \oxframesep \oxframe_2) & = &
+      (\oxvarctx_1 \oxintersect \oxvarctx_2) \oxframesep
+      (\oxframe_1 \oxintersect \oxframe_2) \\
+      \oxemptyctx \oxintersect \oxemptyctx & = & \oxemptyctx 
+    \end{array}
+  }
+}
+
+\newcommand{\oxframeintersectform}{
+  \framebox{$\oxframe_1 \oxintersect \oxframe_2$}
+}
+
+\newcommand{\DefFrameIntersect}{
+  \ensuremath{
+    \begin{array}{lcl}
+      (\oxframe_1, \oxvarctxentry{\oxid}{\oxtype}) \oxintersect (\oxframe_2,
+      \oxvarctxentry{\oxid}{\oxtype}) & = & (\oxframe_1 \oxintersect
+      \oxframe_2), \oxvarctxentry{\oxid}{\oxtype} \\ (\oxframe_1,
+      \oxloanctxentry{\oxcprov}{\oxset{\overline{\oxloan}}}) \oxintersect
+      (\oxframe_2, \oxloanctxentry{\oxcprov}{\oxset{\overline{\oxloan^\prime}}}) & = &
+      (\oxframe_1 \oxintersect \oxframe_2), \oxcprov \mapsto
+      \oxset{\overline{\oxloan}, \overline{\oxloan^\prime}} \\
+     \oxemptyctx \oxintersect \oxemptyctx & = & \oxemptyctx 
+    \end{array}
+  }
+}
+
+\newcommand{\oxvarctxplus}[2]{#1 \circ #2}
+
+% \newcommand{\oxvarctxplusform}{
+%   \framebox{$\oxvarctxplus{\oxvarctx}{\oxvarctx^\prime}$}
+% }
+
+% \newcommand{\DefVarCtxPlus}{
+%   Assuming $\oxdomain{\oxvarctx^\prime} \subseteq \oxdomain{\oxvarctx}$,
+
+%   $\oxvarctxplus{\oxvarctx}{\oxvarctx^\prime} = x \mapsto
+%     \begin{cases}
+%       \oxvarctx^\prime(x) & x \in \oxdomain{\oxvarctx} \wedge x \in \oxdomain{\oxvarctx^\prime} \\
+%       \oxvarctx\cup\oxvarctx^\prime(x) & x \not \in \oxdomain{\oxvarctx} \vee x \not \in \oxdomain{\oxvarctx^\prime}
+%     \end{cases}$
+%   }
+  
+\newcommand{\oxstoreplus}[2]{#1 \circ #2}
+  
+% \newcommand{\oxstoreplusform}{
+%   \framebox{$\oxstoreplus{\oxstore}{\oxstore^\prime}$}
+% }
+
+% \newcommand{\DefStorePlus}{
+%   Assuming $\oxdomain{\oxstore^\prime} \subseteq \oxdomain{\oxstore}$,
+
+%   $\oxstoreplus{\oxstore}{\oxstore^\prime} = x \mapsto
+%   \begin{cases}
+%     \oxstore^\prime(x) & x \in \oxdomain{\oxstore} \wedge x \in \oxdomain{\oxstore^\prime} \\
+%     \oxstore\cup\oxstore^\prime(x) & x \not \in \oxdomain{\oxstore} \vee x \not \in \oxdomain{\oxstore^\prime}
+%   \end{cases}$
+% }
+
+\newcommand{\oxloanctxminusform}{
+  \framebox{$\oxvarctx - \oxplaceexpr = \oxvarctx^\prime$}
+}
+
+\newcommand{\DefLoanCtxMinus}{
+  \input{oxide/loanctx-minus.tex}
+}
+
+\newcommand{\oxenvminusform}{
+  \framebox{$(\oxvarctx) \oxenvminus \oxid = \oxvarctx^\prime$}
+}
+
+\newcommand{\DefMinus}{
+  \input{oxide/env-minus.tex}
+}
+
+\newcommand{\oxtupdateform}{
+  \framebox{$\oxtupdate{\oxvarctx}{\oxplace}{\oxtype}$}
+}
+
+\newcommand{\DefTypeUpdate}{
+  \input{oxide/type-update.tex}
+}
+
+\newcommand{\oxtdagger}[2]{
+  \dagger_{#1} (#2)
+}
+
+\newcommand{\oxtdaggerform}{
+  \framebox{$\oxtdagger{\oxplace}{\oxvarctx} = \oxvarctx^\prime$}
+}
+
+\newcommand{\DefTDagger}{ $\oxtdagger{\oxplace}{\oxvarctx} =
+  \oxvarctx[\overline{\oxcprov \mapsto \emptyset}][\oxplace \mapsto
+    \oxvarctx{(\oxplace)}^\dagger]$ \\ where $\forall i,\ \oxcprov_i \text{ occurs in }
+  \oxvarctx(\oxplace)$ and $\forall [\oxplace^\prime \in \oxvarctx$, $\oxcprov_i
+  \text{ occurs in } \oxvarctx(\oxplace^\prime)$ and $\oxvarctx(\oxplace^\prime) = \oxsitype] \implies \oxplace^\prime =
+  \oxplace$. }
+
+\newcommand{\oxtlookupform}{
+  \framebox{$\oxvarctx(\oxplace)$}
+}
+
+\newcommand{\DefTypeLookup}{
+  \input{oxide/type-lookup.tex}
+}
+
+\newcommand{\oxdecomposeform}{
+  \framebox{$\oxdecompose{\oxtype}{\oxpath}{\oxtypectx}{\oxtype}$}
+}
+
+\newcommand{\DEnd}{
+  \inferrule[D-End]{
+    %% premises
+  }{
+    %% conclusions
+    \oxdecompose{\oxtype}{\oxemptypath}{\oxhole}{\oxtype}
+  }
+}
+
+\newcommand{\DProj}{
+  \inferrule[D-Projection]{
+    %% premises
+    \oxdecompose{\oxtype_i}{\oxpath}{\oxtypectx}{\oxtype} \\
+  }{
+    %% conclusions
+    \oxdecompose{
+      \oxtprod{\oxtype_0 \oxdotsc \oxtype_i \oxdotsc \oxtype_n}
+    }{\oxpathcons{i}{\oxpath}}{
+      \oxtprod{\oxtype_0 \oxdotsc \oxtypectx \oxdotsc \oxtype_n}
+    }
+    {\oxtype}
+  }
+}
+
+\newcommand{\oxvupdateform}{
+  \framebox{$\oxtupdate{\oxstore}{\oxplace}{\oxvalue}$}
+}
+
+\newcommand{\DefValueUpdate}{
+  \input{oxide/value-update.tex}
+}
+
+\newcommand{\oxvlookupform}{
+  \framebox{$\oxstore(\oxplace)$}
+}
+
+\newcommand{\DefValueLookup}{
+  \input{oxide/value-lookup.tex}
+}
+
+\newcommand{\oxvaluedecomposeform}{
+  \framebox{$\oxdecompose{\oxvalue}{\oxpath}{\oxevalctx}{\oxvalue}$}
+}
+
+\newcommand{\DVEnd}{
+  \inferrule[DV-End]{
+    %% premises
+  }{
+    %% conclusions
+    \oxdecompose{\oxvalue}{\oxemptypath}{\oxhole}{\oxvalue}
+  }
+}
+
+\newcommand{\DVProj}{
+  \inferrule[DV-Projection]{
+    %% premises
+    \oxdecompose{\oxvalue_i}{\oxpath}{\oxevalctx}{\oxvalue} \\
+  }{
+    %% conclusions
+    \oxdecompose{
+      \oxtprod{\oxvalue_0 \oxdotsc \oxvalue_i \oxdotsc \oxvalue_n}
+    }{\oxpathcons{i}{\oxpath}}{
+      \oxtprod{\oxvalue_0 \oxdotsc \oxevalctx \oxdotsc \oxvalue_n}
+    }
+    {\oxvalue}
+  }
+}
+
+\newcommand{\DefRelevant}{
+  \oxrelevant{\oxplace_1}{\oxplace_2} = $\oxplace_1$ is not a prefix of
+  $\oxplace_2$ and $\oxplace_2$ is not a prefix of $\oxplace_1$ and $\oxplace_1 \neq \oxplace_2$.
+}
+
+\newcommand{\DefPRelevant}{
+  \oxrelevant{\oxplaceexpr_1}{\oxplaceexpr_2} = $\oxplaceexpr_1 = \oxplaceexprctx_1[\oxplace_1]$
+  and $\oxplaceexpr_2 = \oxplaceexprctx_2[\oxplace_2]$ and $\oxrelevant{\oxplace_1}{\oxplace_2}$.
+}
+
+
+\newcommand{\DefFvars}{
+  \oxfncvars{\oxstore}{\oxexpr} = all the variables $\oxid$ free in $\oxexpr$ which
+  are bound to values in $\oxstore$ that are $\texttt{non-copyable}$. \\
+  \oxfncvars{\oxvarctx}{\oxexpr} = all the variables $\oxid$ free in $\oxexpr$ which
+  are bound to types in $\oxvarctx$ that are $\texttt{non-copyable}$. \\
+}
+
+\newcommand{\oxplacesform}{
+  \framebox{$\oxplaces{\oxvarctx} = \oxset{\overline{\oxplace}}$}
+}
+
+\newcommand{\DefPlaces}{
+  \input{oxide/places.tex}
+}
+
+\newcommand{\oxplacesvform}{
+  \framebox{$\oxplacesv{\oxglobalctx}{\oxplace}{\oxvalue} = \overline{\oxstoreentry{\oxplace}{\oxshape}}$}
+}
+
+\newcommand{\DefComputePlacesVal}{
+  \input{oxide/compute-places-val.tex}
+}
+
+\newcommand{\oxplacestform}{
+  \framebox{$\oxplacest{\oxglobalctx}{\oxplace}{\oxtype} = \overline{\oxvarctxentry{\oxplace}{\oxtype}}$}
+}
+
+\newcommand{\DefComputePlacesTyp}{
+  \input{oxide/compute-places-typ.tex}
+}
+
+\newcommand{\oxvaluifyform}{
+  \framebox{$\oxvaluify{\oxstore}{\oxplace} = \oxvalue$}
+}
+
+\newcommand{\DefComputeValue}{
+  \input{oxide/compute-value.tex}
+}
+
+\newcommand{\oxnoncopyableform}{
+  \framebox{$\oxnoncopyable{\oxglobalctx}{\oxtype}$}
+}
+
+\newcommand{\DefComputeNoncopyable}{
+  \input{oxide/compute-noncopyable.tex}
+}
+
+\newcommand{\oxcopyableform}{
+  \framebox{$\oxcopyable{\oxglobalctx}{\oxtype}$}
+}
+
+\newcommand{\DefComputeCopyable}{
+  \input{oxide/compute-copyable.tex}
+}
+
+\newcommand{\oxexplodeform}{
+  \framebox{$\oxexplode{\oxvarctx}$}
+}
+
+\newcommand{\DefExplode}{
+  $\oxexplode{\oxvarctx} = \underset{\oxvarctxentry{\oxid}{\oxtype} \;\in\; \oxvarctx}{\cup} \ \oxexplode{\oxvarctxentry{\oxid}{\oxtype}}
+$}
+
+\newcommand{\oxexplodeinnerform}{
+  \framebox{$\oxexplode{\oxvarctxentry{\oxplace}{\oxtype}}$}
+}
+
+\newcommand{\DefExplodeInner}{
+  \input{oxide/explode.tex}
+}
+
+\newcommand{\oxoccursbeforeinform}{
+  \framebox{$\oxoccursbeforein{\oxcprov_1}{\oxcprov_2}{\oxvarctx}$}
+}
+
+\newcommand{\OCOccursBase}{
+  \inferrule[OC-OccursBase]{
+    %% premises
+    \oxcprov_1 \in \oxdomain{\oxvarctx}
+  }{
+    %% conclusions
+    \oxoccursbeforein{\oxcprov_1}{\oxcprov_2}{\oxextendctx{\oxvarctx}{\oxcprov_2 \mapsto \oxset{\overline{\oxloan}}}}
+  }
+}
+
+\newcommand{\OCOccursExtendFrame}{
+  \inferrule[OC-OccursExtendFrame]{
+    %% premises
+    \oxoccursbeforein{\oxcprov_1}{\oxcprov_2}{\oxvarctx}
+  }{
+    %% conclusions
+    \oxoccursbeforein{\oxcprov_1}{\oxcprov_2}{\oxvarctx, \oxframe^\prime}
+  }
+}
+
+\newcommand{\OCOccursNewFrame}{
+  \inferrule[OC-OccursNewFrame]{
+    %% premises
+    \oxoccursbeforein{\oxcprov_1}{\oxcprov_2}{\oxvarctx}
+  }{
+    %% conclusions
+    \oxoccursbeforein{\oxcprov_1}{\oxcprov_2}{\oxnewframe{\oxvarctx}{\oxframe}}
+  }
+}
+
+\newcommand{\oxgcloans}[2]{
+  \textrm{gc-loans}_{#1}(#2)
+}
+
+\newcommand{\oxgcloansform}{
+  \framebox{$\oxgcloans{\oxkontctx}{\oxvarctx}$}
+}
+
+\newcommand{\Defgcloans}{
+  $\oxgcloans{\oxkontctx}{\oxvarctx} = \oxvarctx[\overline{\oxcprov \mapsto \emptyset}]$ \\
+  \quad where $\overline{\oxcprov} = \oxset{\oxcprov \in \oxdomain{\oxvarctx} \ | \ \forall \oxtype
+    \in \oxcodomain{\oxkontctx} \cup \oxcodomain{\oxvarctx}. \; \oxcprov \text{ does not occur in } \oxtype}$
+}
+
+\newcommand{\oxrsubform}{
+  \framebox{$\oxrsub{\oxvarctx}{\oxplaceexpr}$}
+}
+
+\newcommand{\Defrsub}{ $\oxrsub{\oxvarctx}{\oxplaceexpr} = \oxvarctx^\prime$ where $\oxdomain{\oxvarctx} = \oxdomain{\oxvarctx^\prime}$ and \\
+  $\forall \oxcprov. \; \oxvarctx^\prime(\oxcprov) =
+  \oxset{\oxloanpkg{\oxmuta}{\oxplaceexpr^\prime} \in \oxvarctx(\oxcprov) \ | \ \oxplaceexpr^\prime \neq
+    \oxplaceexprctx[\oxplaceexpr]}$ and \\
+  $\forall \oxplace. \; \oxvarctx(\oxplace) = \oxvarctx^\prime(\oxplace)$
+}
+
+\newcommand{\oxrsubmanyform}{
+  \framebox{$\oxrsub{\oxvarctx}{\oxset{\overline{\oxplaceexpr}}}$}
+}
+
+\newcommand{\Defrsubmany}{
+  $\oxrsub{\oxvarctx}{\oxset{\oxplaceexpr \oxcomma \overline{\oxplaceexpr}}} =
+  \oxrsub{(\oxrsub{\oxvarctx}{\oxplaceexpr})}{\oxset{\overline{\oxplaceexpr}}}$ \\
+  $\oxrsub{\oxvarctx}{\emptyset} = \oxvarctx$
+}
+
+\newcommand{\oxrgnuniquetoform}{
+  \framebox{
+    $\oxrgnuniqueto{\oxcprov}{\oxplace}{\oxvarctx}$
+  }
+}
+
+\newcommand{\DefRgnUniqueTo}{
+  $\oxrgnuniqueto{\oxcprov}{\oxplace}{\oxvarctx} = \forall \oxvarctxentry{\oxplace^\prime}{\oxtref{\oxcprov^\prime}{\oxmuta^\prime}{\oxxitype_2}}
+  \in \oxexplode{\oxvarctx}. \;
+  \oxplace = \oxplace^\prime \vee \oxcprov \neq \oxcprov^\prime$
+}
+
+\newcommand{\oxloanmappings}[2]{\textrm{regions}(#1,\ #2)}
+
+\newcommand{\oxloanmappingsform}{
+  \framebox{
+    $\oxloanmappings{\oxvarctx}{\oxkontctx} = \oxset{\overline{\oxcprov \mapsto \oxset{\oxloans}}}$
+  }
+}
+
+\newcommand{\Defoxloanmappings}{
+  $\oxloanmappings{\oxvarctx}{\oxkontctx} = \oxset{\oxcprov \mapsto \oxset{\oxloans} \in \oxvarctx} \cup
+  \oxset{\oxcprov \mapsto \oxset{\oxloans} \in \oxframe_c \ | \ \exists \oxxitype \in \oxvarctx \vee \exists \oxxitype \in \oxkontctx.\
+    \oxtycontains{\oxtclosure{
+        \oxsitype_1 \oxdotsc \oxsitype_n
+      }{\oxsitype_r}{\oxframe_c}
+  }{\oxxitype}} $
+}
+

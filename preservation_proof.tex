@@ -1,0 +1,3531 @@
+\begin{oxlemma}{Preservation}{lemma:preservation-app}
+  If $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{\oxvarctx}{\oxexpr}{\oxsitype_1}{\oxvarctx_f} and
+  \oxstorevalidity{\oxglobalctx}{\oxvarctx}{\oxstore}$ and
+  $\oxwfkontctx{\oxglobalctx}{\oxvarctx}{\overline{\oxvalue}}{\oxkontctx}$ and
+  $\oxreduce{\oxglobalctx}{\oxstore}{\oxexpr}{\oxstore^\prime}{\oxexpr^\prime}$, then there exists
+  $\oxvarctx_i$ such that
+  $\oxstorevalidity{\oxglobalctx}{\oxvarctx_i}{\oxstore^\prime}$ and
+  $\oxwfkontctx{\oxglobalctx}{\oxvarctx_i}{\overline{\oxvalue}}{\oxkontctx}$ and
+  $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{\oxvarctx_i}{\oxexpr^\prime}
+  {\oxsitype_2}{\oxvarctx_f^\prime}$ and
+  $\oxtunify[\oxcombine]{\oxemptyctx}{\oxkontctx}{\oxvarctx_f^\prime}
+  {\oxsitype_2}{\oxsitype_1}{\oxvarctx_s}$ and there exists $\oxvarctx_o$ such
+  that $\oxvarctx_f = \oxvarctx_s \oxintersect \oxvarctx_o$.
+\end{oxlemma}
+
+\paragraph{Proof} We proceed by induction on the derivation
+\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{\oxvarctx}{\oxexpr}{\oxtype}{\oxvarctx_f} \\
+
+\oxpreservationcase{T-Move}{\TMove}{\oxplace}{\EMove}{
+  \oxtupdate{\oxvarctx}{\oxplace}{\oxsidtype}
+}
+
+\begin{preservation}
+  %% new store is valid
+  \oxpresline{
+    \oxstorevalidity{\oxglobalctx}{
+      \oxtupdate{\oxvarctx}{\oxplace}{\oxsidtype}
+    }{
+      \oxvupdate{\oxstore}{\oxplace}{\oxuninit}
+    }
+  }{
+    Applying \Lemma{lemma:stack-validity-related-envs} to
+    $\oxsubtypectx{\oxglobalctx}{\oxemptyctx}{\oxvarctx}{
+      \oxtupdate{\oxvarctx}{\oxplace}{\oxsidtype}
+    }$ (immediate by \oxname{R-Env}) and
+    $\oxstorevalidity{\oxglobalctx}{\oxvarctx}{\oxstore}$ (from premise) gives us
+    $\oxstorevalidity{\oxglobalctx}{
+      \oxtupdate{\oxvarctx}{\oxplace}{\oxsidtype}
+    }{\oxstore}$. Then, since we know
+    $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{
+      \oxtupdate{\oxvarctx}{\oxplace}{\oxsidtype}
+    }{\oxuninit}{\oxsidtype}{
+      \oxtupdate{\oxvarctx}{\oxplace}{\oxsidtype}
+    }$ (by \oxname{T-Dead}), we can conclude
+    $\oxstorevalidity{\oxglobalctx}{
+      \oxtupdate{\oxvarctx}{\oxplace}{\oxsidtype}
+    }{
+      \oxvupdate{\oxstore}{\oxplace}{\oxuninit}
+    }$.
+  }
+
+  %% kontctx values are still valid
+  \oxpresline{
+    \oxwfkontctx{\oxglobalctx}{
+      \oxtupdate{\oxvarctx}{\oxplace}{\oxsidtype}
+    }{\overline{\oxvalue}}{\oxkontctx}
+  }{
+    Inverting \oxname{WF-Temporaries} gives us $\forall i \in 1 \oxdots n. \;
+    \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxsitype_1 \oxdotsc \oxsitype_{i-1}}{\oxvarctx}{
+      \oxvalue_i
+    }{\oxsitype_i}{\oxvarctx}$. By \oxname{R-Env}, we have that
+    \oxsubtypectx{\oxglobalctx}{\oxemptyctx}{\oxvarctx}{
+      \oxtupdate{\oxvarctx}{\oxplace}{\oxsidtype}
+    }. Thus, we can apply \Lemma{lemma:value-typing-related-envs} to each of the
+    typing judgments and then apply \oxname{WF-Temporaries} to get
+    $\oxwfkontctx{\oxglobalctx}{
+      \oxtupdate{\oxvarctx}{\oxplace}{\oxsidtype}
+    }{\overline{\oxvalue}}{\oxkontctx}$.
+  }
+
+  %% new expression is well-typed
+  \oxpresline{
+    \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{
+      \oxtupdate{\oxvarctx}{\oxplace}{\oxsidtype}
+    }{\oxvalue}{\oxsitype}{
+      \oxtupdate{\oxvarctx}{\oxplace}{\oxsidtype}
+    }
+  }{
+    Applying \Lemma{lemma:place-exprs-reduce} to
+    $\oxmusafety{\oxemptyctx}{\oxvarctx}{\oxmut}{\oxplace}{
+      \oxset{\oxloanpkg{\oxmut}{\oxplace}}
+    }$, $\oxcomputetynoprov{\oxemptyctx}{\oxvarctx}{\oxmut}{\oxplace}{\oxsitype}$
+    (immediate by \oxname{TC-Place} with $\oxlookup{\oxvarctx}{\oxplace}{
+      \oxsitype
+    }$), and $\oxstorevalidity{\oxglobalctx}{\oxvarctx}{\oxstore}$ gives us
+    $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{\oxvarctx}{\oxvalue}
+    {\oxsitype}{\oxvarctx}$. Then, by applying
+    \Lemma{lemma:value-typing-related-envs} with
+    $\oxsubtypectx{\oxglobalctx}{\oxemptyctx}
+    {\oxvarctx}{\oxtupdate{\oxvarctx}{\oxplace}{\oxsidtype}}$ (immediate by
+    \oxname{R-Env}), we can conclude $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{
+      \oxtupdate{\oxvarctx}{\oxplace}{\oxsidtype}
+    }{\oxvalue}{\oxsitype}{
+      \oxtupdate{\oxvarctx}{\oxplace}{\oxsidtype}
+    }$.
+  }
+
+  %% new type is a subtype of the old type
+  \oxpresline{
+    \oxtunify[\oxcombine]{\oxemptyctx}{\oxkontctx}{
+      \oxtupdate{\oxvarctx}{\oxplace}{\oxsidtype}
+    }{\oxsitype}{\oxsitype}{
+      \oxtupdate{\oxvarctx}{\oxplace}{\oxsidtype}
+    }
+  }{
+    Immediate by \oxname{RR-Refl}.
+  }
+
+  %% new loan context is a sub-context of old loan context
+  \oxpresline{
+    \exists \oxvarctx_o. \oxtupdate{\oxvarctx}{\oxplace}{\oxsidtype} \oxintersect \oxvarctx_o
+    = \oxtupdate{\oxvarctx}{\oxplace}{\oxsidtype}
+  }{
+    $\oxvarctx_o = \oxtupdate{\oxvarctx}{\oxplace}{\oxsidtype}$
+  }
+\end{preservation}
+
+\oxpreservationcase{T-Copy}{\TCopy}{\oxplaceexpr}{\ECopy}{
+  \oxvarctx
+}
+
+\begin{preservation}
+  %% new store is valid
+  \oxpresline{
+    \oxstorevalidity{\oxglobalctx}{\oxvarctx}{\oxstore}
+  }{
+    Immediate from our premise.
+  }
+
+  %% kontctx values are still valid
+  \oxpresline{
+    \oxwfkontctx{\oxglobalctx}{\oxvarctx}{\overline{\oxvalue}}{\oxkontctx}
+  }{
+    Immediate from our premise.
+  }
+
+  %% new expression is well-typed
+  \oxpresline{
+    \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{\oxvarctx}{\oxvalue}
+    {\oxsitype}{\oxvarctx}
+  }{
+    Applying \Lemma{lemma:place-exprs-reduce} to
+    $\oxmusafety{\oxemptyctx}{\oxvarctx}{\oximm}{\oxplaceexpr}{
+      \oxset{\overline{\oxloan}}
+    }$, $\oxcomputetynoprov{\oxemptyctx}{\oxvarctx}{\oximm}{\oxplaceexpr}
+    {\oxsitype}$, and $\oxstorevalidity{\oxglobalctx}{\oxvarctx}{\oxstore}$
+    gives us $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{\oxvarctx}{\oxvalue}
+    {\oxsitype}{\oxvarctx}$.
+  }
+
+  %% new type is a subtype of the old type
+  \oxpresline{
+    \oxtunify[\oxcombine]{\oxemptyctx}{\oxkontctx}{\oxvarctx}
+    {\oxsitype}{\oxsitype}{\oxvarctx}
+  }{
+    Immediate by \oxname{RR-Refl}.
+  }
+
+  %% new loan context is a sub-context of the old loan context
+  \oxpresline{
+    \exists \oxvarctx_o. \oxvarctx \oxintersect \oxvarctx_o = \oxvarctx
+  }{
+    $\oxvarctx_o = \oxvarctx$
+  }
+\end{preservation}
+
+\oxpreservationcase{T-Borrow}{\TBorrow}{
+  \oxref{\oxprov}{\oxmuta}{\oxplaceexpr}
+}{\EBorrow}{
+  \oxupdate{\oxvarctx}{
+    \oxloanctxentry{\oxcprov}{
+      \oxset{\overline{\oxloan}}
+    }
+  }
+}
+
+\begin{preservation}
+  %% new store is valid
+  \oxpresline{
+    \oxstorevalidity{\oxglobalctx}{
+      \oxupdate{\oxvarctx}{
+        \oxloanctxentry{\oxcprov}{
+          \oxset{\overline{\oxloan}}
+        }
+      }
+    }{\oxstore}
+  }{
+    Apply \Lemma{lemma:store-validity-loan-update} to
+    $\oxstorevalidity{\oxglobalctx}{\oxvarctx}{\oxstore}$ (from our premise)
+    and $\oxctxswellformed{\oxglobalctx}{\oxemptyctx}{
+      \oxupdate{\oxvarctx}{
+        \oxloanctxentry{\oxcprov}{
+          \oxset{\overline{\oxloan}}
+        }
+      }
+    }{\oxkontctx}$ (from our premise)
+    gives us $\oxstorevalidity{\oxglobalctx}{
+      \oxupdate{\oxvarctx}{
+        \oxloanctxentry{\oxcprov}{
+          \oxset{\overline{\oxloan}}
+        }
+      }
+    }{\oxstore}$.
+  }
+
+  %% kontctx values are still valid
+  \oxpresline{
+    \oxwfkontctx{\oxglobalctx}{
+      \oxupdate{\oxvarctx}{
+        \oxloanctxentry{\oxcprov}{
+          \oxset{\overline{\oxloan}}
+        }
+      }
+    }{\overline{\oxvalue}}{\oxkontctx}
+  }{
+    Inverting \oxname{WF-Temporaries} gives us $\forall i \in 1 \oxdots n. \;
+    \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxsitype_1 \oxdotsc \oxsitype_{i-1}}{\oxvarctx}{
+      \oxvalue_i
+    }{\oxsitype_i}{\oxvarctx}$. We can then apply
+    \Lemma{lemma:values-well-typed-loan-update} to each of the typing judgments
+    along with
+    $\oxmusafety{\oxemptyctx}{\oxkontctx}{\oxvarctx}{\oxmuta}{\oxplaceexpr}{
+      \oxset{\overline{\oxloan}}
+    }$ and $\oxnotinclosure{\oxkontctx}{\oxvarctx}{\oxcprov}$
+    and $\oxlookup{\oxvarctx}{\oxcprov}{\emptyset}$ (all from the premise of
+    \oxname{T-Borrow}) to get $\forall i \in 1 \oxdots n. \;
+    \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxsitype_1 \oxdotsc \oxsitype_{i-1}}{
+      \oxupdate{\oxvarctx}{
+        \oxloanctxentry{\oxcprov}{
+          \oxset{\overline{\oxloan}}
+        }
+      }
+    }{\oxvalue_i}{\oxsitype_i}{
+      \oxupdate{\oxvarctx}{
+        \oxloanctxentry{\oxcprov}{
+          \oxset{\overline{\oxloan}}
+        }
+      }
+    }$. We can then apply \oxname{WF-Temporaries} to get
+    $\oxwfkontctx{\oxglobalctx}{
+      \oxupdate{\oxvarctx}{
+        \oxloanctxentry{\oxcprov}{
+          \oxset{\overline{\oxloan}}
+        }
+      }
+    }{\overline{\oxvalue}}{\oxkontctx}$.
+  }
+
+  %% new expression is well-typed
+  \oxpresline{
+    \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{\oxvarctx_i}{
+      \oxptr{\oxreferent}
+    }{\oxtref{\oxcprov}{\oxmuta}{\oxxitype}}{\oxvarctx_i}
+  }{
+    Applying \Lemma{lemma:norm-for-valid-referents} to
+    $\oxstorevalidity{\oxglobalctx}{\oxvarctx}{\oxstore}$, and
+    $\oxnorm{\oxstore}{\oxplaceexpr}{\oxreferent}{\_}{\_}$ gives us
+     $\oxreferentvalidity{\oxglobalctx}{\oxvarctx}{
+      \oxreferentctx[\oxplace]
+    }{\oxxitype}$. Then, note that referent well-formedness does not
+    depend on the contents of loan sets. This means we can also conclude
+    $\oxreferentvalidity{\oxglobalctx}{
+      \oxupdate{\oxvarctx}{
+        \oxloanctxentry{\oxcprov}{
+          \oxset{\overline{\oxloan}}
+        }
+      }
+    }{
+      \oxreferentctx[\oxplace]
+    }{\oxxitype}$.
+
+    Applying \Lemma{lemma:norm-place-prefix-in-loans} to
+    $\oxstorevalidity{\oxglobalctx}{\oxvarctx}{\oxstore}$,
+    $\oxnorm{\oxstore}{\oxplaceexpr}{\oxreferent}{\_}{\_}$, and
+    $\oxmusafety{\oxemptyctx}{\oxvarctx}{\oxmuta}{\oxplaceexpr}{
+      \oxset{\overline{\oxloan}}
+    }$ gives us $\oxreferent = \oxreferentctx[\oxplace]$ and
+    $\oxloanpkg{\oxmuta}{\oxplace} \in \oxset{\overline{\oxloan}}$.
+
+    Finally, we can apply \oxname{T-Pointer} to the two facts above to get
+    $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{
+      \oxupdate{\oxvarctx}{
+        \oxloanctxentry{\oxcprov}{
+          \oxset{\overline{\oxloan}}
+        }
+      }
+    }{
+      \oxptr{\oxreferent}
+    }{\oxtref{\oxcprov}{\oxmuta}{\oxxitype}}{
+      \oxupdate{\oxvarctx}{
+        \oxloanctxentry{\oxcprov}{
+          \oxset{\overline{\oxloan}}
+        }
+      }
+    }$.
+  }
+
+  %% new type is a subtype of the old type
+  \oxpresline{
+    \oxtunify[\oxcombine]{\oxemptyctx}{\oxkontctx}{\oxvarctx_i}{
+      \oxtref{\oxcprov}{\oxmuta}{\oxxitype}
+    }{
+      \oxtref{\oxcprov}{\oxmuta}{\oxxitype}
+    }{\oxvarctx_i}
+  }{
+    Immediate by \oxname{RR-Refl}.
+  }
+
+  %% new loan context is a sub-context of the old loan context
+  \oxpresline{
+    \exists \oxvarctx_o. \oxvarctx_i \oxintersect \oxvarctx_o = \oxvarctx_i
+  }{
+    $\oxvarctx_o = \oxvarctx_i$
+  }
+\end{preservation}
+
+\oxpreservationcasemulti{T-BorrowIndex}{\TBorrowIndex}{
+  \oxref{\oxprov}{\oxmuta}{\oxindex{\oxplaceexpr}{\oxexpr_i}}
+}{
+  \EBorrowIndex \and \EBorrowIndexOOB
+}
+
+\oxpreservationsubcaseheading{E-BorrowIndex}{
+  \oxupdate{\oxvarctx^\prime}{
+    \oxloanctxentry{\oxcprov}{
+      \oxset{\overline{\oxloan}}
+    }
+  }
+}
+
+\begin{preservation}
+  %% new store is valid
+  \oxpresline{
+    \oxstorevalidity{\oxglobalctx}{
+      \oxupdate{\oxvarctx^\prime}{
+        \oxloanctxentry{\oxcprov}{
+          \oxset{\overline{\oxloan}}
+        }
+      }
+    }{\oxstore}
+  }{
+    Applying \Lemma{lemma:values-dont-change} to the typing derivation (from
+    \oxname{T-BorrowIndex}) for
+    $\oxexpr$ (which we know is a value from \oxname{E-BorrowIndex}) gives us
+    $\oxsubtypectx{\oxglobalctx}{\oxemptyctx}{\oxvarctx}{\oxvarctx^\prime}$.
+
+    Then, applying \Lemma{lemma:stack-validity-related-envs} to
+    $\oxsubtypectx{\oxglobalctx}{\oxemptyctx}{\oxvarctx}{\oxvarctx^\prime}$ and
+    $\oxstorevalidity{\oxglobalctx}{\oxvarctx}{\oxstore}$ (from premise) gives us
+    $\oxstorevalidity{\oxglobalctx}{\oxvarctx^\prime}{\oxstore}$.
+
+    Finally, applying \Lemma{lemma:store-validity-loan-update} to
+    $\oxstorevalidity{\oxglobalctx}{\oxvarctx^\prime}{\oxstore}$ gives us
+    $\oxstorevalidity{\oxglobalctx}{
+      \oxupdate{\oxvarctx^\prime}{
+        \oxloanctxentry{\oxcprov}{
+          \oxset{\overline{\oxloan}}
+        }
+      }
+    }{\oxstore}$.
+  }
+
+  %% kontctx values are still valid
+  \oxpresline{
+    \oxwfkontctx{\oxglobalctx}{
+      \oxupdate{\oxvarctx^\prime}{
+        \oxloanctxentry{\oxcprov}{
+          \oxset{\overline{\oxloan}}
+        }
+      }
+    }{\overline{\oxvalue}}{\oxkontctx}
+  }{
+    Inverting \oxname{WF-Temporaries} gives us $\forall i \in 1 \oxdots n. \;
+    \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxsitype_1 \oxdotsc \oxsitype_{i-1}}{\oxvarctx}{
+      \oxvalue_i
+    }{\oxsitype_i}{\oxvarctx}$.
+
+    Applying \Lemma{lemma:values-dont-change} to the typing derivation (from
+    \oxname{T-BorrowIndex}) for
+    $\oxexpr$ (which we know is a value from \oxname{E-BorrowIndex}) gives us
+    $\oxsubtypectx{\oxglobalctx}{\oxemptyctx}{\oxvarctx}{\oxvarctx^\prime}$.
+
+    Thus, we can apply \Lemma{lemma:value-typing-related-envs} to each of the
+    typing judgments to get $\forall i \in 1 \oxdots n. \;
+    \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxemptyctx}{\oxvarctx^\prime}{
+      \oxvalue_i
+    }{\oxsitype_i}{\oxvarctx^\prime}$.
+
+    We can then apply \Lemma{lemma:values-well-typed-loan-update} to each of the
+    typing judgments along with
+    $\oxmusafety{\oxemptyctx}{\oxkontctx}{\oxvarctx^\prime}{\oxmuta}{\oxplaceexpr}{
+      \oxset{\overline{\oxloan}}
+    }$ and $\oxnotinclosure{\oxkontctx}{\oxvarctx^\prime}{\oxcprov}$
+    and $\oxlookup{\oxvarctx^\prime}{\oxcprov}{\emptyset}$ (all from the premise
+    of \oxname{T-BorrowIndex}) to get $\forall i \in 1 \oxdots n. \;
+    \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxemptyctx}{
+      \oxupdate{\oxvarctx^\prime}{
+        \oxloanctxentry{\oxcprov}{
+          \oxset{\overline{\oxloan}}
+        }
+      }
+    }{\oxvalue_i}{\oxsitype_i}{
+      \oxupdate{\oxvarctx^\prime}{
+        \oxloanctxentry{\oxcprov}{
+          \oxset{\overline{\oxloan}}
+        }
+      }
+    }$. We can then apply \oxname{WF-Temporaries} to get
+    $\oxwfkontctx{\oxglobalctx}{
+      \oxupdate{\oxvarctx^\prime}{
+        \oxloanctxentry{\oxcprov}{
+          \oxset{\overline{\oxloan}}
+        }
+      }
+    }{\overline{\oxvalue}}{\oxkontctx}$.
+  }
+
+  %% new expression is well-typed
+  \oxpresline{
+    \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{\oxvarctx_i}{
+      \oxindexptr{\oxreferent}{\oxnum_i}
+    }{\oxtref{\oxcprov}{\oxmuta}{\oxsitype}}{\oxvarctx_i}
+  }{
+    Applying \Lemma{lemma:values-dont-change} to the typing derivation (from
+    \oxname{T-BorrowIndex}) for
+    $\oxexpr$ (which we know is a value from \oxname{E-BorrowIndex}) gives us
+    $\oxsubtypectx{\oxglobalctx}{\oxemptyctx}{\oxvarctx}{\oxvarctx^\prime}$.
+
+    Then, applying \Lemma{lemma:stack-validity-related-envs} to
+    $\oxsubtypectx{\oxglobalctx}{\oxemptyctx}{\oxvarctx}{\oxvarctx^\prime}$ and
+    $\oxstorevalidity{\oxglobalctx}{\oxvarctx}{\oxstore}$ (from premise) gives us
+    $\oxstorevalidity{\oxglobalctx}{\oxvarctx^\prime}{\oxstore}$.
+
+    Applying \Lemma{lemma:norm-for-valid-referents} to
+    $\oxstorevalidity{\oxglobalctx}{\oxvarctx^\prime}{\oxstore}$, and
+    $\oxnorm{\oxstore}{\oxplaceexpr}{\oxreferent}{\_}{
+      \oxarr{\oxvalue_0 \oxdotsc \oxvalue_n}
+    }$ gives us $\oxreferentvalidity{\oxglobalctx}{\oxvarctx^\prime}{
+      \oxreferentctx[\oxplace]
+    }{\oxxitype}$. Then, note that referent well-formedness does not
+    depend on the contents of loan sets. This means we can also conclude
+    $\oxreferentvalidity{\oxglobalctx}{
+      \oxupdate{\oxvarctx^\prime}{
+        \oxloanctxentry{\oxcprov}{
+          \oxset{\overline{\oxloan}}
+        }
+      }
+    }{
+      \oxreferentctx[\oxplace]
+    }{\oxxitype}$. We can then apply \oxname{WF-RefIndexArray} or
+    \oxname{WF-RefIndexSlice} to get $\oxreferentvalidity{\oxglobalctx}{
+      \oxupdate{\oxvarctx^\prime}{
+        \oxloanctxentry{\oxcprov}{
+          \oxset{\overline{\oxloan}}
+        }
+      }
+    }{
+      \oxindex{\oxreferentctx[\oxplace]}{\oxnum_i}
+    }{\oxxitype}$.
+
+    Applying \Lemma{lemma:norm-place-prefix-in-loans} to
+    $\oxstorevalidity{\oxglobalctx}{\oxvarctx^\prime}{\oxstore}$,
+    $\oxnorm{\oxstore}{\oxplaceexpr}{\oxreferent}{\_}{
+      \oxarr{\oxvalue_0 \oxdotsc \oxvalue_n}
+    }$, and
+    $\oxmusafety{\oxemptyctx}{\oxvarctx^\prime}{\oxmuta}{\oxplaceexpr}{
+      \oxset{\overline{\oxloan}}
+    }$ gives us $\oxreferent = \oxreferent[\oxplace]$ and
+    $\oxloanpkg{\oxmuta}{\oxplace} \in \oxset{\overline{\oxloan}}$.
+
+    Finally, we can apply \oxname{T-Pointer} to the two facts above to get
+    $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{
+      \oxupdate{\oxvarctx}{
+        \oxloanctxentry{\oxcprov}{
+          \oxset{\overline{\oxloan}}
+        }
+      }
+    }{
+      \oxindexptr{\oxreferent}{\oxnum_i}
+    }{\oxtref{\oxcprov}{\oxmuta}{\oxxitype}}{
+      \oxupdate{\oxvarctx}{
+        \oxloanctxentry{\oxcprov}{
+          \oxset{\overline{\oxloan}}
+        }
+      }
+    }$.
+  }
+
+  %% new type is a subtype of the old type
+  \oxpresline{
+    \oxtunify[\oxcombine]{\oxemptyctx}{\oxkontctx}{\oxvarctx_i}{
+      \oxtref{\oxcprov}{\oxmuta}{\oxsitype}
+    }{
+      \oxtref{\oxcprov}{\oxmuta}{\oxsitype}
+    }{\oxvarctx_i}
+  }{
+    Immediate by \oxname{RR-Refl}.
+  }
+
+  %% new loan context is a sub-context of the old loan context
+  \oxpresline{
+    \exists \oxvarctx_o. \oxvarctx_i \oxintersect \oxvarctx_o = \oxvarctx_i
+  }{
+    $\oxvarctx_o = \oxvarctx_i$
+  }
+\end{preservation}
+
+\oxpreservationsubcaseheading{E-BorrowIndexOOB}{
+  \oxvarctx
+}
+
+\begin{preservation}
+  %% new store is valid
+  \oxpresline{
+    \oxstorevalidity{\oxglobalctx}{\oxvarctx}{\oxstore}
+  }{
+    Immediate from our premise.
+  }
+
+  %% kontctx values are still valid
+  \oxpresline{
+    \oxwfkontctx{\oxglobalctx}{\oxvarctx}{\overline{\oxvalue}}{\oxkontctx}
+  }{
+    Immediate from our premise.
+  }
+
+  %% new expression is well-typed
+  \oxpresline{
+    \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{\oxvarctx}
+    {\oxkey{abort!}(\oxdots)}{\oxtref{\oxcprov}{\oxmuta}{\oxsitype}}{\oxvarctx}
+  }{
+    An \oxkey{abort!} expression is well-typed (at any type) via the rule
+    \oxname{T-Abort}.
+  }
+
+  %% new type is a subtype of the old type
+  \oxpresline{
+    \oxtunify[\oxcombine]{\oxemptyctx}{\oxkontctx}{\oxvarctx}{
+      \oxtref{\oxcprov}{\oxmuta}{\oxsitype}
+    }{
+      \oxtref{\oxcprov}{\oxmuta}{\oxsitype}
+    }{\oxvarctx}
+  }{
+    Immediate by \oxname{RR-Refl}.
+  }
+
+  %% new loan context is a sub-context of the old loan context
+  \oxpresline{
+    \exists \oxvarctx_o. \oxvarctx_i \oxintersect \oxvarctx_o = \oxvarctx_i
+  }{
+    $\oxvarctx_o = \oxvarctx_i$
+  }
+\end{preservation}
+
+\oxpreservationcasemulti{T-BorrowSlice}{\TBorrowSlice}{
+  \oxref{\oxcprov}{\oxmuta}{\oxslice{\oxplaceexpr}{\oxexpr_1}{\oxexpr_2}}
+}{
+  \EBorrowSlice \and \EBorrowSliceOOB
+}
+
+\oxpreservationsubcaseheading{E-BorrowSlice}{
+  \oxupdate{\oxvarctx_2}{
+    \oxloanctxentry{\oxcprov}{
+      \oxset{\overline{\oxloan}}
+    }
+  }
+}
+
+\begin{preservation}
+  %% new store is valid
+  \oxpresline{
+    \oxstorevalidity{\oxglobalctx}{
+      \oxupdate{\oxvarctx_2}{
+        \oxloanctxentry{\oxcprov}{
+          \oxset{\overline{\oxloan}}
+        }
+      }
+    }{\oxstore}
+  }{
+    Applying \Lemma{lemma:values-dont-change} to the typing derivation (from
+    \oxname{T-BorrowSlice}) for $\oxexpr_1$ (which we know is a value from
+    \oxname{E-BorrowSlice}) gives us
+    $\oxsubtypectx{\oxglobalctx}{\oxemptyctx}{\oxvarctx}{\oxvarctx_1}$. Then,
+    applying \Lemma{lemma:values-dont-change} to the typing derivation (from
+    \oxname{T-BorrowSlice}) for  $\oxexpr_2$ (which we know is a value from
+    \oxname{E-BorrowSlice}) gives us
+    $\oxsubtypectx{\oxglobalctx}{\oxemptyctx}{\oxvarctx_1}{\oxvarctx_2}$. Then,
+    by transitivity, we have
+    $\oxsubtypectx{\oxglobalctx}{\oxemptyctx}{\oxvarctx}{\oxvarctx_2}$.
+
+    Then, applying \Lemma{lemma:stack-validity-related-envs} to
+    $\oxsubtypectx{\oxglobalctx}{\oxemptyctx}{\oxvarctx}{\oxvarctx_2}$ and
+    $\oxstorevalidity{\oxglobalctx}{\oxvarctx}{\oxstore}$ (from premise) gives us
+    $\oxstorevalidity{\oxglobalctx}{\oxvarctx_2}{\oxstore}$. Finally,
+    applying \Lemma{lemma:store-validity-loan-update} to
+    $\oxstorevalidity{\oxglobalctx}{\oxvarctx_2}{\oxstore}$ gives us
+    $\oxstorevalidity{\oxglobalctx}{
+      \oxupdate{\oxvarctx_2}{
+        \oxloanctxentry{\oxcprov}{
+          \oxset{\overline{\oxloan}}
+        }
+      }
+    }{\oxstore}$.
+  }
+
+  %% kontctx values are still valid
+  \oxpresline{
+    \oxwfkontctx{\oxglobalctx}{
+      \oxupdate{\oxvarctx_2}{
+        \oxloanctxentry{\oxcprov}{
+          \oxset{\overline{\oxloan}}
+        }
+      }
+    }{\overline{\oxvalue}}{\oxkontctx}
+  }{
+    Inverting \oxname{WF-Temporaries} gives us $\forall i \in 1 \oxdots n. \;
+    \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxsitype_1 \oxdotsc \oxsitype_{i-1}}{\oxvarctx}{
+      \oxvalue_i
+    }{\oxsitype_i}{\oxvarctx}$.
+
+    Applying \Lemma{lemma:values-dont-change} to the typing derivation (from
+    \oxname{T-BorrowSlice}) for $\oxexpr_1$ (which we know is a value from
+    \oxname{E-BorrowSlice}) gives us
+    $\oxsubtypectx{\oxglobalctx}{\oxemptyctx}{\oxvarctx}{\oxvarctx_1}$. Then,
+    applying \Lemma{lemma:values-dont-change} to the typing derivation (from
+    \oxname{T-BorrowSlice}) for  $\oxexpr_2$ (which we know is a value from
+    \oxname{E-BorrowSlice}) gives us
+    $\oxsubtypectx{\oxglobalctx}{\oxemptyctx}{\oxvarctx_1}{\oxvarctx_2}$. Then,
+    by transitivity, we have
+    $\oxsubtypectx{\oxglobalctx}{\oxemptyctx}{\oxvarctx}{\oxvarctx_2}$.
+
+    Then, we apply \Lemma{lemma:value-typing-related-envs} to each of the
+    typing judgments to get $\forall i \in 1 \oxdots n. \;
+    \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxsitype_1 \oxdotsc \oxsitype_{i-1}}{\oxvarctx_2}{
+      \oxvalue_i
+    }{\oxsitype_i}{\oxvarctx_2}$.
+
+    We can then apply \Lemma{lemma:values-well-typed-loan-update} to each of the
+    typing judgments along with
+    $\oxmusafety{\oxemptyctx}{\oxkontctx}{\oxvarctx_2}{\oxmuta}{\oxplaceexpr}{
+      \oxset{\overline{\oxloan}}
+    }$ and $\oxnotinclosure{\oxkontctx}{\oxvarctx_2}{\oxcprov}$
+    and $\oxlookup{\oxvarctx_2}{\oxcprov}{\emptyset}$ (all from the premise
+    of \oxname{T-BorrowSlice}) to get $\forall i \in 1 \oxdots n. \;
+    \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxsitype_1 \oxdotsc \oxsitype_{i-1}}{
+      \oxupdate{\oxvarctx_2}{
+        \oxloanctxentry{\oxcprov}{
+          \oxset{\overline{\oxloan}}
+        }
+      }
+    }{\oxvalue_i}{\oxsitype_i}{
+      \oxupdate{\oxvarctx_2}{
+        \oxloanctxentry{\oxcprov}{
+          \oxset{\overline{\oxloan}}
+        }
+      }
+    }$. We can then apply \oxname{WF-Temporaries} to get
+    $\oxwfkontctx{\oxglobalctx}{
+      \oxupdate{\oxvarctx_2}{
+        \oxloanctxentry{\oxcprov}{
+          \oxset{\overline{\oxloan}}
+        }
+      }
+    }{\overline{\oxvalue}}{\oxkontctx}$.
+  }
+
+  %% new expression is well-typed
+  \oxpresline{
+    \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{\oxvarctx_i}{
+      \oxsliceptr{\oxreferent}{\oxnum_1}{\oxnum_2}
+    }{
+      \oxtref{\oxcprov}{\oxmuta}{\oxtslice{\oxsitype}}
+    }{\oxvarctx_i}
+  }{
+    Applying \Lemma{lemma:values-dont-change} to the typing derivation (from
+    \oxname{T-BorrowSlice}) for $\oxexpr_1$ (which we know is a value from
+    \oxname{E-BorrowSlice}) gives us
+    $\oxsubtypectx{\oxglobalctx}{\oxemptyctx}{\oxvarctx}{\oxvarctx_1}$. Then,
+    applying \Lemma{lemma:values-dont-change} to the typing derivation (from
+    \oxname{T-BorrowSlice}) for  $\oxexpr_2$ (which we know is a value from
+    \oxname{E-BorrowSlice}) gives us
+    $\oxsubtypectx{\oxglobalctx}{\oxemptyctx}{\oxvarctx_1}{\oxvarctx_2}$. Then,
+    by transitivity, we have
+    $\oxsubtypectx{\oxglobalctx}{\oxemptyctx}{\oxvarctx}{\oxvarctx_2}$.
+
+    Then, applying \Lemma{lemma:stack-validity-related-envs} to
+    $\oxsubtypectx{\oxglobalctx}{\oxemptyctx}{\oxvarctx}{\oxvarctx_2}$ and
+    $\oxstorevalidity{\oxglobalctx}{\oxvarctx}{\oxstore}$ (from premise) gives us
+    $\oxstorevalidity{\oxglobalctx}{\oxvarctx_2}{\oxstore}$.
+
+    Applying \Lemma{lemma:norm-for-valid-referents} to
+    $\oxstorevalidity{\oxglobalctx}{\oxvarctx_2}{\oxstore}$, and
+    $\oxnorm{\oxstore}{\oxplaceexpr}{\oxreferent}{\_}{
+      \oxarr{\oxvalue_0 \oxdotsc \oxvalue_n}
+    }$ gives us $\oxreferentvalidity{\oxglobalctx}{\oxvarctx_2}{
+      \oxreferentctx[\oxplace]
+    }{\oxxitype}$. Then, note that referent well-formedness does not
+    depend on the contents of loan sets. This means we can also conclude
+    $\oxreferentvalidity{\oxglobalctx}{
+      \oxupdate{\oxvarctx_2}{
+        \oxloanctxentry{\oxcprov}{
+          \oxset{\overline{\oxloan}}
+        }
+      }
+    }{
+      \oxreferentctx[\oxplace]
+    }{\oxxitype}$. We can then apply \oxname{WF-RefSliceArray} or
+    \oxname{WF-RefSliceSlice} to get $\oxreferentvalidity{\oxglobalctx}{
+      \oxupdate{\oxvarctx^\prime}{
+        \oxloanctxentry{\oxcprov}{
+          \oxset{\overline{\oxloan}}
+        }
+      }
+    }{
+      \oxslice{\oxreferentctx[\oxplace]}{\oxnum_1}{\oxnum_2}
+    }{\oxxitype}$.
+
+    Applying \Lemma{lemma:norm-place-prefix-in-loans} to
+    $\oxstorevalidity{\oxglobalctx}{\oxvarctx_2}{\oxstore}$,
+    $\oxnorm{\oxstore}{\oxplaceexpr}{\oxreferent}{\_}{
+      \oxarr{\oxvalue_0 \oxdotsc \oxvalue_n}
+    }$, and
+    $\oxmusafety{\oxemptyctx}{\oxvarctx_2}{\oxmuta}{\oxplaceexpr}{
+      \oxset{\overline{\oxloan}}
+    }$ gives us $\oxloanpkg{\oxmuta}{\oxplace} \in \oxset{\overline{\oxloan}}$.
+
+    Finally, we can apply \oxname{T-Pointer} to the two facts above to get
+    $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{
+      \oxupdate{\oxvarctx}{
+        \oxloanctxentry{\oxcprov}{
+          \oxset{\overline{\oxloan}}
+        }
+      }
+    }{
+      \oxsliceptr{\oxreferent[\oxplace]}{\oxnum_1}{\oxnum_2}
+    }{\oxtref{\oxcprov}{\oxmuta}{\oxxitype}}{
+      \oxupdate{\oxvarctx}{
+        \oxloanctxentry{\oxcprov}{
+          \oxset{\overline{\oxloan}}
+        }
+      }
+    }$.
+  }
+
+  %% new type is a subtype of the old type
+  \oxpresline{
+    \oxtunify[\oxcombine]{\oxemptyctx}{\oxkontctx}{\oxvarctx_i}{
+      \oxtref{\oxcprov}{\oxmuta}{\oxtslice{\oxsitype}}
+    }{
+      \oxtref{\oxcprov}{\oxmuta}{\oxtslice{\oxsitype}}
+    }{\oxvarctx_i}
+  }{
+    Immediate by \oxname{RR-Refl}.
+  }
+
+  %% new loan context is a sub-context of the old loan context
+  \oxpresline{
+    \exists \oxvarctx_o. \oxvarctx_i \oxintersect \oxvarctx_o = \oxvarctx_i
+  }{
+    $\oxvarctx_o = \oxvarctx_i$
+  }
+\end{preservation}
+
+\oxpreservationsubcaseheading{E-BorrowSliceOOB}{
+  \oxvarctx
+}
+
+\begin{preservation}
+  %% new store is valid
+  \oxpresline{
+    \oxstorevalidity{\oxglobalctx}{\oxvarctx}{\oxstore}
+  }{
+    Immediate from our premise.
+  }
+
+  %% kontctx values are still valid
+  \oxpresline{
+    \oxwfkontctx{\oxglobalctx}{\oxvarctx}{\overline{\oxvalue}}{\oxkontctx}
+  }{
+    Immediate from our premise.
+  }
+
+  %% new expression is well-typed
+  \oxpresline{
+    \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{\oxvarctx}
+    {\oxabort{\oxdots}}{\oxtref{\oxcprov}{\oxmuta}{\oxtslice{\oxsitype}}}
+    {\oxvarctx^\prime}
+  }{
+    An \oxkey{abort!} expression is well-typed (at any type) via the rule \oxname{T-Abort}.
+  }
+
+  %% new type is a subtype of the old type
+  \oxpresline{
+    \oxtunify[\oxcombine]{\oxemptyctx}{\oxkontctx}{\oxvarctx}{
+      \oxtref{\oxcprov}{\oxmuta}{\oxtslice{\oxsitype}}
+    }{
+      \oxtref{\oxcprov}{\oxmuta}{\oxtslice{\oxsitype}}
+    }{\oxvarctx}
+  }{
+    Immediate by \oxname{RR-Refl}.
+  }
+
+  %% new loan context is a sub-context of the old loan context
+  \oxpresline{
+    \exists \oxvarctx_o. \oxvarctx_i \oxintersect \oxvarctx_o = \oxvarctx_i
+  }{
+    $\oxvarctx_o = \oxvarctx_i$
+  }
+\end{preservation}
+
+\oxpreservationcase{T-IndexCopy}{\TIndexCopy}{
+  \oxindex{\oxplaceexpr}{\oxexpr_i}
+}{\EIndexCopy}{
+  \oxvarctx^\prime
+}
+
+\begin{preservation}
+  %% new store is valid
+  \oxpresline{
+    \oxstorevalidity{\oxglobalctx}{\oxvarctx^\prime}{\oxstore}
+  }{
+    Applying \Lemma{lemma:values-dont-change} to the typing derivation (from
+    \oxname{T-IndexCopy}) for $\oxexpr$ (which we know is a value from
+    \oxname{E-IndexCopy}) gives us
+    $\oxsubtypectx{\oxglobalctx}{\oxemptyctx}{\oxvarctx}{\oxvarctx^\prime}$.
+    Then, applying \Lemma{lemma:stack-validity-related-envs} to
+    $\oxsubtypectx{\oxglobalctx}{\oxemptyctx}{\oxvarctx}{\oxvarctx^\prime}$ and
+    $\oxstorevalidity{\oxglobalctx}{\oxvarctx}{\oxstore}$ (from premise) gives us
+    $\oxstorevalidity{\oxglobalctx}{\oxvarctx^\prime}{\oxstore}$.
+  }
+
+  %% kontctx values are still valid
+  \oxpresline{
+    \oxwfkontctx{\oxglobalctx}{\oxvarctx^\prime}{\overline{\oxvalue}}{\oxkontctx}
+  }{
+    Inverting \oxname{WF-Temporaries} gives us $\forall i \in 1 \oxdots n. \;
+    \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxsitype_1 \oxdotsc \oxsitype_{i-1}}{\oxvarctx}{
+      \oxvalue_i
+    }{\oxsitype_i}{\oxvarctx}$.
+
+    Applying \Lemma{lemma:values-dont-change} to the typing derivation (from
+    \oxname{T-IndexCopy}) for
+    $\oxexpr$ (which we know is a value from \oxname{E-IndexCopy}) gives us
+    $\oxsubtypectx{\oxglobalctx}{\oxemptyctx}{\oxvarctx}{\oxvarctx^\prime}$.
+
+    Thus, we can apply \Lemma{lemma:value-typing-related-envs} to each of the
+    typing judgments to get $\forall i \in 1 \oxdots n. \;
+    \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxsitype_1 \oxdotsc \oxsitype_{i-1}}{\oxvarctx^\prime}{
+      \oxvalue_i
+    }{\oxsitype_i}{\oxvarctx^\prime}$.
+
+    Finally, applying \oxname{WF-Temporaries} gives us
+    $\oxwfkontctx{\oxglobalctx}{\oxvarctx^\prime}{\overline{\oxvalue}}{\oxkontctx}$.
+  }
+
+  %% new expression is well-typed
+  \oxpresline{
+    \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{\oxvarctx^\prime}{
+      \oxvalue_{n_i}
+    }{\oxsitype}{\oxvarctx^\prime}
+  }{
+    Applying \Lemma{lemma:values-dont-change} to the typing derivation (from
+    \oxname{T-IndexCopy}) for $\oxexpr$ (which we know is a value from
+    \oxname{E-IndexCopy}) gives us
+    $\oxsubtypectx{\oxglobalctx}{\oxemptyctx}{\oxvarctx}{\oxvarctx^\prime}$.
+    Then, applying \Lemma{lemma:stack-validity-related-envs} to
+    $\oxsubtypectx{\oxglobalctx}{\oxemptyctx}{\oxvarctx}{\oxvarctx^\prime}$ and
+    $\oxstorevalidity{\oxglobalctx}{\oxvarctx}{\oxstore}$ (from premise) gives us
+    $\oxstorevalidity{\oxglobalctx}{\oxvarctx^\prime}{\oxstore}$.
+
+    Applying \Lemma{lemma:place-exprs-reduce} to
+    $\oxmusafety{\oxemptyctx}{\oxvarctx^\prime}{\oximm}{\oxplaceexpr}{
+      \oxset{\overline{\oxloan}}
+    }$, $\oxcomputetynoprov{\oxemptyctx}{\oxvarctx^\prime}{\oximm}{\oxplaceexpr}
+    {\oxsitype}$, and $\oxstorevalidity{\oxglobalctx}{\oxvarctx^\prime}{\oxstore}$
+    % gives us $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxvarctx^\prime}{
+    %   \oxarr{\oxvalue_0 \oxdotsc \oxvalue_{\oxnum_i} \oxdotsc \oxvalue_n}
+    % }{\oxxitype}{\oxvarctx^\prime}$. Then, by inversion of either \oxname{T-Array} or
+    \oxname{T-Slice} (based on whether $\oxxitype = \oxtarr{\oxsitype}{\oxnum}$ or
+    $\oxtslice{\oxsitype}$ respectively), we get
+    $\forall i \in \oxset{1 \oxdots n}. \;
+    \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{\oxvarctx^\prime}{
+      \oxvalue_i
+    }{\oxsitype}{\oxvarctx^\prime}$ (after accounting for the fact that the
+    constituent expressions are values and the output environment matches the
+    input environment). Thus, we can pick out specifically that
+    $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{\oxvarctx^\prime}{
+      \oxvalue_i
+    }{\oxsitype}{\oxvarctx^\prime}$.
+  }
+
+  %% new type is a subtype of the old type
+  \oxpresline{
+    \oxtunify[\oxcombine]{\oxemptyctx}{\oxkontctx}{\oxvarctx^\prime}{\oxsitype}{\oxsitype}{\oxvarctx^\prime}
+  }{
+    Immediate by \oxname{RR-Refl}.
+  }
+
+  %% new loan context is a sub-context of the old loan context
+  \oxpresline{
+    \exists \oxvarctx_o. \oxvarctx^\prime \oxintersect \oxvarctx_o = \oxvarctx^\prime
+  }{
+    $\oxvarctx_o = \oxvarctx^\prime$
+  }
+\end{preservation}
+
+\oxpreservationcase{T-Seq}{\TSeq}{\oxseq{\oxexpr_1}{\oxexpr_2}}{\ESeq}{
+  \oxgcloans{\oxkontctx}{\oxvarctx_1}
+}
+
+\begin{preservation}
+  %% new store is valid
+  \oxpresline{
+    \oxstorevalidity{\oxglobalctx}{
+      \oxgcloans{\oxkontctx}{\oxvarctx_1}
+    }{\oxstore}
+  }{
+    Applying \Lemma{lemma:values-dont-change} to the typing derivation (from
+    \oxname{T-Seq}) for $\oxexpr_1$ (which we know is a value from
+    \oxname{E-Seq}) gives us
+    $\oxsubtypectx{\oxglobalctx}{\oxemptyctx}{\oxvarctx}{\oxvarctx_1}$.
+    Applying \Lemma{lemma:stack-validity-related-envs} with this and
+    $\oxstorevalidity{\oxglobalctx}{\oxvarctx}{\oxstore}$ (from
+    premise) gives us
+    $\oxstorevalidity{\oxglobalctx}{\oxvarctx_1}{\oxstore}$. By definition of
+    \oxname{R-Env}, we know that $\oxsubtypectx{\oxglobalctx}{\oxemptyctx}
+    {\oxvarctx_1}{\oxgcloans{\oxkontctx}{\oxvarctx_1}}$. Then, we can apply
+    \Lemma{lemma:stack-validity-related-envs} to get
+    $\oxstorevalidity{\oxglobalctx}{
+      \oxgcloans{\oxkontctx}{\oxvarctx_1}
+    }{\oxstore}$.
+  }
+
+  %% kontctx values are still valid
+  \oxpresline{
+    \oxwfkontctx{\oxglobalctx}{
+      \oxgcloans{\oxkontctx}{\oxvarctx_1}
+    }{\overline{\oxvalue}}{\oxkontctx}
+  }{
+    Inverting \oxname{WF-Temporaries} gives us $\forall i \in 1 \oxdots n. \;
+    \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxsitype_1 \oxdotsc \oxsitype_{i-1}}{\oxvarctx}{
+      \oxvalue_i
+    }{\oxsitype_i}{\oxvarctx}$.
+
+    Applying \Lemma{lemma:values-dont-change} to the typing derivation (from
+    \oxname{T-Seq}) for
+    $\oxexpr_1$ (which we know is a value from \oxname{E-Seq}) gives us
+    $\oxsubtypectx{\oxglobalctx}{\oxemptyctx}{\oxvarctx}{\oxvarctx_1}$. Then,
+    we note that definitionally $\oxsubtypectx{\oxglobalctx}{\oxemptyctx}{\oxvarctx_1}{
+      \oxgcloans{\oxkontctx}{\oxvarctx_1}
+    }$ since we can only clear loans that are not present in any of the types.
+    Then, by transitivity, we have
+    $\oxsubtypectx{\oxglobalctx}{\oxemptyctx}{\oxvarctx}{
+      \oxgcloans{\oxkontctx}{\oxvarctx_1}
+    }$.
+
+    Thus, we can apply \Lemma{lemma:value-typing-related-envs} to each of the
+    typing judgments to get $\forall i \in 1 \oxdots n. \;
+    \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxsitype_1 \oxdotsc \oxsitype_{i-1}}{
+      \oxgcloans{\oxkontctx}{\oxvarctx_1}
+    }{
+      \oxvalue_i
+    }{\oxsitype_i}{
+      \oxgcloans{\oxkontctx}{\oxvarctx_1}
+    }$.
+
+    Finally, applying \oxname{WF-Temporaries} gives us
+    $\oxwfkontctx{\oxglobalctx}{
+      \oxgcloans{\oxkontctx}{\oxvarctx_1}
+    }{\overline{\oxvalue}}{\oxkontctx}$.
+  }
+
+  %% new expression is well-typed
+  \oxpresline{
+    \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{\oxgcloans{\oxkontctx}{\oxvarctx_1}}
+    {\oxexpr_2}{\oxsitype_2}{\oxvarctx_2}
+  }{
+    Immediate from the premise of \oxname{T-Seq}.
+  }
+
+  %% new type is a subtype of the old type
+  \oxpresline{
+    \oxtunify[\oxcombine]{\oxemptyctx}{\oxkontctx}{\oxvarctx_2}
+    {\oxsitype_2}{\oxsitype_2}{\oxvarctx_2}
+  }{
+    Immediate by \oxname{RR-Refl}.
+  }
+
+  %% new loan context is a sub-context of the old loan context
+  \oxpresline{
+    \exists \oxvarctx_o. \oxvarctx_2 \oxintersect \oxvarctx_o = \oxvarctx_2
+  }{
+    $\oxvarctx_o = \oxvarctx_2$
+  }
+\end{preservation}
+
+\oxpreservationcasemulti{T-Branch}{\TBranch}{
+  \oxbranch{\oxexpr_1}{\oxexpr_2}{\oxexpr_3}
+}{\EIfTrue \and \EIfFalse}
+
+\oxpreservationsubcaseheading{E-IfTrue}{
+  \oxvarctx_1
+}
+
+\begin{preservation}
+  %% new store is valid
+  \oxpresline{
+    \oxstorevalidity{\oxglobalctx}{\oxvarctx_1}{\oxstore}
+  }{
+    Applying \Lemma{lemma:values-dont-change} to the typing derivation (from
+    \oxname{T-Branch}) for $\oxexpr_1$ (which we know is a value from
+    \oxname{E-IfTrue}) gives us
+    $\oxsubtypectx{\oxglobalctx}{\oxemptyctx}{\oxvarctx}{\oxvarctx_1}$. Then,
+    applying \Lemma{lemma:stack-validity-related-envs} with this and
+    $\oxstorevalidity{\oxglobalctx}{\oxvarctx}{\oxstore}$ (from
+    premise) gives us
+    $\oxstorevalidity{\oxglobalctx}{\oxvarctx_1}{\oxstore}$.
+  }
+
+  %% kontctx values are still valid
+  \oxpresline{
+    \oxwfkontctx{\oxglobalctx}{\oxvarctx_1}{\overline{\oxvalue}}{\oxkontctx}
+  }{
+    Inverting \oxname{WF-Temporaries} gives us $\forall i \in 1 \oxdots n. \;
+    \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxsitype_1 \oxdotsc \oxsitype_{i-1}}{\oxvarctx}{
+      \oxvalue_i
+    }{\oxsitype_i}{\oxvarctx}$.
+
+    Applying \Lemma{lemma:values-dont-change} to the typing derivation (from
+    \oxname{T-Branch}) for
+    $\oxexpr_1$ (which we know is a value from \oxname{E-IfTrue}) gives us
+    $\oxsubtypectx{\oxglobalctx}{\oxemptyctx}{\oxvarctx}{\oxvarctx_1}$.
+
+    Thus, we can apply \Lemma{lemma:value-typing-related-envs} to each of the
+    typing judgments to get $\forall i \in 1 \oxdots n. \;
+    \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxsitype_1 \oxdotsc \oxsitype_{i-1}}{\oxvarctx_1}{
+      \oxvalue_i
+    }{\oxsitype_i}{\oxvarctx_1}$.
+
+    Finally, applying \oxname{WF-Temporaries} gives us
+    $\oxwfkontctx{\oxglobalctx}{\oxvarctx_1}{\overline{\oxvalue}}{\oxkontctx}$.
+  }
+
+  %% new expression is well-typed
+  \oxpresline{
+    \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{\oxvarctx_1}{\oxexpr_2}
+    {\oxsitype}{\oxvarctx_2}
+  }{
+    Immediate from premise of \oxname{T-Branch}.
+  }
+
+  %% new type is a subtype of the old type
+  \oxpresline{
+    \oxtunify[\oxcombine]{\oxemptyctx}{\oxkontctx}{\oxvarctx_2}
+    {\oxsitype_2}{\oxsitype}{\oxvarctx_2^\prime}
+  }{
+    Immediate from premise of \oxname{T-Branch}.
+  }
+
+  %% new loan context is a sub-context of the old loan context
+  \oxpresline{
+    \exists \oxvarctx_o. \oxvarctx_2^\prime \oxintersect \oxvarctx_o = \oxvarctx^\prime
+  }{
+    $\oxvarctx_o = \oxvarctx_3^\prime$
+  }
+\end{preservation}
+
+\oxpreservationsubcaseheading{E-IfFalse}{
+  \oxvarctx_1
+}
+
+\begin{preservation}
+  %% new store is valid
+  \oxpresline{
+    \oxstorevalidity{\oxglobalctx}{\oxvarctx_1}{\oxstore}
+  }{
+    Applying \Lemma{lemma:values-dont-change} to the typing derivation (from
+    \oxname{T-Branch}) for $\oxexpr_1$ (which we know is a value from
+    \oxname{E-IfFalse}) gives us
+    $\oxsubtypectx{\oxglobalctx}{\oxemptyctx}{\oxvarctx}{\oxvarctx_1}$. Then,
+    applying \Lemma{lemma:stack-validity-related-envs} with this and
+    $\oxstorevalidity{\oxglobalctx}{\oxvarctx}{\oxstore}$ (from
+    premise) gives us
+    $\oxstorevalidity{\oxglobalctx}{\oxvarctx_1}{\oxstore}$.
+  }
+
+  %% kontctx values are still valid
+  \oxpresline{
+    \oxwfkontctx{\oxglobalctx}{\oxvarctx_1}{\overline{\oxvalue}}{\oxkontctx}
+  }{
+    Inverting \oxname{WF-Temporaries} gives us $\forall i \in 1 \oxdots n. \;
+    \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxsitype_1 \oxdotsc \oxsitype_{i-1}}{\oxvarctx}{
+      \oxvalue_i
+    }{\oxsitype_i}{\oxvarctx}$.
+
+    Applying \Lemma{lemma:values-dont-change} to the typing derivation (from
+    \oxname{T-Branch}) for
+    $\oxexpr_1$ (which we know is a value from \oxname{E-IfFalse}) gives us
+    $\oxsubtypectx{\oxglobalctx}{\oxemptyctx}{\oxvarctx}{\oxvarctx_1}$.
+
+    Thus, we can apply \Lemma{lemma:value-typing-related-envs} to each of the
+    typing judgments to get $\forall i \in 1 \oxdots n. \;
+    \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxsitype_1 \oxdotsc \oxsitype_{i-1}}{\oxvarctx_1}{
+      \oxvalue_i
+    }{\oxsitype_i}{\oxvarctx_1}$.
+
+    Finally, applying \oxname{WF-Temporaries} gives us
+    $\oxwfkontctx{\oxglobalctx}{\oxvarctx_1}{\overline{\oxvalue}}{\oxkontctx}$.
+  }
+
+  %% new expression is well-typed
+  \oxpresline{
+    \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{\oxvarctx_1}
+    {\oxexpr_3}{\oxsitype_3}{\oxvarctx_3}
+  }{
+    Immediate from premise of \oxname{T-Branch}.
+  }
+
+  %% new type is a subtype of the old type
+  \oxpresline{
+    \oxtunify[\oxcombine]{\oxemptyctx}{\oxkontctx}{\oxvarctx_3}
+    {\oxsitype_3}{\oxsitype}{\oxvarctx_3^\prime}
+  }{
+    Immediate from premise of \oxname{T-Branch}.
+  }
+
+  %% new loan context is a sub-context of the old loan context
+  \oxpresline{
+    \exists \oxvarctx_o. \oxvarctx_3^\prime \oxintersect \oxvarctx_o = \oxvarctx^\prime
+  }{
+    $\oxvarctx_o = \oxvarctx_2^\prime$ (note that $\oxintersect$ commutes)
+  }
+\end{preservation}
+
+\oxpreservationcasemulti{T-Match}{\TMatch}{
+  \oxmatch{\oxexpr}{\oxid_1}{\oxexpr_1}{\oxid_2}{\oxexpr_2}
+}{\EMatchLeft \and \EMatchRight}
+
+\oxpreservationsubcaseheading{E-MatchLeft}{
+  \oxextendctx{\oxvarctx^\prime}{
+    \oxvarctxentry{\oxid_1}{\oxsitype_l}
+  }
+}
+
+\begin{preservation}
+  %% new store is valid
+  \oxpresline{
+    \oxstorevalidity{\oxglobalctx}{
+      \oxextendctx{\oxvarctx^\prime}{
+        \oxvarctxentry{\oxid_1}{\oxsitype_l}
+      }
+    }{
+      \oxextendctx{\oxstore}{
+        \oxstoreentry{\oxid_1}{\oxvalue}
+      }
+    }
+  }{
+    Applying \Lemma{lemma:values-dont-change} to the typing derivation (from
+    \oxname{T-Match}) for $\oxexpr$ (which we know is a value from
+    \oxname{E-MatchLeft}) gives us
+    $\oxsubtypectx{\oxglobalctx}{\oxemptyctx}{\oxvarctx}{\oxvarctx^\prime}$. Then,
+    applying \Lemma{lemma:stack-validity-related-envs} with this and
+    $\oxstorevalidity{\oxglobalctx}{\oxvarctx}{\oxstore}$ (from
+    premise) gives us
+    $\oxstorevalidity{\oxglobalctx}{\oxvarctx^\prime}{\oxstore}$. Then, using
+    $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{\oxvarctx}{\oxvalue}{\oxsitype_l}
+    {\oxvarctx^\prime}$ (which we get by inversion of \oxname{T-Inl} in the
+    derivation for $\oxexpr$) with \oxname{WF-StackFrame} allows us to finally
+    conclude $\oxstorevalidity{\oxglobalctx}{
+      \oxextendctx{\oxvarctx^\prime}{
+        \oxvarctxentry{\oxid_1}{\oxsitype_l}
+      }
+    }{
+      \oxextendctx{\oxstore}{
+        \oxstoreentry{\oxid_1}{\oxvalue}
+      }
+    }$.
+  }
+
+  %% kontctx values are still valid
+  \oxpresline{
+    \oxwfkontctx{\oxglobalctx}{
+      \oxextendctx{\oxvarctx^\prime}{
+        \oxvarctxentry{\oxid_1}{\oxsitype_l}
+      }
+    }{\overline{\oxvalue}}{\oxkontctx}
+  }{
+    Inverting \oxname{WF-Temporaries} gives us $\forall i \in 1 \oxdots n. \;
+    \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxsitype_1 \oxdotsc \oxsitype_{i-1}}{\oxvarctx}{
+      \oxvalue_i
+    }{\oxsitype_i}{\oxvarctx}$.
+
+    Applying \Lemma{lemma:values-dont-change} to the typing derivation (from
+    \oxname{T-Match}) for
+    $\oxexpr$ (which we know is a value from \oxname{E-MatchLeft}) gives us
+    $\oxsubtypectx{\oxglobalctx}{\oxemptyctx}{\oxvarctx}{\oxvarctx^\prime}$.
+
+    Thus, we can apply \Lemma{lemma:value-typing-related-envs} to each of the
+    typing judgments to get $\forall i \in 1 \oxdots n. \;
+    \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxsitype_1 \oxdotsc \oxsitype_{i-1}}{\oxvarctx^\prime}{
+      \oxvalue_i
+    }{\oxsitype_i}{\oxvarctx^\prime}$.
+
+    Applying \Lemma{lemma:values-well-typed-extension} to each of the value
+    typing judgments and $\forall \oxcprov \in
+    \oxfprovs{\oxtsum{\oxsitype_l}{\oxsitype_r}}. \;
+    \oxnotreborrowed{\oxvarctx^\prime}{\oxcprov}$ (from the premise of
+    \oxname{T-Match}) gives us
+    $\forall i \in 1 \oxdots n. \;
+    \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxsitype_1 \oxdotsc \oxsitype_{i-1}}{
+      \oxextendctx{\oxvarctx^\prime}{
+        \oxvarctxentry{\oxid_1}{\oxsitype_l}
+      }
+    }{
+      \oxvalue_i
+    }{\oxsitype_i}{
+      \oxextendctx{\oxvarctx^\prime}{
+        \oxvarctxentry{\oxid_1}{\oxsitype_l}
+      }
+    }$.
+
+    Finally, applying \oxname{WF-Temporaries} gives us
+    $\oxwfkontctx{\oxglobalctx}{
+      \oxextendctx{\oxvarctx^\prime}{
+        \oxvarctxentry{\oxid_1}{\oxsitype_l}
+      }
+    }{\overline{\oxvalue}}{\oxkontctx}$.
+  }
+
+  %% new expression is well-typed
+  \oxpresline{
+    \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{
+      \oxextendctx{\oxvarctx^\prime}{
+        \oxvarctxentry{\oxid_1}{\oxsitype_l}
+      }
+    }{\oxexpr_1}
+    {\oxsitype_1}{\oxvarctx_1}
+  }{
+    Immediate from applying \oxname{T-Shift} to
+    $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{
+      \oxextendctx{\oxvarctx^\prime}{
+        \oxvarctxentry{\oxid_1}{\oxsitype_l}
+      }
+    }{
+      \oxexpr_1
+    }{\oxsitype_1}{
+      \oxextendctx{\oxvarctx_1}{
+        \oxvarctxentry{\oxid_1}{\oxsdtype_l}
+      }
+    }$ from the premise of \oxname{T-Match}.
+  }
+
+  %% new type is a subtype of the old type
+  \oxpresline{
+    \oxtunify[\oxcombine]{\oxemptyctx}{\oxkontctx}{\oxvarctx_1}
+    {\oxsitype_1}{\oxsitype}{\oxvarctx_1^\prime}
+  }{
+    Immediate from premise of \oxname{T-Match}.
+  }
+
+  %% new loan context is a sub-context of the old loan context
+  \oxpresline{
+    \exists \oxvarctx_o. \oxvarctx_1^\prime \oxintersect \oxvarctx_o = \oxvarctx^\prime
+  }{
+    $\oxvarctx_o = \oxvarctx_2^\prime$
+  }
+\end{preservation}
+
+\oxpreservationsubcaseheading{E-MatchRight}{
+  \oxextendctx{\oxvarctx^\prime}{
+    \oxvarctxentry{\oxid_2}{\oxsitype_r}
+  }
+}
+
+\begin{preservation}
+  %% new store is valid
+  \oxpresline{
+    \oxstorevalidity{\oxglobalctx}{
+      \oxextendctx{\oxvarctx^\prime}{
+        \oxvarctxentry{\oxid_2}{\oxsitype_r}
+      }
+    }{
+      \oxextendctx{\oxstore}{
+        \oxstoreentry{\oxid_2}{\oxvalue}
+      }
+    }
+  }{
+    Applying \Lemma{lemma:values-dont-change} to the typing derivation (from
+    \oxname{T-Match}) for $\oxexpr$ (which we know is a value from
+    \oxname{E-MatchRight}) gives us
+    $\oxsubtypectx{\oxglobalctx}{\oxemptyctx}{\oxvarctx}{\oxvarctx^\prime}$. Then,
+    applying \Lemma{lemma:stack-validity-related-envs} with this and
+    $\oxstorevalidity{\oxglobalctx}{\oxvarctx}{\oxstore}$ (from
+    premise) gives us
+    $\oxstorevalidity{\oxglobalctx}{\oxvarctx^\prime}{\oxstore}$. Then, using
+    $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{\oxvarctx}{\oxvalue}{\oxsitype_r}
+    {\oxvarctx^\prime}$ (which we get by inversion of \oxname{T-Inr} in the
+    derivation for $\oxexpr$) with \oxname{WF-StackFrame} allows us to finally
+    conclude $\oxstorevalidity{\oxglobalctx}{
+      \oxextendctx{\oxvarctx^\prime}{
+        \oxvarctxentry{\oxid_2}{\oxsitype_r}
+      }
+    }{
+      \oxextendctx{\oxstore}{
+        \oxstoreentry{\oxid_2}{\oxvalue}
+      }
+    }$.
+  }
+
+  %% kontctx values are still valid
+  \oxpresline{
+    \oxwfkontctx{\oxglobalctx}{
+      \oxextendctx{\oxvarctx^\prime}{
+        \oxvarctxentry{\oxid_2}{\oxsitype_r}
+      }
+    }{\overline{\oxvalue}}{\oxkontctx}
+  }{
+    Inverting \oxname{WF-Temporaries} gives us $\forall i \in 1 \oxdots n. \;
+    \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxsitype_1 \oxdotsc \oxsitype_{i-1}}{\oxvarctx}{
+      \oxvalue_i
+    }{\oxsitype_i}{\oxvarctx}$.
+
+    Applying \Lemma{lemma:values-dont-change} to the typing derivation (from
+    \oxname{T-Match}) for
+    $\oxexpr$ (which we know is a value from \oxname{E-MatchLeft}) gives us
+    $\oxsubtypectx{\oxglobalctx}{\oxemptyctx}{\oxvarctx}{\oxvarctx^\prime}$.
+
+    Thus, we can apply \Lemma{lemma:value-typing-related-envs} to each of the
+    typing judgments to get $\forall i \in 1 \oxdots n. \;
+    \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxsitype_1 \oxdotsc \oxsitype_{i-1}}{\oxvarctx^\prime}{
+      \oxvalue_i
+    }{\oxsitype_i}{\oxvarctx^\prime}$.
+
+    Applying \Lemma{lemma:values-well-typed-extension} to each of the value
+    typing judgments and $\forall \oxcprov \in
+    \oxfprovs{\oxtsum{\oxsitype_l}{\oxsitype_r}}. \;
+    \oxnotreborrowed{\oxvarctx^\prime}{\oxcprov}$ (from the premise of
+    \oxname{T-Match}) gives us
+    $\forall i \in 1 \oxdots n. \;
+    \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxsitype_1 \oxdotsc \oxsitype_{i-1}}{
+      \oxextendctx{\oxvarctx^\prime}{
+        \oxvarctxentry{\oxid_2}{\oxsitype_r}
+      }
+    }{
+      \oxvalue_i
+    }{\oxsitype_i}{
+      \oxextendctx{\oxvarctx^\prime}{
+        \oxvarctxentry{\oxid_2}{\oxsitype_r}
+      }
+    }$.
+
+    Finally, applying \oxname{WF-Temporaries} gives us
+    $\oxwfkontctx{\oxglobalctx}{
+      \oxextendctx{\oxvarctx^\prime}{
+        \oxvarctxentry{\oxid_2}{\oxsitype_r}
+      }
+    }{\overline{\oxvalue}}{\oxkontctx}$.
+  }
+
+  %% new expression is well-typed
+  \oxpresline{
+    \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{
+      \oxextendctx{\oxvarctx^\prime}{
+        \oxvarctxentry{\oxid_2}{\oxsitype_r}
+      }
+    }{\oxexpr_2}
+    {\oxsitype_2}{\oxvarctx_2}
+  }{
+    Immediate from applying \oxname{T-Shift} to
+    $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{
+      \oxextendctx{\oxvarctx^\prime}{
+        \oxvarctxentry{\oxid_2}{\oxsitype_r}
+      }
+    }{
+      \oxexpr_2
+    }{\oxsitype_2}{
+      \oxextendctx{\oxvarctx_2}{
+        \oxvarctxentry{\oxid_2}{\oxsdtype_r}
+      }
+    }$ from the premise of \oxname{T-Match}.
+  }
+
+  %% new type is a subtype of the old type
+  \oxpresline{
+    \oxtunify[\oxcombine]{\oxemptyctx}{\oxkontctx}{\oxvarctx_2}
+    {\oxsitype_2}{\oxsitype}{\oxvarctx_2^\prime}
+  }{
+    Immediate from premise of \oxname{T-Match}.
+  }
+
+  %% new loan context is a sub-context of the old loan context
+  \oxpresline{
+    \exists \oxvarctx_o. \oxvarctx_2^\prime \oxintersect \oxvarctx_o = \oxvarctx^\prime
+  }{
+    $\oxvarctx_o = \oxvarctx_1^\prime$ (note that $\oxintersect$ commutes)
+  }
+\end{preservation}
+
+\oxpreservationcase{T-Assign}{\TAssign}{
+  \oxassign{\oxplace}{\oxexpr_a}
+}{\EAssign}{
+  \oxgcloans{\oxkontctx}{\oxtupdate{\oxvarctx^\prime}{\oxplace}{\oxsitype}}
+}
+
+\begin{preservation}
+  %% new store is valid
+  \oxpresline{
+    \oxstorevalidity{\oxglobalctx}{
+      \oxgcloans{\oxkontctx}{\oxtupdate{\oxvarctx^\prime}{\oxplace}{\oxsitype}}
+    }{
+      \oxvupdate{\oxstore}{\oxplace}{\oxvaluectx[\oxvalue]}
+    }
+  }{
+    From our premise, we have
+    $\oxstorevalidity{\oxglobalctx}{\oxvarctx}{\oxstore}$. Then, applying
+    \Lemma{lemma:values-dont-change} to the typing derivation
+    $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{\oxvarctx}{
+      \oxvalue
+    }{\oxsitype}{\oxvarctx_1}$ (from the premise of \oxname{T-Assign} combined
+    with the fact that $\oxexpr$ is a value from \oxname{E-Assign}) gives us
+    $\oxsubtypectx{\oxglobalctx}{\oxemptyctx}{\oxvarctx}{\oxvarctx_1}$. Then,
+    applying \Lemma{lemma:stack-validity-related-envs} to these two facts gives
+    us $\oxstorevalidity{\oxglobalctx}{\oxvarctx_1}{\oxstore}$.
+
+    Finally, we apply \Lemma{lemma:stack-validity-assign} to
+    $\oxstorevalidity{\oxglobalctx}{\oxvarctx_1}{\oxstore}$ and
+    $\oxlookup{{\oxvarctx_1}}{\oxplace}{\oxsxtype}$ (from premise) and
+    $\oxtunify[\oxnoop]{\oxemptyctx}{\oxkontctx}{
+      \oxrsub{\oxvarctx_1}{\oxplace}
+    }{\oxsitype}{\oxsxtype}{\oxvarctx^\prime}$ (from the premise of
+    \oxname{T-Assign}) and
+    $\oxmusafety{\oxemptyctx}{\oxvarctx^\prime}{\oxmut}{\oxplace}{
+      \oxset{\oxloanpkg{\oxmut}{\oxplace}}
+    }$ (from premise of \oxname{T-Assign} and
+    $\oxnorm{\oxstore}{\oxplace}{\oxplace}{\oxvaluectx}{\_}$ and $\oxplace =
+    \oxproj{\oxid}{\oxpath}$ (both from the premise of \oxname{E-Assign}),
+    $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{
+      \oxrsub{\oxvarctx_1}{\oxplaceexpr} }{\oxvalue}{\oxsitype}{
+      \oxrsub{\oxvarctx_1}{\oxplaceexpr} }$ (from above) and
+    $\oxstorevalidity{\oxglobalctx}{
+      \oxgcloans{\oxkontctx}{\oxtupdate{\oxvarctx^\prime}{\oxplace}{\oxsitype}}
+    }{
+      \oxvupdate{\oxstore}{\oxid}{\oxvaluectx[\oxvalue]}
+    }$.
+  }
+
+  %% kontctx values are still valid
+  \oxpresline{
+    \oxwfkontctx{\oxglobalctx}{
+      \oxgcloans{\oxkontctx}{\oxtupdate{\oxvarctx^\prime}{\oxplace}{\oxsitype}}
+    }{\overline{\oxvalue}}{\oxkontctx}
+  }{
+    Inverting \oxname{WF-Temporaries} gives us $\forall i \in 1 \oxdots n. \;
+    \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxsitype_1 \oxdotsc \oxsitype_{i-1}}{\oxvarctx}{
+      \oxvalue_i
+    }{\oxsitype_i}{\oxvarctx}$.
+
+    Applying \Lemma{lemma:values-dont-change} to the typing derivation (from
+    \oxname{T-Let}) for
+    $\oxexpr_1$ (which we know is a value from \oxname{E-Let}) gives us
+    $\oxsubtypectx{\oxglobalctx}{\oxemptyctx}{\oxvarctx}{\oxvarctx_1}$.
+    Then, we can apply \Lemma{lemma:value-typing-related-envs} to each of the
+    typing judgments to get $\forall i \in 1 \oxdots n. \;
+    \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxsitype_1 \oxdotsc \oxsitype_{i-1}}{\oxvarctx_1}{
+      \oxvalue_i
+    }{\oxsitype_i}{\oxvarctx_1}$.
+
+    Then, we apply \Lemma{lemma:values-well-typed-assignment} to each of these
+    typing judgments to get $\forall i \in 1 \oxdots n. \;
+    \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxsitype_1 \oxdotsc \oxsitype_{i-1}}{
+      \oxgcloans{\oxkontctx}{\oxtupdate{\oxvarctx^\prime}{\oxplace}{\oxsitype}}
+    }{
+      \oxvalue_i
+    }{\oxsitype_i}{
+      \oxgcloans{\oxkontctx}{\oxtupdate{\oxvarctx^\prime}{\oxplace}{\oxsitype}}
+    }$. After which we can apply \oxname{WF-Temporaries} to conclude
+    $\oxwfkontctx{\oxglobalctx}{
+      \oxgcloans{\oxkontctx}{\oxtupdate{\oxvarctx^\prime}{\oxplace}{\oxsitype}}
+    }{\overline{\oxvalue}}{\oxkontctx}$.
+  }
+
+  %% new expression is well-typed
+  \oxpresline{
+    \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{
+      \oxvarctx_i
+    }{\oxunit}{\oxtunit}{
+      \oxvarctx_i
+    }
+  }{
+    Immediate by \oxname{T-Unit}.
+  }
+
+  %% new type is a subtype of the old type
+  \oxpresline{
+    \oxtunify[\oxcombine]{\oxemptyctx}{\oxkontctx}{
+      \oxvarctx_i
+    }{\oxtunit}{\oxtunit}{
+      \oxvarctx_i
+    }
+  }{
+    Immediate by \oxname{RR-Refl}.
+  }
+
+  %% new loan context is a sub-context of the old loan context
+  \oxpresline{
+    \exists \oxvarctx_o.
+    \oxvarctx_i
+    \oxintersect \oxvarctx_o =
+    \oxvarctx_i
+  }{
+    $\oxvarctx_o = \oxvarctx_i =
+    \oxgcloans{\oxkontctx}{\oxtupdate{\oxvarctx^\prime}{\oxplace}{\oxsitype}}$
+  }
+\end{preservation}
+
+\oxpreservationcase{T-AssignDeref}{\TAssignDeref}{
+  \oxassign{\oxplaceexpr}{\oxexpr_a}
+}{\EAssign}{
+  \oxvarctx^\prime
+}
+
+\begin{preservation}
+  %% new store is valid
+  \oxpresline{
+    \oxstorevalidity{\oxglobalctx}{\oxvarctx^\prime}{
+      \oxvupdate{\oxstore}{\oxplace}{\oxvaluectx[\oxvalue]}
+    }
+  }{
+    From our premise, we have
+    $\oxstorevalidity{\oxglobalctx}{\oxvarctx}{\oxstore}$. Then, applying
+    \Lemma{lemma:values-dont-change} to the typing derivation
+    $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{\oxvarctx}{
+      \oxvalue
+    }{\oxsitype}{\oxvarctx_1}$ (from the premise of \oxname{T-AssignDeref} combined
+    with the fact that $\oxexpr$ is a value from \oxname{E-Assign}) gives us
+    $\oxsubtypectx{\oxglobalctx}{\oxemptyctx}{\oxvarctx}{\oxvarctx_1}$. Then,
+    applying \Lemma{lemma:stack-validity-related-envs} to these two facts gives
+    us $\oxstorevalidity{\oxglobalctx}{\oxvarctx_1}{\oxstore}$.
+
+    Then, applying \Lemma{lemma:stack-validity-region-rewriting} to
+    $\oxstorevalidity{\oxglobalctx}{\oxvarctx_1}{\oxstore}$ and
+    $\oxtunify[\oxcombine]{\oxemptyctx}{\oxkontctx}{\oxvarctx_1}
+    {\oxsitype_n}{\oxsitype_o}{\oxvarctx^\prime}$ (from the premise of
+    \oxname{T-AssignDeref}) gives us
+    $\oxstorevalidity{\oxglobalctx}{\oxvarctx^\prime}{\oxstore}$.
+  }
+
+  %% kontctx values are still valid
+  \oxpresline{
+    \oxwfkontctx{\oxglobalctx}{
+      \oxvarctx^\prime
+    }{\overline{\oxvalue}}{\oxkontctx}
+  }{
+    Inverting \oxname{WF-Temporaries} gives us $\forall i \in 1 \oxdots n. \;
+    \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxsitype_1 \oxdotsc \oxsitype_{i-1}}{\oxvarctx}{
+      \oxvalue_i
+    }{\oxsitype_i}{\oxvarctx}$.
+
+    Applying \Lemma{lemma:values-dont-change} to the typing derivation (from
+    \oxname{T-AssignDeref}) for
+    $\oxexpr$ (which we know is a value from \oxname{E-Assign}) gives us
+    $\oxsubtypectx{\oxglobalctx}{\oxemptyctx}{\oxvarctx}{\oxvarctx_1}$.
+    Then, we can apply \Lemma{lemma:value-typing-related-envs} to each of the
+    typing judgments to get $\forall i \in 1 \oxdots n. \;
+    \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxsitype_1 \oxdotsc \oxsitype_{i-1}}{\oxvarctx_1}{
+      \oxvalue_i
+    }{\oxsitype_i}{\oxvarctx_1}$.
+
+    Then, applying \Lemma{lemma:subtyping-value-typing} to each of these
+    derivations along with
+    $\oxtunify[\oxcombine]{\oxemptyctx}{\oxkontctx}{\oxvarctx_1}
+    {\oxsitype_n}{\oxsitype_o}{\oxvarctx^\prime}$ (from the premise of
+    \oxname{T-AssignDeref}) gives us $\forall i \in 1 \oxdots n. \;
+    \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxsitype_1 \oxdotsc \oxsitype_{i-1}}{
+      \oxvarctx^\prime
+    }{\oxvalue_i}{\oxsitype_i}{\oxvarctx^\prime}$. We can then apply
+    \oxname{WF-Temporaries} to conclude
+    $\oxwfkontctx{\oxglobalctx}{
+      \oxvarctx^\prime
+    }{\overline{\oxvalue}}{\oxkontctx}$.
+  }
+
+  %% new expression is well-typed
+  \oxpresline{
+    \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{
+      \oxvarctx^\prime
+    }{\oxunit}{\oxtunit}{
+      \oxvarctx^\prime
+    }
+  }{
+    Immediate by \oxname{T-Unit}.
+  }
+
+  %% new type is a subtype of the old type
+  \oxpresline{
+    \oxtunify[\oxcombine]{\oxemptyctx}{\oxkontctx}{
+      \oxvarctx^\prime
+    }{\oxtunit}{\oxtunit}{
+      \oxvarctx^\prime
+    }
+  }{
+    Immediate by \oxname{RR-Refl}.
+  }
+
+  %% new loan context is a sub-context of the old loan context
+  \oxpresline{
+    \exists \oxvarctx_o. \oxvarctx^\prime \oxintersect
+    \oxvarctx_o = \oxvarctx^\prime
+  }{
+    $\oxvarctx_o = \oxvarctx^\prime$
+  }
+\end{preservation}
+
+\oxpreservationcase{T-Let}{\TLet}{
+  \oxlet{\oxid}{\oxsitype}{\oxexpr_1}{\oxexpr_2}
+}{\ELet}{
+  \oxgcloans{\oxkontctx}{
+    \oxextendctx{\oxvarctx_1^\prime}{
+      \oxvarctxentry{\oxid}{\oxsitype_a}
+    }
+  }
+}
+
+\begin{preservation}
+  %% new store is valid
+  \oxpresline{
+    \oxstorevalidity{\oxglobalctx}{
+      \oxgcloans{\oxkontctx}{
+        \oxextendctx{\oxvarctx_1^\prime}{
+          \oxvarctxentry{\oxid}{\oxsitype_a}
+        }
+      }
+    }{
+      \oxextendctx{\oxstore}{\oxstoreentry{\oxid}{\oxvalue}}
+    }
+  }{
+    Applying \Lemma{lemma:values-dont-change} to the typing derivation (from
+    \oxname{T-Let}) for $\oxexpr_1$ (which we know is a value from
+    \oxname{E-Let}) gives us
+    $\oxsubtypectx{\oxglobalctx}{\oxemptyctx}{\oxvarctx}{\oxvarctx_1}$.
+    Then, we can apply \Lemma{lemma:stack-validity-related-envs} to get
+    $\oxstorevalidity{\oxglobalctx}{\oxvarctx_1}{\oxstore}$.
+    Then,
+    applying \Lemma{lemma:stack-validity-region-rewriting} to
+    $\oxtunify[\oxcombine]{\oxemptyctx}{\oxkontctx}{\oxvarctx_1}{\oxsitype_1}{\oxsitype_a}
+    {\oxvarctx_1^\prime}$ (from premise of \oxname{T-Let}) gives us
+    $\oxstorevalidity{\oxglobalctx}{\oxvarctx_1^\prime}{\oxstore}$. We can also
+    apply \Lemma{lemma:values-typed-supertype} to $\oxtypjudge{\oxglobalctx}
+    {\oxemptyctx}{\oxkontctx}{\oxvarctx}{\oxvalue}{\oxsitype_1}{\oxvarctx_1}$ (from premise
+    of \oxname{T-Let}) and $\oxtunify[\oxcombine]{\oxemptyctx}{\oxkontctx}{\oxvarctx_1}
+    {\oxsitype_1}{\oxsitype_a}{\oxvarctx_1^\prime}$ (from premise of
+    \oxname{T-Let}) gives us $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}
+    {\oxvarctx^\prime}{\oxexpr_1}{\oxsitype_a}{\oxvarctx^\prime}$
+
+    Then, apply \Lemma{lemma:store-validity-extension} to
+    $\oxstorevalidity{\oxglobalctx}{\oxvarctx_1^\prime}{\oxstore}$ and
+    $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{\oxvarctx^\prime}
+    {\oxexpr_1}{\oxsitype_a}{\oxvarctx^\prime}$ gives us
+    $\oxstorevalidity{\oxglobalctx}{
+      \oxextendctx{\oxvarctx_1^\prime}{
+        \oxvarctxentry{\oxid}{\oxsitype_a}
+      }
+    }{
+      \oxextendctx{\oxstore}{\oxstoreentry{\oxid}{\oxvalue}}
+    }$. By definition of
+    \oxname{R-Env}, we know that $\oxsubtypectx{\oxglobalctx}{\oxemptyctx}{
+      \oxextendctx{\oxvarctx_1^\prime}{
+        \oxvarctxentry{\oxid}{\oxsitype_a}
+      }
+    }{
+      \oxgcloans{\oxkontctx}{
+        \oxextendctx{\oxvarctx_1^\prime}{
+          \oxvarctxentry{\oxid}{\oxsitype_a}
+        }
+      }
+    }$. Then, we can apply
+    \Lemma{lemma:stack-validity-related-envs} to conclude
+    $\oxstorevalidity{\oxglobalctx}{
+      \oxgcloans{\oxkontctx}{
+        \oxextendctx{\oxvarctx_1^\prime}{
+          \oxvarctxentry{\oxid}{\oxsitype_a}
+        }
+      }
+    }{
+      \oxextendctx{\oxstore}{\oxstoreentry{\oxid}{\oxvalue}}
+    }$.
+  }
+
+  %% kontctx values are still valid
+  \oxpresline{
+    \oxwfkontctx{\oxglobalctx}{
+      \oxgcloans{\oxkontctx}{
+        \oxextendctx{\oxvarctx_1^\prime}{
+          \oxvarctxentry{\oxid}{\oxsitype_a}
+        }
+      }
+    }{\overline{\oxvalue}}{\oxkontctx}
+  }{
+    Inverting \oxname{WF-Temporaries} gives us $\forall i \in 1 \oxdots n. \;
+    \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxsitype_1 \oxdotsc \oxsitype_{i-1}}{\oxvarctx}{
+      \oxvalue_i
+    }{\oxsitype_i}{\oxvarctx}$.
+
+    Applying \Lemma{lemma:values-dont-change} to the typing derivation (from
+    \oxname{T-Let}) for
+    $\oxexpr_1$ (which we know is a value from \oxname{E-Let}) gives us
+    $\oxsubtypectx{\oxglobalctx}{\oxemptyctx}{\oxvarctx}{\oxvarctx_1}$.
+    Then, we can apply \Lemma{lemma:value-typing-related-envs} to each of the
+    typing judgments to get $\forall i \in 1 \oxdots n. \;
+    \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxsitype_1 \oxdotsc \oxsitype_{i-1}}{\oxvarctx_1}{
+      \oxvalue_i
+    }{\oxsitype_i}{\oxvarctx_1}$.
+
+    Applying \Lemma{lemma:values-well-typed-extension} to each of the value
+    typing judgments and $\forall \oxcprov \in \oxfprovs{\oxsitype_a}. \;
+    \oxnotreborrowed{\oxvarctx_1^\prime}{\oxcprov}$ (from the premise of
+    \oxname{T-Let}) gives us
+    $\forall i \in 1 \oxdots n. \;
+    \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxsitype_1 \oxdotsc \oxsitype_{i-1}}{
+      \oxextendctx{\oxvarctx_1}{
+        \oxvarctxentry{\oxid}{\oxsitype_a}
+      }
+    }{
+      \oxvalue_i
+    }{\oxsitype_i}{
+      \oxextendctx{\oxvarctx_1}{
+        \oxvarctxentry{\oxid}{\oxsitype_a}
+      }
+    }$.
+
+    Then, we note that definitionally
+    $\oxsubtypectx{\oxglobalctx}{\oxemptyctx}{
+      \oxextendctx{\oxvarctx_1}{
+        \oxvarctxentry{\oxid}{\oxsitype_a}
+      }
+    }{
+      \oxgcloans{\oxkontctx}{
+        \oxextendctx{\oxvarctx_1}{
+          \oxvarctxentry{\oxid}{\oxsitype_a}
+        }
+      }
+    }$ since we can only clear loans that are not present in any of the types.
+    We can use this with each typing derivation in \Lemma{lemma:values-dont-change},
+    and then finally apply \oxname{WF-Temporaries} to get
+    $\oxwfkontctx{\oxglobalctx}{
+      \oxgcloans{\oxkontctx}{
+        \oxextendctx{\oxvarctx_1}{
+          \oxvarctxentry{\oxid}{\oxsitype_a}
+        }
+      }
+    }{\overline{\oxvalue}}{\oxkontctx}$.
+  }
+
+  %% new expression is well-typed
+  \oxpresline{
+    \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{
+      \oxgcloans{\oxkontctx}{
+        \oxextendctx{\oxvarctx_1^\prime}{
+          \oxvarctxentry{\oxid}{\oxsitype_a}
+        }
+      }
+    }{\oxshift{\oxexpr}}{\oxsitype_2}{\oxvarctx_2}
+  }{
+    Immediate by applying \oxname{T-Shift} to the derivation
+    \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{
+      \oxgcloans{\oxkontctx}{
+        \oxextendctx{\oxvarctx_1^\prime}{
+          \oxvarctxentry{\oxid}{\oxsitype_a}
+        }
+      }
+    }{\oxexpr}{\oxsitype_2}{
+      \oxextendctx{\oxvarctx_2}{
+        \oxvarctxentry{\oxid}{\oxsdtype}
+      }
+    } (from premise of \oxname{T-Let}).
+  }
+
+  %% new type is a subtype of the old type
+  \oxpresline{
+    \oxtunify[\oxcombine]{\oxemptyctx}{\oxkontctx}{\oxvarctx_2}
+    {\oxsitype_2}{\oxsitype_2}{\oxvarctx_2}
+  }{
+    Immediate by \oxname{RR-Refl}.
+  }
+
+  %% new loan context is a sub-context of the old loan context
+  \oxpresline{
+    \exists \oxvarctx_o. \oxvarctx_2 \oxintersect \oxvarctx_o = \oxvarctx_2
+  }{
+    $\oxvarctx_o = \oxvarctx_2$
+  }
+\end{preservation}
+
+\oxpreservationcase{T-LetRegion}{\TLetProv}{
+  \oxletrgn{\oxcprov}{\oxexpr}
+}{\ELetProv}{
+  \oxvarctx^\prime
+}
+
+\begin{preservation}
+  %% new store is valid
+  \oxpresline{
+    \oxstorevalidity{\oxglobalctx}{\oxvarctx^\prime}{\oxstore}
+  }{
+    Applying \Lemma{lemma:values-dont-change} to the typing derivation (from
+    \oxname{T-LetRegion}) for $\oxexpr$ (which we know is a value from
+    \oxname{E-LetRegion}) gives us
+    $\oxsubtypectx{\oxglobalctx}{\oxemptyctx}{\oxvarctx}{\oxvarctx^\prime}$. Then,
+    applying \Lemma{lemma:stack-validity-related-envs} with this and
+    $\oxstorevalidity{\oxglobalctx}{\oxvarctx}{\oxstore}$ (from
+    premise) gives us
+    $\oxstorevalidity{\oxglobalctx}{\oxvarctx^\prime}{\oxstore}$.
+  }
+
+  %% kontctx values are still valid
+  \oxpresline{
+    \oxwfkontctx{\oxglobalctx}{\oxvarctx^\prime}{\overline{\oxvalue}}{\oxkontctx}
+  }{
+    Inverting \oxname{WF-Temporaries} gives us $\forall i \in 1 \oxdots n. \;
+    \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxsitype_1 \oxdotsc \oxsitype_{i-1}}{\oxvarctx}{
+      \oxvalue_i
+    }{\oxsitype_i}{\oxvarctx}$.
+
+    Applying \Lemma{lemma:values-dont-change} to the typing derivation (from
+    \oxname{T-LetRegion}) for
+    $\oxexpr$ (which we know is a value from \oxname{E-LetRegion}) gives us
+    $\oxsubtypectx{\oxglobalctx}{\oxemptyctx}{\oxvarctx}{\oxvarctx^\prime}$.
+
+    Thus, we can apply \Lemma{lemma:value-typing-related-envs} to each of the
+    typing judgments to get $\forall i \in 1 \oxdots n. \;
+    \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxsitype_1 \oxdotsc \oxsitype_{i-1}}{\oxvarctx^\prime}{
+      \oxvalue_i
+    }{\oxsitype_i}{\oxvarctx^\prime}$.
+
+    Finally, applying \oxname{WF-Temporaries} gives us
+    $\oxwfkontctx{\oxglobalctx}{\oxvarctx^\prime}{\overline{\oxvalue}}{\oxkontctx}$.
+  }
+
+  %% new expression is well-typed
+  \oxpresline{
+    \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{\oxvarctx^\prime}{\oxvalue}
+    {\oxsitype}{\oxvarctx^\prime}
+  }{
+    We know from \oxname{E-LetRegion} that $\oxexpr$ is a value $\oxvalue$. Thus,
+    we can apply \Lemma{lemma:value-typing-output} to
+    $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{\oxvarctx}{\oxvalue}{\oxsitype}{
+      \oxextendctx{\oxvarctx^\prime}{
+        \oxloanctxentry{\oxcprov}{\oxset{\overline{\oxloan}}}
+      }
+    }$ to get $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{
+      \oxextendctx{\oxvarctx^\prime}{
+        \oxloanctxentry{\oxcprov}{\oxset{\overline{\oxloan}}}
+      }
+    }{\oxvalue}{\oxsitype}{
+      \oxextendctx{\oxvarctx^\prime}{
+        \oxloanctxentry{\oxcprov}{\oxset{\overline{\oxloan}}}
+      }
+    }$.
+
+    We now wish to show that
+    $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{\oxvarctx^\prime}{\oxvalue}
+    {\oxsitype}{\oxvarctx^\prime}$. By inspecting the grammar of values and
+    their typing rules, we know that the only values who depend on the
+    context are pointers and closure values. But by inversion on
+    $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{\oxvarctx}{
+      \oxletrgn{\oxcprov}{\oxvalue}
+    }{\oxsitype}{\oxvarctx^\prime}$, we know that
+    $\oxtypevalidity{\oxglobalctx}{\oxemptyctx}{\oxvarctx^\prime}{\oxsitype}$.
+    Since the type is valid without the frame, we know that the values
+    cannot depend on that frame. Thus, we can conclude
+    $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{\oxvarctx^\prime}{\oxvalue}
+    {\oxsitype}{\oxvarctx^\prime}$.
+  }
+
+  %% new type is a subtype of the old type
+  \oxpresline{
+    \oxtunify[\oxcombine]{\oxemptyctx}{\oxkontctx}{\oxvarctx^\prime}
+    {\oxsitype}{\oxsitype}{\oxvarctx^\prime}
+  }{
+    Immediate by \oxname{RR-Refl}.
+  }
+
+  %% new loan context is a sub-context of the old loan context
+  \oxpresline{
+    \exists \oxvarctx_o. \oxvarctx^\prime \oxintersect \oxvarctx_o = \oxvarctx^\prime
+  }{
+    $\oxvarctx_o = \oxvarctx^\prime$
+  }
+\end{preservation}
+
+\oxpreservationcase{T-While}{\TWhile}{
+  \oxwhile{\oxexpr_1}{\oxexpr_2}
+}{\EWhile}{
+  \oxvarctx
+}
+
+\begin{preservation}
+  %% new store is valid
+  \oxpresline{
+    \oxstorevalidity{\oxglobalctx}{\oxvarctx}{\oxstore}
+  }{
+    Immediate from our premise.
+  }
+
+  %% kontctx values are still valid
+  \oxpresline{
+    \oxwfkontctx{\oxglobalctx}{\oxvarctx}{\overline{\oxvalue}}{\oxkontctx}
+  }{
+    Immediate from our premise.
+  }
+
+  %% new expression is well-typed
+  \oxpresline{
+    \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{\oxvarctx}{
+      \oxexpr^\prime
+      % \oxbranch{\oxexpr_1}{
+      %   \oxseq{\oxexpr_2}{
+      %     \oxwhile{\oxexpr_1}{\oxexpr_2}
+      %   }
+      % }{\oxunit}
+    }{\oxtunit}{\oxvarctx_2}
+  }{
+    We would like to build a derivation to show that the expression
+    $\oxbranch{\oxexpr_1}{
+      \oxseq{\oxexpr_2}{
+        \oxwhile{\oxexpr_1}{\oxexpr_2}
+      }
+    }{\oxunit}$ is well-typed. We thus start by applying \oxname{T-Branch}.
+
+    This requires us to show three things. First, $\oxtypjudge{\oxglobalctx}
+    {\oxemptyctx}{\oxkontctx}{\oxvarctx}{\oxexpr_1}{\oxtbool}{\oxvarctx_1}$ which we have
+    from the premise of \oxname{T-While}. Second, $\oxtypjudge{\oxglobalctx}
+    {\oxemptyctx}{\oxkontctx}{\oxvarctx_1}{
+      \oxseq{\oxexpr_2}{
+        \oxwhile{\oxexpr_1}{\oxexpr_2}
+      }
+    }{\oxtunit}{\oxvarctx_2}$. We build this by applying \oxname{T-Seq} to
+    $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{\oxvarctx_1}{\oxexpr_2}
+    {\oxtunit}{\oxvarctx_2}$ and $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}
+    {\oxvarctx_2}{\oxwhile{\oxexpr_1}{\oxexpr_2}}{\oxvarctx_2}$. The former is
+    directly in the premise of \oxname{T-While} and the latter can be built by
+    applying \oxname{T-While} to
+    $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{\oxvarctx_2}{
+      \oxexpr_1
+    }{\oxtbool}{\oxvarctx_2}$ and
+    $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{\oxvarctx_2}{
+      \oxexpr_2
+    }{\oxtunit}{\oxvarctx_2}$, both from the premise of our original
+    \oxname{T-While}. Finally, we need to show
+    $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{\oxvarctx_2}{
+      \oxunit
+    }{\oxtunit}{\oxvarctx_2}$, which is immediate from \oxname{T-Unit}.
+  }
+
+  %% new type is a subtype of the old type
+  \oxpresline{
+    \oxtunify[\oxcombine]{\oxemptyctx}{\oxkontctx}{\oxvarctx_2}
+    {\oxtunit}{\oxtunit}{\oxvarctx_2}
+  }{
+    Immediate by \oxname{RR-Refl}.
+  }
+
+  %% new loan context is a sub-context of the old loan context
+  \oxpresline{
+    \exists \oxvarctx_o. \oxvarctx_2 \oxintersect \oxvarctx_o = \oxvarctx_2
+  }{
+    $\oxvarctx_o = \oxvarctx_2$
+  }
+\end{preservation}
+
+\oxpreservationcasemulti{T-ForArray}{\TForArray}{
+  \oxfor{\oxid}{\oxexpr_1}{\oxexpr_2}
+}{
+  \EForArray \and \EForEmptyArray
+}
+
+\oxpreservationsubcaseheading{E-ForArray}{
+  \oxextendctx{\oxvarctx_1}{\oxvarctxentry{\oxid}{\oxsitype}}
+}
+
+\begin{preservation}
+  %% new store is valid
+  \oxpresline{
+    \oxstorevalidity{\oxglobalctx}{
+      \oxextendctx{\oxvarctx_1}{\oxvarctxentry{\oxid}{\oxsitype}}
+    }{
+      \oxextendctx{\oxstore}{
+        \oxstoreentry{\oxid}{\oxvalue_0}
+      }
+    }
+  }{
+    Applying \Lemma{lemma:values-dont-change} to the typing derivation (from
+    \oxname{T-ForArray}) for $\oxexpr_1$ (which we know is a value from
+    \oxname{E-ForArray}) gives us
+    $\oxsubtypectx{\oxglobalctx}{\oxemptyctx}{\oxvarctx}{\oxvarctx_1}$. Then,
+    we can apply \Lemma{lemma:stack-validity-related-envs} to get
+    $\oxstorevalidity{\oxglobalctx}{\oxvarctx_1}{\oxstore}$. Applying
+    \Lemma{lemma:value-typing-output} to the derivation
+    $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{\oxvarctx}
+    {\oxarr{\oxvalue_0 \oxdotsc \oxvalue_n}}{\oxtarr{\oxsitype}{\oxnum}}{\oxvarctx_1}$
+    gives us $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{\oxvarctx_1}
+    {\oxarr{\oxvalue_0 \oxdotsc \oxvalue_n}}{\oxtarr{\oxsitype}{\oxnum}}{\oxvarctx_1}$.
+    Then, using inversion (of \oxname{T-Array}), we get
+    $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{\oxvarctx_1}
+    {\oxvalue_0}{\oxsitype}{\oxvarctx_1}$. Finally, applying
+    \Lemma{lemma:store-validity-extension} to
+    $\oxstorevalidity{\oxglobalctx}{\oxvarctx_1}{\oxstore}$ and
+    $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{\oxvarctx_1}
+    {\oxvalue_0}{\oxsitype}{\oxvarctx_1}$ gives us
+    $\oxstorevalidity{\oxglobalctx}{
+      \oxextendctx{\oxvarctx_1}{
+        \oxvarctxentry{\oxid}{\oxsitype}
+      }
+    }{
+      \oxextendctx{\oxstore}{\oxstoreentry{\oxid}{\oxvalue_0}}
+    }$.
+  }
+
+  %% kontctx values are still valid
+  \oxpresline{
+    \oxwfkontctx{\oxglobalctx}{
+      \oxextendctx{\oxvarctx_1}{
+        \oxvarctxentry{\oxid}{\oxsitype}
+      }
+    }{\overline{\oxvalue}}{\oxkontctx}
+  }{
+    Inverting \oxname{WF-Temporaries} gives us $\forall i \in 1 \oxdots n. \;
+    \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxsitype_1 \oxdotsc \oxsitype_{i-1}}{\oxvarctx}{
+      \oxvalue_i
+    }{\oxsitype_i}{\oxvarctx}$.
+
+    Applying \Lemma{lemma:values-dont-change} to the typing derivation (from
+    \oxname{T-ForArray}) for
+    $\oxexpr_1$ (which we know is a value from \oxname{E-ForArray}) gives us
+    $\oxsubtypectx{\oxglobalctx}{\oxemptyctx}{\oxvarctx}{\oxvarctx_1}$.
+
+    Thus, we can apply \Lemma{lemma:value-typing-related-envs} to each of the
+    typing judgments to get $\forall i \in 1 \oxdots n. \;
+    \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxemptyctx}{\oxvarctx_1}{
+      \oxvalue_i
+    }{\oxsitype_i}{\oxvarctx_1}$.
+
+    Applying \Lemma{lemma:values-well-typed-extension} to each of the value
+    typing judgments and $\forall \oxcprov \in \oxfprovs{\oxsitype}. \;
+    \oxnotreborrowed{\oxvarctx_1}{\oxcprov}$ (from the premise of
+    \oxname{T-ForArray}) gives us
+    $\forall i \in 1 \oxdots n. \;
+    \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxemptyctx}{
+      \oxextendctx{\oxvarctx_1}{
+        \oxvarctxentry{\oxid}{\oxsitype}
+      }
+    }{
+      \oxvalue_i
+    }{\oxsitype_i}{
+      \oxextendctx{\oxvarctx_1}{
+        \oxvarctxentry{\oxid}{\oxsitype}
+      }
+    }$.
+  }
+
+  %% new expression is well-typed
+  \oxpresline{
+    \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{
+      \oxextendctx{\oxvarctx_1}{\oxvarctxentry{\oxid}{\oxsitype}}
+    }{\oxexpr^\prime}{\oxtunit}{\oxvarctx_1}
+  }{
+    We need to build a derivation for the expression $\oxseq{\oxshift{\oxexpr}}{
+      \oxfor{\oxid}{\oxarr{\oxvalue_1 \oxdotsc \oxvalue_n}}{\oxexpr}
+    }$. The bottom of this derivation will be \oxname{T-Seq} which requires us
+    to show that $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{
+      \oxextendctx{\oxvarctx_1}{
+        \oxvarctxentry{\oxid}{\oxsitype}
+      }
+    }{\oxshift{\oxexpr}}{\oxtunit}{\oxvarctx_1}$ and that
+    $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{\oxvarctx_1}{
+      \oxfor{\oxid}{\oxarr{\oxvalue_1 \oxdotsc \oxvalue_n}}{\oxexpr}
+    }{\oxtunit}{\oxvarctx_1}$.
+
+    To show $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{
+      \oxextendctx{\oxvarctx_1}{
+        \oxvarctxentry{\oxid}{\oxsitype}
+      }
+    }{\oxshift{\oxexpr}}{\oxtunit}{\oxvarctx_1}$, we apply \oxname{T-Shift} to
+    $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{
+      \oxextendctx{\oxvarctx_1}{
+        \oxvarctxentry{\oxid}{\oxsitype}
+      }
+    }{\oxexpr}{\oxtunit}{
+      \oxextendctx{\oxvarctx_1}{
+        \oxvarctxentry{\oxid}{\oxsdtype}
+      }
+    }$ (from the premise of \oxname{T-ForArray}).
+
+    To show $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{\oxvarctx_1}{
+      \oxfor{\oxid}{\oxarr{\oxvalue_1 \oxdotsc \oxvalue_n}}{\oxexpr}
+    }{\oxtunit}{\oxvarctx_1}$, we apply \Lemma{lemma:value-typing-output} to the
+    derivation $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{\oxvarctx}
+    {\oxarr{\oxvalue_0 \oxdotsc
+        \oxvalue_n}}{\oxtarr{\oxsitype}{\oxnum}}{\oxvarctx_1}$ to get
+    $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{\oxvarctx_1} {\oxarr{\oxvalue_0
+        \oxdotsc \oxvalue_n}}{\oxtarr{\oxsitype}{\oxnum}}{\oxvarctx_1}$. Then,
+    we rewrite the derivation (inverting and then reapply \oxname{T-Array}) to
+    exclude $\oxvalue_0$ giving us
+    $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{\oxvarctx_1} {\oxarr{\oxvalue_1
+        \oxdotsc \oxvalue_n}}{\oxtarr{\oxsitype}{\oxnum - 1}}{\oxvarctx_1}$.
+    Finally, we apply \oxname{T-ForArray} using this combined with
+    $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{\oxvarctx_1}
+    {\oxexpr}{\oxtunit}{\oxvarctx_1}$ (from the premise of \oxname{T-ForArray}).
+  }
+
+  %% new type is a subtype of the old type
+  \oxpresline{
+    \oxtunify[\oxcombine]{\oxemptyctx}{\oxkontctx}{\oxvarctx_1}
+    {\oxtunit}{\oxtunit}{\oxvarctx_1}
+  }{
+    Immediate by \oxname{RR-Refl}.
+  }
+
+  %% new loan context is a sub-context of the old loan context
+  \oxpresline{
+    \exists \oxvarctx_o. \oxvarctx_1 \oxintersect \oxvarctx_o = \oxvarctx_1
+  }{
+    $\oxvarctx_o = \oxvarctx_1$
+  }
+\end{preservation}
+
+\oxpreservationsubcaseheading{E-ForEmptyArray}{
+  \oxvarctx
+}
+
+\begin{preservation}
+  %% new store is valid
+  \oxpresline{
+    \oxstorevalidity{\oxglobalctx}{\oxvarctx}{\oxstore}
+  }{
+    Immediate from our premise.
+  }
+
+  %% kontctx values are still valid
+  \oxpresline{
+    \oxwfkontctx{\oxglobalctx}{\oxvarctx}{\overline{\oxvalue}}{\oxkontctx}
+  }{
+    Immediate from our premise.
+  }
+
+  %% new expression is well-typed
+  \oxpresline{
+    \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{\oxvarctx}
+    {\oxunit}{\oxtunit}{\oxvarctx}
+  }{
+    Immediate by \oxname{T-Unit}.
+  }
+
+  %% new type is a subtype of the old type
+  \oxpresline{
+    \oxtunify[\oxcombine]{\oxemptyctx}{\oxkontctx}{\oxvarctx}
+    {\oxtunit}{\oxtunit}{\oxvarctx}
+  }{
+    Immediate by \oxname{RR-Refl}.
+  }
+
+  %% new loan context is a sub-context of the old loan context
+  \oxpresline{
+    \exists \oxvarctx_o. \oxvarctx \oxintersect \oxvarctx_o = \oxvarctx
+  }{
+    $\oxvarctx_o = \oxvarctx$
+  }
+\end{preservation}
+
+\oxpreservationcasemulti{T-ForSlice}{\TForSlice}{
+  \oxfor{\oxid}{\oxexpr_1}{\oxexpr_2}
+}{
+  \EForSlice \and \EForEmptySlice
+}
+
+\oxpreservationsubcaseheading{E-ForSlice}{
+  \oxextendctx{\oxvarctx_1}{
+    \oxvarctxentry{\oxid}{
+      \oxtref{\oxcprov}{\oxmuta}{\oxsitype}
+    }
+  }
+}
+
+\begin{preservation}
+  %% new store is valid
+  \oxpresline{
+    \oxstorevalidity{\oxglobalctx}{
+      \oxextendctx{\oxvarctx_1}{
+        \oxvarctxentry{\oxid}{
+          \oxtref{\oxcprov}{\oxmuta}{\oxsitype}
+        }
+      }
+    }{
+      \oxextendctx{\oxstore}{
+        \oxstoreentry{\oxid}{
+          \oxindexptr{\oxreferent}{\oxnum_1}
+        }
+      }
+    }
+  }{
+    Applying \Lemma{lemma:values-dont-change} to the typing derivation (from
+    \oxname{T-ForSlice}) for $\oxexpr_1$ (which we know is a value from
+    \oxname{E-ForSlice}) gives us
+    $\oxsubtypectx{\oxglobalctx}{\oxemptyctx}{\oxvarctx}{\oxvarctx_1}$. Then,
+    we can apply \Lemma{lemma:stack-validity-related-envs} to get
+    $\oxstorevalidity{\oxglobalctx}{\oxvarctx_1}{\oxstore}$. Applying
+    \Lemma{lemma:value-typing-output} to the derivation
+    $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{\oxvarctx}
+    {\oxsliceptr{\oxreferent}{i}{j}}{
+      \oxtref{\oxcprov}{\oxmuta}{\oxtslice{\oxsitype}}
+    }{\oxvarctx_1}$
+    gives us $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{\oxvarctx_1}
+    {\oxsliceptr{\oxreferent}{i}{j}}{
+      \oxtref{\oxcprov}{\oxmuta}{\oxtslice{\oxsitype}}
+    }{\oxvarctx_1}$.
+    Then, using inversion (on \oxname{T-Pointer}), we get
+    $\oxreferentvalidity{\oxglobalctx}{\oxvarctx_1}{
+      \oxslice{\oxreferent}{i}{j}
+    }{\oxxitype}$ (where $\oxxitype = \oxtarr{\oxsitype}{\oxnum}$ or
+    $\oxtslice{\oxsitype}$) and
+    $\oxloanpkg{\oxmuta}{\oxplace} \in \oxvarctx_1(\oxcprov)$ (where
+    $\oxreferent = \oxreferentctx[\oxplace]$). We can invert
+    \oxname{WF-RefSliceArray} or \oxname{WF-RefSliceSlice} (based on
+    $\oxxitype$) for $\oxreferentvalidity{\oxglobalctx}{\oxvarctx_1}{
+      \oxslice{\oxreferent}{i}{j}
+    }{\oxxitype}$ and then apply \oxname{WF-RefIndexArray} or
+    \oxname{WF-RefIndexSlice} appropriately to get
+    $\oxreferentvalidity{\oxglobalctx}{\oxvarctx_1}{
+      \oxindex{\oxreferent}{i}
+    }{\oxxitype}$. We can then use
+    \oxname{T-Pointer} to get
+    $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{\oxvarctx_1}
+    {\oxindexptr{\oxreferent}{\oxnum_1}}{
+      \oxtref{\oxcprov}{\oxmuta}{\oxsitype}
+    }{\oxvarctx_1}$. Finally, applying
+    \Lemma{lemma:store-validity-extension} to
+    $\oxstorevalidity{\oxglobalctx}{\oxvarctx_1}{\oxstore}$ and
+    $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{\oxvarctx_1}
+    {\oxindexptr{\oxreferent}{\oxnum_1}}{
+      \oxtref{\oxcprov}{\oxmuta}{\oxsitype}
+    }{\oxvarctx_1}$ gives us
+    $\oxstorevalidity{\oxglobalctx}{
+      \oxextendctx{\oxvarctx_1}{
+        \oxvarctxentry{\oxid}{\oxtref{\oxcprov}{\oxmuta}{\oxsitype}}
+      }
+    }{
+      \oxextendctx{\oxstore}{
+        \oxstoreentry{\oxid}{\oxindexptr{\oxreferent}{\oxnum_1}}
+      }
+    }$.
+  }
+
+  %% kontctx values are still valid
+  \oxpresline{
+    \oxwfkontctx{\oxglobalctx}{
+      \oxextendctx{\oxvarctx_1}{
+        \oxvarctxentry{\oxid}{
+          \oxtref{\oxcprov}{\oxmuta}{\oxsitype}
+        }
+      }
+    }{\overline{\oxvalue}}{\oxkontctx}
+  }{
+    Inverting \oxname{WF-Temporaries} gives us $\forall i \in 1 \oxdots n. \;
+    \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxsitype_1 \oxdotsc \oxsitype_{i-1}}{\oxvarctx}{
+      \oxvalue_i
+    }{\oxsitype_i}{\oxvarctx}$.
+
+    Applying \Lemma{lemma:values-dont-change} to the typing derivation (from
+    \oxname{T-ForSlice}) for
+    $\oxexpr_1$ (which we know is a value from \oxname{E-ForSlice}) gives us
+    $\oxsubtypectx{\oxglobalctx}{\oxemptyctx}{\oxvarctx}{\oxvarctx_1}$.
+
+    Thus, we can apply \Lemma{lemma:value-typing-related-envs} to each of the
+    typing judgments to get $\forall i \in 1 \oxdots n. \;
+    \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxemptyctx}{\oxvarctx_1}{
+      \oxvalue_i
+    }{\oxsitype_i}{\oxvarctx_1}$.
+
+    Applying \Lemma{lemma:values-well-typed-extension} to each of the value
+    typing judgments and $\forall \oxcprov \in
+    \oxfprovs{\oxtref{\oxprov}{\oxmuta}{\oxsitype}}. \;
+    \oxnotreborrowed{\oxvarctx_1}{\oxcprov}$ (from the premise of
+    \oxname{T-ForSlice}) gives us
+    $\forall i \in 1 \oxdots n. \;
+    \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxemptyctx}{
+      \oxextendctx{\oxvarctx_1}{
+        \oxvarctxentry{\oxid}{
+          \oxtref{\oxcprov}{\oxmuta}{\oxsitype}
+        }
+      }
+    }{
+      \oxvalue_i
+    }{\oxsitype_i}{
+      \oxextendctx{\oxvarctx_1}{
+        \oxvarctxentry{\oxid}{
+          \oxtref{\oxcprov}{\oxmuta}{\oxsitype}
+        }
+      }
+    }$.
+  }
+
+  %% new expression is well-typed
+  \oxpresline{
+    \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{
+      \oxextendctx{\oxvarctx_1}{
+        \oxvarctxentry{\oxid}{
+          \oxtref{\oxcprov}{\oxmuta}{\oxsitype}
+        }
+      }
+    }{\oxexpr^\prime}{\oxtunit}{\oxvarctx_1}
+  }{
+    We need to build a derivation for the expression $\oxseq{\oxshift{\oxexpr}}{
+      \oxfor{\oxid}{
+        \oxsliceptr{\oxreferent}{\oxnum_1^\prime}{\oxnum_2}
+      }{\oxexpr}
+    }$. The bottom of this derivation will be \oxname{T-Seq} which requires us
+    to show that $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{
+      \oxextendctx{\oxvarctx_1}{
+        \oxvarctxentry{\oxid}{\oxsitype}
+      }
+    }{\oxshift{\oxexpr}}{\oxtunit}{\oxvarctx_1}$ and that
+    $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{\oxvarctx_1}{
+      \oxfor{\oxid}{
+        \oxsliceptr{\oxreferent}{\oxnum_1^\prime}{\oxnum_2}
+      }{\oxexpr}
+    }{\oxtunit}{\oxvarctx_1}$.
+
+    To show $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{
+      \oxextendctx{\oxvarctx_1}{
+        \oxvarctxentry{\oxid}{\oxsitype}
+      }
+    }{\oxshift{\oxexpr}}{\oxtunit}{\oxvarctx_1}$, we apply \oxname{T-Shift} to
+    $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{
+      \oxextendctx{\oxvarctx_1}{
+        \oxvarctxentry{\oxid}{\oxsitype}
+      }
+    }{\oxexpr}{\oxtunit}{
+      \oxextendctx{\oxvarctx_1}{
+        \oxvarctxentry{\oxid}{\oxsdtype}
+      }
+    }$ (from the premise of \oxname{T-ForSlice}).
+
+    To show $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{\oxvarctx_1}{
+      \oxfor{\oxid}{\oxsliceptr{\oxreferent}{\oxnum_1^\prime}{\oxnum_2}}{\oxexpr}
+    }{\oxtunit}{\oxvarctx_1}$, we apply
+    \Lemma{lemma:value-typing-output} to the derivation
+    $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{\oxvarctx}
+    {\oxsliceptr{\oxreferent}{\oxnum_1}{\oxnum_2}}{
+      \oxtref{\oxcprov}{\oxmuta}{\oxtslice{\oxsitype}}
+    }{\oxvarctx_1}$
+    to get $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{\oxvarctx_1}
+    {\oxsliceptr{\oxreferent}{\oxnum_1}{\oxnum_2}}{
+      \oxtref{\oxcprov}{\oxmuta}{\oxtslice{\oxsitype}}
+    }{\oxvarctx_1}$. Then, we rewrite the derivation (inverting and then reapply
+    \oxname{T-Pointer}) to increment $\oxnum_1$ to $\oxnum_1^\prime$ giving us
+    $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{\oxvarctx_1}
+    {\oxsliceptr{\oxreferent}{\oxnum_1^\prime}{\oxnum_2}}{
+      \oxtref{\oxcprov}{\oxmuta}{\oxtslice{\oxsitype}}
+    }{\oxvarctx_1}$.
+    Finally, we apply \oxname{T-ForSlice} using this combined with
+    $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{\oxvarctx_1}
+    {\oxexpr}{\oxtunit}{\oxvarctx_1}$ (from the premise of \oxname{T-ForSlice}).
+  }
+
+  %% new type is a subtype of the old type
+  \oxpresline{
+    \oxtunify[\oxcombine]{\oxemptyctx}{\oxkontctx}{\oxvarctx_1}
+    {\oxtunit}{\oxtunit}{\oxvarctx_1}
+  }{
+    Immediate by \oxname{RR-Refl}.
+  }
+
+  %% new loan context is a sub-context of the old loan context
+  \oxpresline{
+    \exists \oxvarctx_o. \oxvarctx_1 \oxintersect \oxvarctx_o = \oxvarctx_1
+  }{
+    $\oxvarctx_o = \oxvarctx_1$
+  }
+\end{preservation}
+
+\oxpreservationsubcaseheading{E-ForEmptySlice}{
+  \oxvarctx
+}
+
+\begin{preservation}
+  %% new store is valid
+  \oxpresline{
+    \oxstorevalidity{\oxglobalctx}{\oxvarctx}{\oxstore}
+  }{
+    Immediate from our premise.
+  }
+
+  %% kontctx values are still valid
+  \oxpresline{
+    \oxwfkontctx{\oxglobalctx}{\oxvarctx}{\overline{\oxvalue}}{\oxkontctx}
+  }{
+    Immediate from our premise.
+  }
+
+  %% new expression is well-typed
+  \oxpresline{
+    \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{\oxvarctx}
+    {\oxunit}{\oxtunit}{\oxvarctx}
+  }{
+    Immediate by \oxname{T-Unit}.
+  }
+
+  %% new type is a subtype of the old type
+  \oxpresline{
+    \oxtunify[\oxcombine]{\oxemptyctx}{\oxkontctx}{\oxvarctx}
+    {\oxtunit}{\oxtunit}{\oxvarctx}
+  }{
+    Immediate by \oxname{RR-Refl}.
+  }
+
+  %% new loan context is a sub-context of the old loan context
+  \oxpresline{
+    \exists \oxvarctx_o. \oxvarctx \oxintersect \oxvarctx_o = \oxvarctx
+  }{
+    $\oxvarctx_o = \oxvarctx$
+  }
+\end{preservation}
+
+\oxpreservationcase[
+% Let $\oxsitype_{\textsc{s}1} =
+% \oxsubst{\oxsubst{\oxsitype_1}{\overline{\oxprov^\prime}}{\overline{\oxprov}}}
+% {\overline{\oxsitype}}{\overline{\oxtvar}} \oxdotsc \oxsitype_{\textsc{s}n} =
+% \oxsubst{\oxsubst{\oxsitype_n}{\overline{\oxprov^\prime}}{\overline{\oxprov}}}
+% {\overline{\oxsitype}}{\overline{\oxtvar}}$.
+]{T-AppFunction}{\TApp}{
+  \oxapp{\oxexpr_f}{
+    \overline{\oxenv} \oxcomma
+    \overline{\oxprov^\prime} \oxcomma
+    \overline{\oxsitype}
+  }{
+    \oxexpr_1 \oxdotsc \oxexpr_n
+  }
+}{\EAppFun}{
+  \oxnewframe{\oxvarctx_b}{
+    \oxvarctxentry{\oxid_1}{\delta(\oxsitype_1)} \oxdotsc
+    \oxvarctxentry{\oxid_n}{\delta(\oxsitype_n)}
+  }
+}
+
+\begin{preservation}
+  %% new store is valid
+  \oxpresline{
+    \oxstorevalidity{\oxglobalctx}{
+      \oxvarctx_i
+    }{
+      \oxstore^\prime
+    }
+  }{
+    Applying \Lemma{lemma:values-dont-change} to the derivation for $\oxvalue_f$
+    gives us $\oxsubtypectx{\oxglobalctx}{\oxemptyctx}{\oxvarctx}{\oxvarctx_0}$.
+    Then, applying \Lemma{lemma:values-dont-change} to the derivations for
+    every $\oxvalue_i$ gives us $\forall i \in \oxset{1 \oxdots n}. \;
+    \oxsubtypectx{\oxglobalctx}{\oxemptyctx}{\oxvarctx_{i-1}}{\oxvarctx_i}$.
+
+    Inversion on $\oxrunifymany{\oxemptyctx}{\oxkontctx}{\oxvarctx_n}{
+      \oxsubstmany{\oxabsprov_2}{\oxprov}{\oxabsprov}
+    }{
+      \oxsubstmany{\oxabsprov_1}{\oxprov}{\oxabsprov}
+    }{\oxvarctx_b}$ gives us a sequence of outlives relations with
+    intermediate contexts. Applying  \Lemma{lemma:outlives-related} to each of
+    them and then combining the result by transitivity gives us
+    $\oxsubtypectx{\oxglobalctx}{\oxemptyctx}{\oxvarctx_n}{\oxvarctx_b}$.
+    Combining both by transitivity, we have
+    $\oxsubtypectx{\oxglobalctx}{\oxemptyctx}{\oxvarctx}{\oxvarctx_b}$.
+
+    We can then apply \Lemma{lemma:stack-validity-related-envs} with
+    $\oxstorevalidity{\oxglobalctx}{\oxvarctx}{\oxstore}$ to get
+    $\oxstorevalidity{\oxglobalctx}{\oxvarctx_b}{\oxstore}$.
+
+    We can apply \oxname{WF-StackFrame} to get
+    $\oxstorevalidity{\oxglobalctx}{
+      \oxnewframe{\oxvarctx_b}{\oxemptyctx}
+    }{
+      \oxnewframe{\oxstore}{\oxemptyctx}
+    }$. Then, we repeatedly apply \Lemma{lemma:store-validity-extension} to
+    the derivations for the arguments ($\oxvalue_1 \oxdots \oxvalue_n$) to get
+    $\oxstorevalidity{\oxglobalctx}{
+      \oxnewframe{\oxvarctx}{
+        \oxvarctxentry{\oxid_1}{\delta(\oxsitype_1)} \oxdotsc
+        \oxvarctxentry{\oxid_n}{\delta(\oxsitype_n)}
+      }
+    }{
+      \oxnewframe{\oxstore}{
+        \oxstoreentry{\oxid_1}{\oxvalue_1} \oxdotsc
+        \oxstoreentry{\oxid_n}{\oxvalue_n}
+      }
+    }$.
+  }
+
+  %% kontctx values are still valid
+  \oxpresline{
+    \oxwfkontctx{\oxglobalctx}{\oxvarctx_i}{\overline{\oxvalue}}{\oxkontctx}
+  }{
+    Inverting \oxname{WF-Temporaries} gives us $\forall i \in 1 \oxdots n. \;
+    \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxsitype_1 \oxdotsc \oxsitype_{i-1}}{\oxvarctx}{
+      \oxvalue_i
+    }{\oxsitype_i}{\oxvarctx}$.
+
+    Applying \Lemma{lemma:values-dont-change} to the derivation for $\oxvalue_f$
+    gives us $\oxsubtypectx{\oxglobalctx}{\oxemptyctx}{\oxvarctx}{\oxvarctx_0}$.
+    Then, applying \Lemma{lemma:values-dont-change} to the derivations for
+    every $\oxvalue_i$ gives us $\forall i \in \oxset{1 \oxdots n}. \;
+    \oxsubtypectx{\oxglobalctx}{\oxemptyctx}{\oxvarctx_{i-1}}{\oxvarctx_i}$.
+
+    Inversion on $\oxrunifymany{\oxemptyctx}{\oxkontctx}{\oxvarctx_n}{
+      \oxsubstmany{\oxabsprov_2}{\oxprov}{\oxabsprov}
+    }{
+      \oxsubstmany{\oxabsprov_1}{\oxprov}{\oxabsprov}
+    }{\oxvarctx_b}$ gives us a sequence of outlives relations with
+    intermediate contexts. Applying  \Lemma{lemma:outlives-related} to each of
+    them and then combining the result by transitivity gives us
+    $\oxsubtypectx{\oxglobalctx}{\oxemptyctx}{\oxvarctx_n}{\oxvarctx_b}$.
+    Combining both by transitivity, we have
+    $\oxsubtypectx{\oxglobalctx}{\oxemptyctx}{\oxvarctx}{\oxvarctx_b}$.
+
+    Thus, we can apply \Lemma{lemma:value-typing-related-envs} to each of the
+    typing judgments to get $\forall i \in 1 \oxdots n. \;
+    \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxemptyctx}{\oxvarctx_b}{
+      \oxvalue_i
+    }{\oxsitype_i}{\oxvarctx_b}$.
+
+    We also immediately have that adding a new empty frame leaves all the typing
+    derivations good since it doesn't actually bind any new names on its own.
+    Thus, we have $\forall i \in 1 \oxdots n. \;
+    \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxemptyctx}{
+      \oxnewframe{\oxvarctx_b}{\oxemptyctx}
+    }{
+      \oxvalue_i
+    }{\oxsitype_i}{
+      \oxnewframe{\oxvarctx_b}{\oxemptyctx}
+    }$.
+
+    Repeatedly applying \Lemma{lemma:values-well-typed-extension} to each of the value
+    typing judgments gives us
+    $\forall i \in 1 \oxdots n. \;
+    \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxemptyctx}{
+      \oxnewframe{\oxvarctx_b}{
+        \oxvarctxentry{\oxid_1}{\delta(\oxsitype_1)} \oxdotsc
+        \oxvarctxentry{\oxid_n}{\delta(\oxsitype_n)}
+      }
+    }{
+      \oxvalue_i
+    }{\oxsitype_i}{
+      \oxnewframe{\oxvarctx_b}{
+        \oxvarctxentry{\oxid_1}{\delta(\oxsitype_1)} \oxdotsc
+        \oxvarctxentry{\oxid_n}{\delta(\oxsitype_n)}
+      }
+    }$.
+  }
+
+  %% new expression is well-typed
+  \oxpresline{
+    \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{\oxvarctx_i}{
+      \oxexpr^\prime
+    }{\delta(\oxsitype_f)}{\oxvarctx_b}
+  }{
+    Applying \Lemma{lemma:function-defns-self-contained} with
+    $\oxctxswellformed{\oxglobalctx}{\oxemptyctx}{\oxvarctx_b}{\oxkontctx}$ and
+    $\oxlookup{\oxglobalctx}{\oxfnname}{
+      \oxfuncdef{\oxfnname}{
+        \overline{\oxenvvar} \oxcomma \overline{\oxabsprov} \oxcomma \overline{\oxtvar}
+      }{
+        \oxascribe{\oxid_1}{\oxsitype_1} \oxdotsc
+        \oxascribe{\oxid_n}{\oxsitype_n}
+      }{\oxsitype_r}{\overline{\oxabsprov_1: \oxabsprov_2}}{\oxexpr}
+    }$ (from the premise of on \oxname{E-AppFunction}) gives us
+    $\oxtypjudge{\oxglobalctx}{
+      \overline{\oxtvarctxentry{\oxenvvar}{\oxkenv}} \oxcomma
+      \overline{\oxtvarctxentry{\oxabsprov}{\oxkprov}} \oxcomma
+      \overline{\oxabsprov_1 \oxoutlives \oxabsprov_2} \oxcomma
+      \overline{\oxtvarctxentry{\oxtvar}{\oxktype}}
+    }{\oxkontctx}{
+      \oxnewframe{\oxvarctx_b}{
+        \oxvarctxentry{\oxid_1}{\oxsitype_1} \oxdotsc
+        \oxvarctxentry{\oxid_n}{\oxsitype_n}
+      }
+    }{
+      \oxframed{\oxexpr}
+    }{
+      \oxsitype_f
+    }{\oxvarctx_b}$.
+
+    We then repeatedly apply \Lemma{lemma:substitution} for all of our type,
+    region, and environment variables to get
+    $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{
+      \oxnewframe{\oxvarctx_b}{
+        \oxvarctxentry{\oxid_1}{\delta(\oxsitype_1)} \oxdotsc
+        \oxvarctxentry{\oxid_n}{\delta(\oxsitype_n)}
+      }
+    }{
+      \oxframed{\oxexpr}
+    }{\delta(\oxsitype_f)}{\oxvarctx_b}$.
+  }
+
+  %% new type is a subtype of the old type
+  \oxpresline{
+    \oxtunify[\oxcombine]{\oxemptyctx}{\oxkontctx}{\oxvarctx_b}{
+      \oxtype^\prime
+    }{
+      \oxtype^\prime
+    }{\oxvarctx_b}
+  }{
+    Immediate by \oxname{RR-Refl}.
+  }
+
+  %% new loan context is a sub-context of the old loan context
+  \oxpresline{
+    \exists \oxvarctx_o. \oxvarctx_b \oxintersect \oxvarctx_o = \oxvarctx_b
+  }{
+    $\oxvarctx_o = \oxvarctx_b$
+  }
+\end{preservation}
+
+\oxpreservationcase{T-AppClosure}{\TAppClosure}{
+  \oxapply{\oxexpr_f}{
+    \oxexpr_1 \oxdotsc \oxexpr_n
+  }
+}{\EApp}{
+  \oxnewframe{\oxvarctx^\prime_n}{
+    \oxextendctx{\oxframe_c}{
+      \oxvarctxentry{\oxid_1}{\oxsitype_1} \oxdotsc
+      \oxvarctxentry{\oxid_n}{\oxsitype_n}
+    }
+  }
+}
+
+\begin{preservation}
+  %% new store is valid
+  \oxpresline{
+    \oxstorevalidity{\oxglobalctx}{
+      \oxvarctx_i
+    }{
+      \oxstore^\prime
+    }
+  }{
+    Applying \Lemma{lemma:values-dont-change} to the derivation for $\oxvalue_f$
+    gives us $\oxsubtypectx{\oxglobalctx}{\oxemptyctx}{\oxvarctx}{\oxvarctx_0}$.
+    We can apply \Lemma{lemma:stack-validity-related-envs} with
+    $\oxstorevalidity{\oxglobalctx}{\oxvarctx}{\oxstore}$ to get
+    $\oxstorevalidity{\oxglobalctx}{\oxvarctx_0}{\oxstore}$.
+
+    Then, for each pair of value typing judgment and region rewriting, we follow
+    the same pattern we will describe in terms of an arbitrary index $i$. First,
+    we apply \Lemma{lemma:values-dont-change} to the derivation for $\oxvalue_i$
+    to get $\oxsubtypectx{\oxglobalctx}{\oxemptyctx}
+    {\oxvarctx_{i-1}}{\oxvarctx_i}$. Then, applying
+    \Lemma{lemma:stack-validity-related-envs} gives us
+    $\oxstorevalidity{\oxglobalctx}{\oxvarctx_i}{\oxstore}$. Then, we can apply
+    \Lemma{lemma:stack-validity-region-rewriting} to
+    $\oxtunify[\oxcombineunrest]{\oxemptyctx}{\oxkontctx}{\oxvarctx_i}
+    {\oxsitype_{i^\prime}}{\oxsitype_i}{\oxvarctx_i^\prime}$ to get
+    $\oxstorevalidity{\oxglobalctx}{\oxvarctx_i^\prime}{\oxstore}$. Going through
+    this for all the values in sequence gives us
+    $\oxstorevalidity{\oxglobalctx}{\oxvarctx_n^\prime}{\oxstore}$
+
+    Then, inversion of \oxname{T-ClosureValue} for the typing derivation for
+    $\oxvalue_f$ gives us
+    $\oxsubstorevalidity{\oxglobalctx}{\oxvarctx}{\oxstackframe_c}{\oxframe_c}$.
+    We can then invert \oxname{WF-Frame} here to get
+    $\oxdomain{\oxstackframe} = \oxdomain{\oxframe_c}|_\oxid$
+    $\forall \oxid \in \oxdomain{\oxstackframe}. \;
+    \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{\oxnewframe{\oxvarctx}{\oxframe_c}}
+    {\oxstackframe(\oxid)}{\oxframe_c(\oxid)}{\oxnewframe{\oxvarctx}{\oxframe_c}}$
+    which we can then use with $\oxstorevalidity{\oxglobalctx}{\oxvarctx_n}{\oxstore}$
+    in \oxname{WF-StackFrame} to get
+    $\oxstorevalidity{\oxglobalctx}{
+      \oxnewframe{\oxvarctx_n^{\prime}}{\oxframe_c}
+    }{
+      \oxnewframe{\oxstore}{\oxstackframe_c}
+    }$.
+
+    Finally, we repeatedly apply \Lemma{lemma:store-validity-extension} to
+    the derivations for the arguments ($\oxvalue_1 \oxdots \oxvalue_n$) to get
+    $\oxstorevalidity{\oxglobalctx}{
+      \oxvarctx_i
+    }{
+      \oxstore^\prime
+    }$.
+  }
+
+  %% kontctx values are still valid
+  \oxpresline{
+    \oxwfkontctx{\oxglobalctx}{\oxvarctx_i}{\overline{\oxvalue^\prime}}{\oxkontctx}
+  }{
+    Inverting \oxname{WF-Temporaries} gives us $\forall j \in 1 \oxdots n. \;
+    \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxsitype_1 \oxdotsc \oxsitype_{i-1}}{\oxvarctx}{
+      \oxvalue^\prime_j
+    }{\oxsitype_j}{\oxvarctx}$.
+
+    Applying \Lemma{lemma:values-dont-change} to the derivation for $\oxvalue_f$
+    gives us $\oxsubtypectx{\oxglobalctx}{\oxemptyctx}{\oxvarctx}{\oxvarctx_0}$.
+    For each of $\forall j \in 1 \oxdots n. \;
+    \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxemptyctx}{\oxvarctx}{
+      \oxvalue^\prime_j
+    }{\oxsitype_i}{\oxvarctx}$, we apply \Lemma{lemma:value-typing-related-envs}
+    to get $\forall j \in 1 \oxdots n. \;
+    \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxemptyctx}{\oxvarctx_0}{
+      \oxvalue^\prime_j
+    }{\oxsitype_j}{\oxvarctx_0}$
+
+    From here, we have an alternating pattern of lemmas to apply to deal with
+    the interleaved value typing and then region rewriting in the premise of
+    \oxname{T-AppClosure}. For each value $\oxvalue_i$ in \oxname{T-AppClosure},
+    we'll first apply \Lemma{lemma:values-dont-change} to get
+    $\oxsubtypectx{\oxglobalctx}{\oxemptyctx}{\oxvarctx_{i-1}}{\oxvarctx_i}$.
+    Then, we'll apply \Lemma{lemma:value-typing-related-envs} to
+    $\forall j \in 1 \oxdots n. \;
+    \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxemptyctx}{\oxvarctx_{i-1}}{
+      \oxvalue^\prime_j
+    }{\oxsitype_j}{\oxvarctx_{i-1}}$ to get $\forall j \in 1 \oxdots n. \;
+    \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxemptyctx}{\oxvarctx_i}{
+      \oxvalue^\prime_j
+    }{\oxsitype_j}{\oxvarctx_i}$. Then, we apply
+    \Lemma{lemma:subtyping-value-typing} to each of these along with the
+    rewriting $\oxtunify[\oxcombineunrest]{\oxemptyctx}{\oxkontctx}{\oxvarctx_i}
+    {\oxsitype_{i^\prime}}{\oxsitype_i}{\oxvarctx_i^\prime}$ to get
+    $\forall j \in 1 \oxdots n. \;
+    \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxemptyctx}{\oxvarctx_i^\prime}{
+      \oxvalue^\prime_j
+    }{\oxsitype_j}{\oxvarctx_i^\prime}$. After going through this for each value
+    $\oxvalue_i$, we have $\forall j \in 1 \oxdots n. \;
+    \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxemptyctx}{\oxvarctx_n^\prime}{
+      \oxvalue^\prime_j
+    }{\oxsitype_j}{\oxvarctx_n^\prime}$.
+
+    We also immediately have that adding a new empty frame leaves all the typing
+    derivations good since it doesn't actually bind any new names on its own.
+    Thus, we have $\forall i \in 1 \oxdots n. \;
+    \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxemptyctx}{
+      \oxnewframe{\oxvarctx_n^\prime}{\oxemptyctx}
+    }{
+      \oxvalue_i
+    }{\oxsitype_i}{
+      \oxnewframe{\oxvarctx_n^\prime}{\oxemptyctx}
+    }$.
+
+    Repeatedly applying \Lemma{lemma:values-well-typed-extension} to each of the
+    value typing judgments and each of $\forall i \in \oxset{ 1 \oxdots n }. \;
+    \forall \oxcprov \in \oxfprovs{\oxsitype_i}. \;
+    \oxnotreborrowed{\oxvarctx_1}{\oxcprov}$ (from the premise of
+    \oxname{T-App}) gives us
+    $\forall i \in 1 \oxdots n. \;
+    \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxemptyctx}{
+      \oxnewframe{\oxvarctx_n^\prime}{
+        \oxextendctx{\oxframe_c}{
+          \oxvarctxentry{\oxid_1}{\oxsitype_1} \oxdotsc
+          \oxvarctxentry{\oxid_n}{\oxsitype_n}
+        }
+      }
+    }{
+      \oxvalue_i
+    }{\oxsitype_i}{
+      \oxnewframe{\oxvarctx_n^\prime}{
+        \oxextendctx{\oxframe_c}{
+          \oxvarctxentry{\oxid_1}{\oxsitype_1} \oxdotsc
+          \oxvarctxentry{\oxid_n}{\oxsitype_n}
+        }
+      }
+    }$.
+  }
+\end{preservation} %% breaking for pagebreak
+\begin{preservation}
+  %% new expression is well-typed
+  \oxpresline{
+    \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{\oxvarctx_i}{
+      \oxexpr^\prime
+    }{\oxsitype_f}{\oxvarctx^\prime_n}
+  }{
+    Consider first the typing derivation for $\oxvalue_f$ of
+    $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{\oxvarctx}{
+      \oxvalue_f
+    }{
+      \oxtfun{}{
+        \oxsitype_1 \oxdotsc \oxsitype_n
+      }{\oxsitype_f}{\oxenv_c}
+    }{\oxvarctx_0^\prime}$.
+
+    Applying \Lemma{lemma:value-typing-output} gives us
+    $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{\oxvarctx_0^\prime}{
+      \oxvalue_f
+    }{
+      \oxtfun{}{
+        \oxsitype_1 \oxdotsc \oxsitype_n
+      }{\oxsitype_f}{\oxenv_c}
+    }{\oxvarctx_0^\prime}$.
+
+    Then, as in the previous cases, we can apply
+    \Lemma{lemma:values-dont-change}, \Lemma{lemma:value-typing-related-envs},
+    and \Lemma{lemma:subtyping-value-typing} in sequence starting with the above
+    typing derivation with each of the typing derivations for the arguments
+    $\oxvalue_i$ and their subsequent corresponding region rewriting derivation.
+    At the end, this gives us
+    $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{\oxvarctx_n^\prime}{
+      \oxvalue_f
+    }{
+      \oxtfun{}{
+        \oxsitype_1 \oxdotsc \oxsitype_n
+      }{\oxsitype_f}{\oxenv_c}
+    }{\oxvarctx_n^\prime}$
+
+    Then, inversion on \oxname{T-ClosureValue} on this typing derivation for
+    $\oxvalue_f$ gives us $\oxfvars{\oxexpr} \setminus \overline{\oxid} =
+    \overline{\oxid_f} = \oxdomain{\oxframe_c}|_\oxid$,
+    $\overline{\oxcprov} = \overline{\oxfprovs{\oxvarctx(\oxid_f)}} \oxcomma
+    \oxfprovs{\oxexpr} = \oxdomain{\oxframe_c}|_\oxcprov$, and
+    $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{
+      \oxnewframe{\oxvarctx_n^\prime}{
+        \oxframe_c \oxcomma
+        \oxvarctxentry{\oxid_1}{\oxsitype_1} \oxdotsc
+        \oxvarctxentry{\oxid_n}{\oxsitype_n}
+      }
+    }{\oxexpr}{\oxsitype_r}{\oxnewframe{\oxvarctx_n^\prime}{\oxframe}}$. We can
+    then apply \oxname{T-Framed} to get
+    $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{
+      \oxnewframe{\oxvarctx_n}{
+        \oxextendctx{\oxframe_c}{
+          \oxvarctxentry{\oxid_1}{\oxsitype_1} \oxdotsc
+          \oxvarctxentry{\oxid_n}{\oxsitype_n}
+        }
+      }
+    }{
+      \oxframed{\oxexpr}
+    }{\oxsitype_f}{\oxvarctx_n}$.
+  }
+
+  %% new type is a subtype of the old type
+  \oxpresline{
+    \oxtunify[\oxcombine]{\oxemptyctx}{\oxkontctx}{\oxvarctx^\prime_n}{
+      \oxsitype_f
+    }{
+      \oxsitype_f
+    }{\oxvarctx^\prime_n}
+  }{
+    Immediate by \oxname{RR-Refl}.
+  }
+
+  %% new loan context is a sub-context of the old loan context
+  \oxpresline{
+    \exists \oxvarctx_o. \oxvarctx^\prime_n \oxintersect \oxvarctx_o =
+    \oxvarctx^\prime_n
+  }{
+    $\oxvarctx_o = \oxvarctx^\prime_n$
+  }
+\end{preservation}
+
+\oxpreservationcase{T-Function}{\TFunction}{
+  \oxtfun{\overline{\oxprov} \oxcomma \overline{\oxtvar}}{
+    \oxsitype_1 \oxdotsc \oxsitype_n
+  }{\oxsitype_r}{}
+}{\EFunction}{
+  \oxvarctx
+}
+
+\begin{preservation}
+  %% new store is valid
+  \oxpresline{\oxstorevalidity{\oxglobalctx}{\oxvarctx}{\oxstore}}{
+    Immediate from our premise.
+  }
+
+  %% kontctx values are still valid
+  \oxpresline{
+    \oxwfkontctx{\oxglobalctx}{\oxvarctx}{\overline{\oxvalue}}{\oxkontctx}
+  }{
+    Immediate from our premise.
+  }
+
+  %% new expression is well-typed
+  \oxpresline{
+    \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{\oxvarctx}
+    {\oxexpr^\prime}{\oxtype^\prime}{\oxvarctx}
+  }{
+    By \oxname{T-ClosureValue} since $\oxstore_c$ is empty, and we know that the
+    body itself is well-typed as a consequence of inversion on
+    \oxname{WF-FunctionDefinition} for \oxfnname.
+  }
+
+  %% new type is a subtype of the old type
+  \oxpresline{
+    \oxtunify[\oxcombine]{\oxemptyctx}{\oxkontctx}{\oxvarctx}
+    {\oxtype^\prime}{\oxtype}{\oxvarctx}
+  }{
+    Immediate by \oxname{RR-Refl}.
+  }
+
+  %% new loan context is a sub-context of the old loan context
+  \oxpresline{
+    \exists \oxvarctx_o. \oxvarctx \oxintersect \oxvarctx_o = \oxvarctx
+  }{
+    $\oxvarctx_o = \oxvarctx$
+  }
+\end{preservation}
+
+
+\oxpreservationcase{T-Closure}{\TClosure}{
+  \oxfunction{
+    \overline{\oxenvvar} \oxcomma \overline{\oxprov} \oxcomma \overline{\oxtvar}
+  }{
+    \oxascribe{\oxid_1}{\oxsitype_1} \oxdotsc
+    \oxascribe{\oxid_n}{\oxsitype_n}
+  }{\oxsitype_r}{
+    \oxexpr
+  }
+}{\EClosure}{
+  \oxtupdatemany{\oxvarctx}{\oxid_{nc}}{\oxtuninit{\oxvarctx(\oxid_{nc})}}
+}
+
+\begin{preservation}
+  %% new store is valid
+  \oxpresline{
+    \oxstorevalidity{\oxglobalctx}{
+      \oxtupdatemany{\oxvarctx}{\oxid_{nc}}{\oxtuninit{\oxvarctx(\oxid_{nc})}}
+    }{
+      \oxupdate{\oxstore}{
+        \overline{\oxstoreentry{\oxid_{nc}}{\oxuninit}}
+      }
+    }
+  }{
+    Compared to $\oxvarctx$, we know that
+    $\oxtupdatemany{\oxvarctx}{\oxid_{nc}}{\oxtuninit{\oxvarctx(\oxid_{nc})}}$
+    has more things marked dead and no other changes. Thus, we can apply
+    \oxname{R-Env} to get $\oxsubtypectx{\oxglobalctx}{\oxemptyctx}{\oxvarctx}{
+      \oxtupdatemany{\oxvarctx}{\oxid_{nc}}{\oxtuninit{\oxvarctx(\oxid_{nc})}}
+    }$. Then, we can apply \Lemma{lemma:stack-validity-related-envs} to get
+    $\oxstorevalidity{\oxglobalctx}{
+      \oxtupdatemany{\oxvarctx}{\oxid_{nc}}{\oxtuninit{\oxvarctx(\oxid_{nc})}}
+    }{\oxstore}$. Since $\oxuninit$ is good at every dead type $\oxsdtype$ by
+    \oxname{T-Dead}, we can then build a new derivation using that rule instead
+    for every $\oxid_{nc}$ that is now at a dead type. This gives us
+    $\oxstorevalidity{\oxglobalctx}{
+      \oxtupdatemany{\oxvarctx}{\oxid_{nc}}{\oxtuninit{\oxvarctx(\oxid_{nc})}}
+    }{
+      \oxupdate{\oxstore}{
+        \overline{\oxstoreentry{\oxid_{nc}}{\oxuninit}}
+      }
+    }$.
+  }
+
+  %% kontctx values are still valid
+  \oxpresline{
+    \oxwfkontctx{\oxglobalctx}{
+      \oxtupdatemany{\oxvarctx}{\oxid_{nc}}{\oxtuninit{\oxvarctx(\oxid_{nc})}}
+    }{\overline{\oxvalue}}{\oxkontctx}
+  }{
+    Inverting \oxname{WF-Temporaries} gives us $\forall i \in 1 \oxdots n. \;
+    \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxsitype_1 \oxdotsc \oxsitype_{i-1}}{\oxvarctx}{
+      \oxvalue_i
+    }{\oxsitype_i}{\oxvarctx}$. By \oxname{R-Env}, we have that
+    \oxsubtypectx{\oxglobalctx}{\oxemptyctx}{\oxvarctx}{
+      \oxtupdatemany{\oxvarctx}{\oxid_{nc}}{\oxtuninit{\oxvarctx(\oxid_{nc})}}
+    }. Thus, we can apply \Lemma{lemma:value-typing-related-envs} to each of the
+    typing judgments and then apply \oxname{WF-Temporaries} to get
+    $\oxwfkontctx{\oxglobalctx}{
+      \oxtupdatemany{\oxvarctx}{\oxid_{nc}}{\oxtuninit{\oxvarctx(\oxid_{nc})}}
+    }{\overline{\oxvalue}}{\oxkontctx}$.
+  }
+
+  %% new expression is well-typed
+  \oxpresline{
+    \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{\oxvarctx_i}
+    {\oxexpr^\prime}{\oxtype^\prime}{\oxvarctx_i}
+  }{
+    Immediate by inversion of \oxname{T-Closure} and application of
+    \oxname{T-ClosureValue}. Note that they have identical premises.
+  }
+
+  %% new type is a subtype of the old type
+  \oxpresline{
+    \oxtunify[\oxcombine]{\oxemptyctx}{\oxkontctx}{\oxvarctx_i}
+    {\oxtype^\prime}{\oxtype^\prime}{\oxvarctx_i}
+  }{
+    Immediate by \oxname{RR-Refl}.
+  }
+
+  %% new loan context is a sub-context of the old loan context
+  \oxpresline{
+    \exists \oxvarctx_o. \oxvarctx_i \oxintersect \oxvarctx_o = \oxvarctx_i
+  }{
+    $\oxvarctx_o = \oxvarctx_i$
+  }
+\end{preservation}
+
+\oxpreservationcase{T-Shift}{\TShift}{
+  \oxshift{\oxexpr_i}
+}{\EShift}{\oxvarctx^\prime}
+
+\begin{preservation}
+  %% new store is valid
+  \oxpresline{
+    \oxstorevalidity{\oxglobalctx}{\oxvarctx^\prime}{\oxstore}
+  }{
+    By inversion of \oxname{WF-StackFrame} on $\oxstorevalidity{\oxglobalctx}{
+      \oxextendctx{\oxvarctx^\prime}{\oxvarctxentry{\oxid}{\oxsdtype}}
+    }{\oxextendctx{\oxstore}{\oxstoreentry{\oxid}{\oxvalue^\prime}}}$, we get
+    $\oxstorevalidity{\oxglobalctx}{\oxvarctx_i}{\oxstore}$,
+    $\oxdomain{
+      \oxextendctx{\oxstackframe}{
+        \oxstoreentry{\oxid}{\oxvalue^\prime}
+      }
+    } = \oxdomain{
+      \oxextendctx{\oxframe}{
+        \oxvarctxentry{\oxid}{\oxsdtype}
+      }
+    }|_\oxid$, and
+    $\forall \oxid \in \oxdomain{
+      \oxnewframe{\oxstore}{
+        \oxextendctx{\oxstackframe}{
+          \oxstoreentry{\oxid}{\oxvalue^\prime}
+        }
+      }
+    }. \;
+    \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{
+      \oxnewframe{\oxvarctx_i}{
+        \oxextendctx{\oxframe}{
+          \oxvarctxentry{\oxid}{\oxsdtype}
+        }
+      }
+    }{
+      (\oxnewframe{\oxstore}{
+        \oxextendctx{\oxstackframe}{
+          \oxstoreentry{\oxid}{\oxvalue^\prime}
+        }
+      })(\oxid)
+    }{(\oxnewframe{\oxvarctx_i}{
+        \oxextendctx{\oxframe}{
+          \oxvarctxentry{\oxid}{\oxsdtype}
+        }
+      })(\oxid)}{
+      \oxnewframe{\oxvarctx_i}{
+        \oxextendctx{\oxframe}{
+          \oxvarctxentry{\oxid}{\oxsdtype}
+        }
+      }
+    }$. Note that $\oxnewframe{\oxvarctx_i}{\oxframe} = \oxvarctx^\prime$.
+    We can then immediately see that the above implies
+    $\oxdomain{\oxstackframe} = \oxdomain{\oxframe}|_\oxid$ and
+    $\forall \oxid \in \oxdomain{
+      \oxnewframe{\oxstore}{
+        \oxextendctx{\oxstackframe}{
+          \oxstoreentry{\oxid}{\oxvalue^\prime}
+        }
+      }
+    }. \;
+    \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{
+      \oxnewframe{\oxvarctx_i}{\oxframe}
+    }{
+      (\oxnewframe{\oxstore}{\oxstackframe})(\oxid)
+    }{(\oxnewframe{\oxvarctx_i}{\oxframe})(\oxid)}{
+      \oxnewframe{\oxvarctx_i}{\oxframe}
+    }$. Thus, we can apply \oxname{WF-StackFrame} to get
+    $\oxstorevalidity{\oxglobalctx}{
+      \oxnewframe{\oxvarctx_i}{\oxstackframe}
+    }{\oxstore}$ which can be rewritten as
+    $\oxstorevalidity{\oxglobalctx}{\oxvarctx^\prime}{\oxstore}$.
+  }
+
+  %% kontctx values are still valid
+  \oxpresline{
+    \oxwfkontctx{\oxglobalctx}{\oxvarctx^\prime}{\overline{\oxvalue}}{\oxkontctx}
+  }{
+    Inverting \oxname{WF-Temporaries} gives us $\forall i \in 1 \oxdots n. \;
+    \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxsitype_1 \oxdotsc \oxsitype_{i-1}}{\oxvarctx}{
+      \oxvalue_i
+    }{\oxsitype_i}{\oxvarctx}$.
+
+    Applying \Lemma{lemma:values-dont-change} to the typing derivation (from
+    \oxname{T-Shift}) for
+    $\oxexpr$ (which we know is a value from \oxname{E-Shift}) gives us
+    $\oxsubtypectx{\oxglobalctx}{\oxemptyctx}{\oxvarctx}{\oxvarctx^\prime}$.
+
+    Thus, we can apply \Lemma{lemma:value-typing-related-envs} to each of the
+    typing judgments to get $\forall i \in 1 \oxdots n. \;
+    \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxsitype_1 \oxdotsc \oxsitype_{i-1}}{\oxvarctx^\prime}{
+      \oxvalue_i
+    }{\oxsitype_i}{\oxvarctx^\prime}$.
+
+    Finally, applying \oxname{WF-Temporaries} gives us
+    $\oxwfkontctx{\oxglobalctx}{\oxvarctx^\prime}{\overline{\oxvalue}}{\oxkontctx}$.
+  }
+
+  %% new expression is well-typed
+  \oxpresline{
+    \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{\oxvarctx^\prime}{\oxvalue}
+    {\oxsitype}{\oxvarctx^\prime}
+  }{
+    We know from \oxname{E-Shift} that $\oxexpr$ is a value $\oxvalue$. Thus,
+    we can apply \Lemma{lemma:value-typing-output} to
+    $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{\oxvarctx}{\oxvalue}{\oxsitype}{
+      \oxextendctx{\oxvarctx^\prime}{
+        \oxvarctxentry{\oxid}{\oxsdtype}
+      }
+    }$ to get $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{
+      \oxextendctx{\oxvarctx^\prime}{
+        \oxvarctxentry{\oxid}{\oxsdtype}
+      }
+    }{\oxvalue}{\oxsitype}{
+      \oxextendctx{\oxvarctx^\prime}{
+        \oxvarctxentry{\oxid}{\oxsdtype}
+      }
+    }$.
+
+    We now wish to show that
+    $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{\oxvarctx^\prime}{\oxvalue}
+    {\oxsitype}{\oxvarctx^\prime}$. By inspecting the grammar of values and
+    their typing rules, we know that the only values who depend on the
+    context are pointers and closure values. But by inversion on
+    $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{\oxvarctx}{
+      \oxshift{\oxvalue}
+    }{\oxsitype}{\oxvarctx^\prime}$, we know that
+    $\oxtypevalidity{\oxglobalctx}{\oxemptyctx}{\oxvarctx^\prime}{\oxsitype}$.
+    Since the type is valid without the frame, we know that the values
+    cannot depend on that frame. Thus, we can conclude
+    $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{\oxvarctx^\prime}{\oxvalue}
+    {\oxsitype}{\oxvarctx^\prime}$.
+  }
+
+  %% new type is a subtype of the old type
+  \oxpresline{
+    \oxtunify[\oxcombine]{\oxemptyctx}{\oxkontctx}{\oxvarctx^\prime}
+    {\oxsitype}{\oxsitype}{\oxvarctx^\prime}
+  }{
+    Immediate by \oxname{RR-Refl}.
+  }
+
+  %% new loan context is a sub-context of the old loan context
+  \oxpresline{
+    \exists \oxvarctx_o. \oxvarctx^\prime \oxintersect \oxvarctx_o = \oxvarctx^\prime
+  }{
+    $\oxvarctx_o = \oxvarctx^\prime$
+  }
+\end{preservation}
+
+\oxpreservationcase{T-Framed}{\TFramed}{
+  \oxframed{\oxexpr_i}
+}{\EFramed}{\oxvarctx^\prime}
+
+\begin{preservation}
+  %% new store is valid
+  \oxpresline{
+    \oxstorevalidity{\oxglobalctx}{\oxvarctx^\prime}{\oxstore}
+  }{
+    Applying \Lemma{lemma:stack-envminus} to $\oxstorevalidity{\oxglobalctx}{
+      \oxnewframe{\oxvarctx^\prime}{\oxframe}
+    }{\oxnewframe{\oxstore}{\oxstackframe}}$ gives us
+    $\oxstorevalidity{\oxglobalctx}{\oxvarctx^\prime}{\oxstore}$.
+  }
+
+  %% kontctx values are still valid
+  \oxpresline{
+    \oxwfkontctx{\oxglobalctx}{\oxvarctx^\prime}{\overline{\oxvalue}}{\oxkontctx}
+  }{
+    Inverting \oxname{WF-Temporaries} gives us $\forall i \in 1 \oxdots n. \;
+    \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxsitype_1 \oxdotsc \oxsitype_{i-1}}{\oxvarctx}{
+      \oxvalue_i
+    }{\oxsitype_i}{\oxvarctx}$.
+
+    Applying \Lemma{lemma:values-dont-change} to the typing derivation (from
+    \oxname{T-Framed}) for
+    $\oxexpr$ (which we know is a value from \oxname{E-Framed}) gives us
+    $\oxsubtypectx{\oxglobalctx}{\oxemptyctx}{\oxvarctx}{\oxvarctx^\prime}$.
+
+    Thus, we can apply \Lemma{lemma:value-typing-related-envs} to each of the
+    typing judgments to get $\forall i \in 1 \oxdots n. \;
+    \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxsitype_1 \oxdotsc \oxsitype_{i-1}}{\oxvarctx^\prime}{
+      \oxvalue_i
+    }{\oxsitype_i}{\oxvarctx^\prime}$.
+
+    Finally, applying \oxname{WF-Temporaries} gives us
+    $\oxwfkontctx{\oxglobalctx}{\oxvarctx^\prime}{\overline{\oxvalue}}{\oxkontctx}$.
+  }
+
+  %% new expression is well-typed
+  \oxpresline{
+    \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{\oxvarctx^\prime}{\oxvalue}
+    {\oxsitype}{\oxvarctx^\prime}
+  }{
+    We know from \oxname{E-Framed} that $\oxexpr$ is a value $\oxvalue$. Thus,
+    we can apply \Lemma{lemma:value-typing-output} to
+    $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{
+      \oxnewframe{\oxvarctx}{\oxframe}
+    }{\oxvalue}{\oxsitype}{
+      \oxnewframe{\oxvarctx^\prime}{\oxframe^\prime}
+    }$ to get $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{
+      \oxnewframe{\oxvarctx^\prime}{\oxframe^\prime}
+    }{\oxvalue}{\oxsitype}{
+      \oxnewframe{\oxvarctx^\prime}{\oxframe^\prime}
+    }$.
+
+    We now wish to show that
+    $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{\oxvarctx^\prime}{\oxvalue}
+    {\oxsitype}{\oxvarctx^\prime}$. By inspecting the grammar of values and
+    their typing rules, we know that the only values who depend on the
+    context are pointers and closure values. But by inversion on
+    $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{\oxvarctx}{
+      \oxframed{\oxvalue}
+    }{\oxsitype}{\oxvarctx^\prime}$, we know that
+    $\oxtypevalidity{\oxglobalctx}{\oxemptyctx}{\oxvarctx^\prime}{\oxsitype}$.
+    Since the type is valid without the frame, we know that the values
+    cannot depend on that frame. Thus, we can conclude
+    $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{\oxvarctx^\prime}{\oxvalue}
+    {\oxsitype}{\oxvarctx^\prime}$.
+  }
+
+  %% new type is a subtype of the old type
+  \oxpresline{
+    \oxtunify[\oxcombine]{\oxemptyctx}{\oxkontctx}{\oxvarctx^\prime}
+    {\oxsitype}{\oxsitype}{\oxvarctx^\prime}
+  }{
+    Immediate by \oxname{RR-Refl}.
+  }
+
+  %% new loan context is a sub-context of the old loan context
+  \oxpresline{
+    \exists \oxvarctx_o. \oxvarctx^\prime \oxintersect \oxvarctx_o = \oxvarctx^\prime
+  }{
+    $\oxvarctx_o = \oxvarctx^\prime$
+  }
+\end{preservation}
+
+\noindent Case \oxname{T-BorrowIndex}: \\[0.5em]
+\begin{tabular}{l}
+  \pbox{\textwidth}{\vspace*{0.5em} From premise: \vspace*{0.5em}} \\
+
+  \framebox[\textwidth]{
+    \figuresize
+    \begin{mathpar}
+      \TBorrowIndex
+    \end{mathpar}
+  } \\
+
+  \pbox{\textwidth}{
+    \vspace*{0.5em}
+    Since $\oxexpr =
+    \oxref{\oxcprov}{\oxmuta}{\oxindex{\oxplaceexpr}{\oxexpr}}$, by inspection of
+    the reduction rules, we know that $\oxexpr$ steps with the following rule:
+    \vspace*{0.5em}
+  } \\
+
+  \framebox[\textwidth]{
+    \figuresize
+    \begin{mathpar}
+      \inferrule[E-EvalCtx]{
+        %% premises
+        \oxreduce{\oxglobalctx}{\oxstore}{\oxexpr}
+                 {\oxstore^\prime}{\oxexpr^\prime}
+      }{
+        \oxreduce{\oxglobalctx}{\oxstore}{\oxref{\oxcprov}{\oxmuta}{\oxindex{\oxplaceexpr}{\oxexpr}}}
+                 {\oxstore^\prime}{\oxref{\oxcprov}{\oxmuta}{\oxindex{\oxplaceexpr}{\oxexpr^\prime}}}
+      }
+    \end{mathpar}
+  } \\[1.5em]
+
+\end{tabular}
+
+We begin by applying the induction hypothesis on $\oxexpr$. We get that $\exists
+\oxvarctx_i$ such that
+$\oxstorevalidity{\oxglobalctx}{\oxvarctx_i}{\oxstore^\prime}$ and
+$\oxwfkontctx{\oxglobalctx}{\oxvarctx_i}{\overline{\oxvalue}}{\oxkontctx}$ and
+$\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{\oxvarctx_i}{\oxexpr^\prime}{\oxtnum}{\oxvarctx_f^\prime}$
+and
+$\oxtunify[\oxcombine]{\oxemptyctx}{\oxkontctx}{\oxvarctx_f^\prime}{\oxtnum}{\oxtnum}{\oxvarctx_s}$
+and there exists $\oxvarctx_o$ such that $\oxvarctx^\prime = \oxvarctx_s
+\oxintersect \oxvarctx_o$. Note that since rewriting does nothing with
+$\oxtnum$, $\oxvarctx_f^\prime = \oxvarctx_s$. We chose $\oxvarctx_i$ in the
+lemma statement to be \framebox{$\oxvarctx_i$} and need to show:
+
+\begin{preservation}
+  %% new store is valid
+  \oxpresline{
+    \oxstorevalidity{\oxglobalctx}{\oxvarctx_i}{\oxstore^\prime}
+  }{
+    Immediate.
+  }
+  \oxpresline{
+    \oxwfkontctx{\oxglobalctx}{\oxvarctx_i}{\overline{\oxvalue}}{\oxkontctx}
+  }{
+    Immediate
+  }
+
+  %% new expression is well-typed
+  \oxpresline{
+    \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{\oxvarctx_i}{\oxref{\oxcprov}{\oxmuta}
+      {\oxplaceexpr[\oxexpr^\prime]}}{\oxtref{\oxcprov}{\oxmuta}{\oxsitype}}
+               {\oxvarctx_f^\prime[\oxcprov \mapsto \oxset{\oxloans^\prime}]}
+  }{
+    We'd like to apply \oxname{T-BorrowIndex}. In order to do so, we still need
+    to show $\oxvarctx^\prime_f(\oxcprov) = \emptyset$,
+    $\oxnotinclosure{\oxkontctx}{\oxvarctx^\prime_f}{\oxcprov}$,
+    $\oxmusafety{\oxglobalctx}{\oxemptyctx}{\oxvarctx_f^\prime}{\oxmuta}{\oxplaceexpr}{\oxset{\oxloans^\prime}}$,
+    and
+    $\oxcomputetynoprov{\oxemptyctx}{\oxvarctx^\prime}{\oxmuta}{\oxplaceexpr}{\oxxitype}$.
+
+    $\oxvarctx^\prime_f(\oxcprov) = \emptyset$ is immediate because $\oxvarctx^\prime_f(\oxcprov) \subseteq \oxvarctx^\prime(\oxcprov)$.
+
+    Both $\oxnotinclosure{\oxkontctx}{\oxvarctx^\prime_f}{\oxcprov}$ and
+    $\oxcomputetynoprov{\oxemptyctx}{\oxvarctx^\prime}{\oxmuta}{\oxplaceexpr}{\oxxitype}$
+    follow from the fact that types are unchanged between $\oxvarctx^\prime$ and
+    $\oxvarctx^\prime_f$.
+
+    The last obligation is
+    $\oxmusafety{\oxglobalctx}{\oxemptyctx}{\oxvarctx_f^\prime}{\oxmuta}{\oxplaceexpr}{\oxset{\oxloans^\prime}}$,
+    which follows from \Lemma{lemma:ownership-safety-more-precise}
+  }
+
+  %% new type is a subtype of the old type
+  \oxpresline{
+    \oxtunify[\oxcombine]{\oxemptyctx}{\oxkontctx}{\oxvarctx_f^{\prime}[\oxcprov \mapsto \oxset{\oxloans^\prime}]}
+    {\oxtnum}{\oxtnum}{\oxvarctx_s}
+  }{
+    Immediate, with $\oxvarctx_s = \oxvarctx_f^\prime[\oxcprov \mapsto \oxset{\oxloans^\prime}]$.
+  }
+
+  %% new loan context is a sub-context of the old loan context
+  \oxpresline{
+    \exists \oxvarctx_o. \oxvarctx_s \oxintersect \oxvarctx_o =
+    \oxvarctx^\prime[\oxcprov \mapsto \oxset{\oxloans}]
+  }{
+    From our application of the induction hypothesis above, we have that
+    $\oxvarctx^\prime = \oxvarctx_f^\prime \oxintersect \oxvarctx_o$. As we
+    found in the typing judgement section above, $\oxset{\oxloans^\prime}
+    \subseteq \oxset{\oxloans}$. Therefore, for this judgement, we can use
+    $\oxvarctx_o[\oxcprov \mapsto \oxset{\oxloans} \setminus
+      \oxset{\oxloans^\prime}]$.
+  }
+\end{preservation}
+
+
+
+\noindent Case \oxname{T-Tuple}: \\[0.5em]
+\begin{tabular}{l}
+  \pbox{\textwidth}{\vspace*{0.5em} From premise: \vspace*{0.5em}} \\
+
+  \framebox[\textwidth]{
+    \figuresize
+    \begin{mathpar}
+      \TTuple
+    \end{mathpar}
+  } \\
+  \pbox{\textwidth}{
+    \vspace*{0.5em}
+    Since $\oxexpr = \oxprod{\oxvalue_1 \oxdotsc \oxvalue_{i-1}, \oxexpr_i \oxdotsc \oxexpr_n}$, by inspection of the
+    reduction rules, we know that $\oxexpr$ steps with the following rule:
+    \vspace*{0.5em}
+  } \\
+
+  \framebox[\textwidth]{
+    \figuresize
+    \begin{mathpar}
+      \inferrule[E-EvalCtx]{
+        %% premises
+        \oxreduce{\oxglobalctx}{\oxstore}{\oxexpr_i}
+                 {\oxstore^\prime}{\oxexpr_i^\prime}
+      }{
+        \oxreduce{\oxglobalctx}{\oxstore}{\oxprod{\oxvalue_1 \oxdotsc \oxvalue_{i-1}, \oxexpr_i \oxdotsc \oxexpr_n}}
+                 {\oxstore^\prime}{\oxprod{\oxvalue_1 \oxdotsc \oxvalue_{i-1}, \oxexpr_i^\prime, \oxexpr_{i+1} \oxdotsc \oxexpr_n}}
+      }
+    \end{mathpar}
+  } \\[1.5em]
+\end{tabular} \\[1em]
+
+We want to apply our induction hypothesis to the premise of \oxname{E-EvalCtx}
+with the typing judgement $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx,
+  \oxsitype_1 \oxdotsc \oxsitype_{i-1}}{\oxvarctx_{i-1}}
+{\oxexpr_i}{\oxsitype_i}{\oxvarctx_i}$. In order to do so we need to show that
+$\forall \ \overline{\oxvalue}$.
+$\oxwfkontctx{\oxglobalctx}{\oxvarctx_{i-1}}{\overline{\oxvalue}, \oxvalue_1
+  \oxdotsc \oxvalue_{i-1}}{\oxkontctx, \oxsitype_1 \oxdotsc \oxsitype_{i-1}}$
+given that
+$\oxwfkontctx{\oxglobalctx}{\oxvarctx_0}{\overline{\oxvalue}}{\oxkontctx}$. So
+let $\oxvalue \in \overline{\oxvalue}$. For each $\oxvalue_{j}$, where $0 < j <
+i$, we can repeatedly apply \Lemma{lemma:values-dont-change} to get
+$\oxsubtypectx{\oxglobalctx}{\oxemptyctx}{\oxvarctx_{j-1}}{\oxvarctx_{i-1}}$, and
+then apply \Lemma{lemma:value-typing-related-envs} to get that $\forall \oxvalue_k \in \overline{\oxvalue}$. 
+$\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx, \oxsitype_1 \oxdotsc
+  \oxsitype_{k-1}}{\oxvarctx_{i-1}}{\oxvalue_k}{\oxkontctx[k]}{\oxvarctx_{i-1}}$.
+
+
+Now we can apply the induction hypothesis to get there is some
+$\oxvarctx_{i-1}^\prime$ such that $\forall\, \overline{\oxvalue}$.
+$\oxwfkontctx{\oxglobalctx}{\oxvarctx_{i-1}^\prime}{\overline{\oxvalue}}
+{\oxkontctx, \oxsitype_1 \oxdotsc \oxsitype_{i-1}}$ and
+$\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx, \oxsitype_1 \oxdotsc \oxsitype_{i-1}}{\oxvarctx_{i-1}^{\prime}}
+{\oxexpr_i^{\prime}}{\oxtype_i^{\textsc{si} \prime}}{\oxvarctx_i^{\prime}}$,
+with $\oxstorevalidity{\oxglobalctx}{\oxvarctx_{i-1}^\prime}{\oxstore^\prime}$
+and $\oxtunify[\oxcombine]{\oxemptyctx}{\oxkontctx, \oxsitype_1 \oxdotsc \oxsitype_{i-1}}{\oxvarctx_i^\prime}
+{\oxtype_i^{\textsc{si}\prime}}{\oxsitype_i}{\oxvarctx_{si}}$ and there is some
+$\oxvarctx_{oi}$ such that $\oxvarctx_i = \oxvarctx_{si} \oxintersect \oxvarctx_{oi}$.
+
+We then pick $\oxvarctx_i$ in the lemma statement to be
+\framebox{$\oxvarctx_{i-1}^{\prime}$} and need to show:
+
+
+\begin{preservation}
+  %% new store is valid
+  \oxpresline{
+    \oxstorevalidity{\oxglobalctx}{\oxvarctx_{i-1}^{\prime}}{\oxstore^\prime}
+  }{
+    Immediate.
+  }
+  \oxpresline{
+    \oxwfkontctx{\oxglobalctx}{\oxvarctx_{i-1}^\prime}{\overline{\oxvalue}}{\oxkontctx}
+  }{
+    Immediate
+  }
+
+  %% new expression is well-typed
+  \oxpresline{
+    \begin{array}{r}
+    \oxglobalctx; \, \oxemptyctx; \, \oxkontctx; \, \oxvarctx_{i-1}^{ \prime} \vdash
+    \framebox{$\oxprod{\oxvalue_1 \oxdotsc \oxvalue_{i-1}, \oxexpr_i^\prime,
+        \oxexpr_{i+1} \oxdotsc \oxexpr_n}$}\\
+    : \oxprod{\oxsitype_1 \oxdotsc
+        \oxsitype_{i-1}, \oxtype_i^{\textsc{si} \prime}, \oxsitype_{i+1}
+        \oxdotsc \oxsitype_{n}} \Rightarrow \oxvarctx_n^{\prime}
+    \end{array}
+  }{ We want to apply \oxname{T-Tuple} in order to typecheck this tuple
+    expression. We firstly want to show that we can typecheck $\oxvalue_1$
+    through $\oxvalue_{i-1}$ with initial input context
+    $\oxvarctx_{i-1}^{\prime}$. For each $\oxvalue_{j}$, where $0 < j < i$, we
+    can repeatedly apply \Lemma{lemma:values-dont-change} to get
+    $\oxsubtypectx{\oxglobalctx}{\oxemptyctx}{\oxvarctx_{j-1}}{\oxvarctx_{i-1}}$,
+    and then apply \Lemma{lemma:value-typing-related-envs} to get that
+    $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx, \oxsitype_1 \oxdotsc \oxsitype_{j-1}}{\oxvarctx_{i-1}}{\oxvalue_j}{\oxtype_j}{\oxvarctx_{i-1}}$,
+    and finally applying our continuation typing hypothesis gives us
+    $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx, \oxsitype_1 \oxdotsc \oxsitype_{j-1}}{\oxvarctx_{i-1}^\prime}{\oxvalue_j}{\oxtype_j}{\oxvarctx_{i-1}^\prime}$.
+
+    Then we can use the result of our induction hypothesis,
+    $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx, \oxsitype_1 \oxdotsc
+      \oxsitype_{i-1}}{\oxvarctx_{i-1}^{\prime}}{\oxexpr_i^{\prime}}{\oxtype_i^{\textsc{si}
+        \prime}}{\oxvarctx_i^{\prime}}$.
+
+    And finally for $\oxexpr_{i+1} \oxdotsc \oxexpr_n$, we can repeatedly apply
+    \Lemma{lemma:expressions-typing-more-precise}. }
+
+  %% new type is a subtype of the old type
+  \oxpresline{
+    \oxtunify[\oxcombine]{\oxemptyctx}{\oxkontctx}{\oxvarctx_n^{\prime}}
+             {\oxprod{\oxsitype_1 \oxdotsc \oxsitype_{i-1},
+                 \oxtype_i^{\textsc{si} \prime}, \oxsitype_{i+1} \oxdotsc
+                 \oxsitype_{n}}}{\oxprod{\oxsitype_1 \oxdotsc
+                 \oxsitype_n}}{\oxvarctx_s}
+  }{
+    Apply \oxname{RR-Tuple} to
+    \oxname{RR-Refl} for every pair of types that are identical, leaving just
+    $\oxtype_i^{\textsc{si}\prime}$ and $\oxsitype_i$ for which we can use
+    $\oxtunify[\oxcombine]{\oxemptyctx}
+    {\oxkontctx, \oxsitype_1 \oxdotsc \oxsitype_{i-1}}{\oxvarctx_i^\prime}
+    {\oxtype_i^{\textsc{si}\prime}}{\oxsitype_i}{\oxvarctx_{si}}$ from
+    our induction hypothesis with
+    \Lemma{lemma:rewriting-parallel-expression} and
+    \Lemma{lemma:rewriting-smaller-kont} to get that
+    $\oxtunify[\oxcombine]{\oxemptyctx}{\oxkontctx}{\oxvarctx_n^\prime}
+    {\oxtype_i^{\textsc{si}\prime}}{\oxsitype_i}{\oxvarctx_s}$.
+  }
+
+  %% new loan context is a sub-context of the old loan context
+  \oxpresline{
+    \exists \oxvarctx_o. \oxvarctx_s \oxintersect \oxvarctx_o = \oxvarctx_n
+  }{
+    Note from the induction hypothesis above, we have $\oxvarctx_{i} =
+    \oxvarctx_{si} \oxintersect \oxvarctx_{oi}$. This means that for whatever
+    loan sets were unioned between $\oxvarctx_i^\prime$ and $\oxvarctx_{si}$,
+    those loan sets will be unioned between $\oxvarctx^\prime_n$ and
+    $\oxvarctx_s$. And since $\oxvarctx_i$ contained $\oxvarctx_{si}$, it will
+    also be true that $\oxvarctx_n$ will contain $\oxvarctx_s$, which means we
+    can use $\oxvarctx_o = \oxvarctx_n \setminus \oxvarctx_s$.
+   }
+\end{preservation}
+
+\oxpreservationcaseheader{T-Drop}{\TDrop}
+
+Since \oxname{T-Drop} applies to \emph{any} expression $\oxexpr$, we cannot
+determine anything about what rule we stepped with. So, we will instead try to
+apply our induction hypothesis to the typing derivation in the premise of
+\oxname{T-Drop}
+\oxtypjudge{(\oxglobalctx}{\oxemptyctx}{\oxkontctx}{
+  \oxtupdate{\oxvarctx}{\oxplace}{\oxsidtype_\oxplace}
+}{\oxexpr}{\oxsxtype}{\oxvarctx_f)}. To do this, we need
+to establish the premises of our inductive hypothesis.
+
+Namely, we need to show:
+\begin{enumerate}
+\item \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{
+    \oxtupdate{\oxvarctx}{\oxplace}{\oxsidtype_\oxplace}
+  }{\oxexpr}{\oxsxtype}{\oxvarctx_f},
+\item $\oxstorevalidity{\oxglobalctx}{
+    \oxtupdate{\oxvarctx}{\oxplace}{\oxsidtype_\oxplace}
+  }{\oxstore}$,
+\item $\oxreduce{\oxglobalctx}{\oxstore}{\oxexpr}
+  {\oxstore^\prime}{\oxexpr^\prime}$.
+\end{enumerate}
+
+\vspace{0.5em}
+
+\begin{enumerate}
+\item follows immediately from our premise.
+\item follows almost directly from our premise, which tells us that
+  $\oxstorevalidity{\oxglobalctx}{\oxvarctx}{\oxstore}$.
+  We just need to show that the value at $\oxid$ (where $\oxid$ is the root of
+  $\oxplace$) is still valid at its new type. Fortunately, it's old derivation
+  works almost perfectly except for typing the part that corresponds directly to
+  $\oxplace$. In this case, we can use \oxname{T-Dead} on the value to get the
+  new derivation with that part of the aggregate structure at the uninitialized
+  type $\oxsidtype_\oxplace$.
+\item follows immediately from our premise.
+\end{enumerate}
+
+\vspace{0.5em}
+
+This allows us to use our induction hypothesis to conclude that there exists
+$\oxvarctx^\prime_i$ such that:
+\begin{enumerate}
+  \setcounter{enumi}{4}
+\item $\oxstorevalidity{\oxglobalctx}{\oxvarctx^\prime_i}{\oxstore^\prime}$,
+\item $\oxwfkontctx{\oxglobalctx}{\oxvarctx^\prime_i}{\overline{\oxvalue}}{\oxkontctx}$,
+\item $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{\oxvarctx^\prime_i}
+  {\oxexpr^\prime}{\oxtype^\prime}{\oxvarctx_f^\prime}$,
+\item $\oxtunify[\oxcombine]{\oxemptyctx}{\oxkontctx}{\oxvarctx_f^\prime}
+  {\oxtype^\prime}{\oxsxtype}{\oxvarctx_s}$, and
+\item $\exists \oxvarctx_o. \; \oxvarctx_s \oxintersect \oxvarctx_o = \oxvarctx_f$.
+\end{enumerate}
+\hfill$\square$
+
+%%% Local Variables:
+%%% mode: latex
+%%% fill-column: 80
+%%% End:

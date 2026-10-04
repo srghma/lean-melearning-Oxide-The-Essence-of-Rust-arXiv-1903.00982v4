@@ -1,0 +1,10 @@
+\begin{align*}
+  \texttt{noncopyable}_{\,\oxglobalctx} \  \oxbasetype &= \bot \\
+  \texttt{noncopyable}_{\,\oxglobalctx} \  \alpha &= \top \\
+  \texttt{noncopyable}_{\,\oxglobalctx} \  \oxtref{\_}{\;\oxmut\;}{\_} &= \top \\
+  \texttt{noncopyable}_{\,\oxglobalctx} \  \oxtref{\_}{\;\oximm\;}{\_} &= \bot \\
+  \texttt{noncopyable}_{\,\oxglobalctx} \  \oxtfun{\_}{\_}{\_}{\_} &= \bot \\
+  \texttt{noncopyable}_{\,\oxglobalctx} \  \oxtarr{\oxtype}{\_} &= \texttt{noncopyable}_{\,\oxglobalctx} \  \oxtype \\
+  \texttt{noncopyable}_{\,\oxglobalctx} \  \oxtslice{\oxtype} &= \texttt{noncopyable}_{\,\oxglobalctx} \  \oxtype \\
+  \texttt{noncopyable}_{\,\oxglobalctx} \  \oxtprod{\oxtype, \ldots} &= \texttt{noncopyable}_{\,\oxglobalctx} \  \oxtype \, \vee \,  \ldots \\
+\end{align*}

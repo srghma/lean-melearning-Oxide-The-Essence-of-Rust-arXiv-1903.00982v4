@@ -1,0 +1,24 @@
+\begin{lstlisting}
+$\oxwellaliasedframe{\oxtvarctx}{\oxvarctx}{\oxstore}$ =
+  $\forall \oxplace \in \oxdomain{\oxvarctx} $. $
+    \oxmusafety{\oxtvarctx}{\oxkontctx}{\oxvarctx}{\oximm}{\oxplace}{
+      \oxset{\overline{\oxloan}}
+    } \implies$
+    $\oxstore = \oxnewframe{\oxstore_1}{\oxnewframe{\oxstackframe_\oxplace}{\oxstore_2}}$ $\wedge$ $\oxplace \in \oxstackframe_\oxplace \wedge \oxplace \not \in \oxstore_2$ $\wedge$ $\oxvarctx(\oxplace) = \oxtref{\oxcprov}{\oxmuta}{\oxxitype_1}$
+    $\oxstackframe_\oxplace(\oxplace) = \oxpt{\oxplace_p} \vee
+      \oxstackframe_\oxplace(\oxplace) = \oxindexptr{\oxplace_p}{\oxnum} \vee
+      \oxstackframe_\oxplace(\oxplace) = \oxsliceptr{\oxplace_p}{\oxnum_1}{\oxnum_2}
+      \implies$
+      $\forall \oxplace^\prime \mapsto v^\prime \in \oxnewframe{\oxstackframe_\oxplace}{\oxstore_2}$. $
+         \oxmusafety{\oxtvarctx}{\oxkontctx}{\oxvarctx}{\oximm}{\oxplace^\prime}{
+          \oxset{\overline{\oxloan}}
+        }
+       \implies$
+        $(v^\prime = \oxptr{\oxplace_p^\prime} \vee
+        v^\prime =
+        \oxindexptr{\oxplace_p^\prime}{\oxnum^\prime} \vee
+        v^\prime =
+        \oxsliceptr{\oxplace_p^\prime}{\oxnum_1^\prime}{\oxnum_2^\prime})$ $\wedge$ $\oxvarctx(\oxplace^\prime) = \oxtref{\oxcprov^\prime}{\oxmuta^\prime}{\oxxitype_2}$
+           $\wedge$ $\oxplace_p^\prime \in \oxdomain{\oxnewframe{\oxstackframe_\oxplace}{\oxstore_2}}$ $\wedge$ $(\oxmuta = \oxmut \vee \oxmuta^\prime = \oxmut)
+           \implies \oxrelevant{\oxplace_p^\prime}{\oxplace_p}$
+\end{lstlisting}

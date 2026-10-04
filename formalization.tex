@@ -1,0 +1,1288 @@
+In this section, we present \lang's formal semantics. We first discuss the terms
+in the language (\Sec{sec:terms}), then the types (\Sec{sec:types}) and
+\emph{regions} (\Sec{sec:regions}), and our environments and the
+mechanics of typechecking (\Sec{sec:typechecking}). Finally, we move on to
+discussion of our metatheory (\Sec{sec:metatheory}) and tested semantics
+(\Sec{sec:tested-semantics}).
+
+\subsection{The Syntax of \lang}
+\label{sec:terms}
+
+\begin{figure}
+  \figuresize
+  \oxnamegrammar
+
+  \begin{minipage}{.43\textwidth}
+    \begin{bnf}
+      \oxpathgrammar \\
+      \oxplacegrammar \\
+      \oxplaceexprgrammar \\
+      \oxplaceexprctxgrammar \\[1em]
+
+      \oxprovgrammar \\
+      \oxmutagrammar \\[1em]
+    \end{bnf}
+  \end{minipage}
+  \begin{minipage}{.56\textwidth}
+    \begin{bnf}
+      \oxprimitivegrammar \\
+      \oxexpressiongrammar \\
+    \end{bnf}
+  \end{minipage}
+
+  \vspace{-1em}
+  \caption{Term Syntax of \lang}
+  \label{fig:term-syntax}
+  \vspace{-1em}
+\end{figure}
+
+\Fig{fig:term-syntax} presents the syntax of \lang terms, in four broad
+groupings: (1)~metavariables for the various kinds of names that exist,
+(2)~places, which act as names for abstract memory locations, 
+(3)~annotations for references, and (4)~the actual terms of the language. The
+first group is fairly conventional, but we'll discuss special names like
+frame variables as they come up.
+
+\paragraph{Places and Place Expressions} As we saw in \Sec{sec:borrowing},
+places $\oxplace$ and place expressions $\oxplaceexpr$ are names for paths from
+a particular variable to a particular part of the object stored there, whether
+that be a projection of a tuple, or a field of a struct (where a struct is
+really precisely just a named tuple or record type). One might think of place
+expressions as a sort of syntactic generalization of variables. They are
+analogous to what are called \texttt{lvalues} in C. Places $\oxplace$ are a
+subset of place expressions that do not include dereferences. They can
+intuitively be thought of as an abstract name of a memory location since when
+bound, they will always correspond to one particular value on the stack. Place
+expression contexts $\oxplaceexprctx$ are used in various parts of the formalism
+to decompose place expressions $\oxplaceexpr$ into an innermost dereferenced
+place, $\oxderef{\oxplace}$, and an outer context $\oxplaceexprctx$.
+
+\paragraph{Annotations for References} In \lang, we have two annotations that we
+provide for every borrowing expression. First, we annotate references with
+ownership qualifiers $\oxmuta$, indicating whether the reference is shared
+($\oximm$) or unique ($\oxmut$). We use these rather than their equivalents in
+Rust (no annotation and $\rusti{mut}$ respectively) because the terms more
+accurately reflect the semantic focus on \emph{aliasing}, rather than
+\emph{mutation}. Indeed, in Rust, a value of the type \rusti{&&mut u32}
+\emph{cannot} be mutated (because we have a shared reference to a unique
+reference), and a value of the type \rusti{&Cell<u32>}\footnote{\rusti{Cell<T>}
+  is a Rust standard library type that provides a ``mutable memory location''
+  that allows mutation in its API.} \emph{can} be mutated through the method
+\rusti{Cell::set}.
+
+Second, we annotate references with \emph{regions}. Regions $\oxprov$ have two
+forms: abstract regions $\oxabsprov$ (pronounced \emph{var-rho}) and concrete
+regions $\oxcprov$. Abstract regions correspond to lifetime variables
+\rusti{'a}, \rusti{'b}, etc.\ in Rust, and are used polymorphically in function
+types to indicate that the function is agnostic to the particular regions of
+reference-type parameters. Concrete regions, by contrast, carry concrete
+information in the environment where they correspond to a set of loans. A loan
+$\oxloanpkg{\oxmuta}{\oxplaceexpr}$ indicates a possible origin
+($\oxplaceexpr$), qualified by whether the loan is unique or shared ($\oxmuta$).
+Intuitively, each loan tells us a single possible origin for a reference, while
+a concrete region maps to \emph{all} possible origins of a reference. As we will
+see in \Sec{sec:regions}, regions are essential to enabling our type system to
+guarantee the correct use of unique and shared references.
+
+\paragraph{Expressions} Expressions $\oxexpr$ in \lang are numerous, but largely
+standard. For example, constants $\oxprim$ consist of the unit value $\oxunit$,
+unsigned 32-bit integers $\oxnum$, and boolean values $\oxtrue$ and $\oxfalse$.
+The most interesting expressions in \lang are the ones we've already seen by
+example: place expression usage (written simply $\oxplaceexpr$) and borrowing
+(with several forms that we explain shortly). The former may be thought of as
+variables that behave linearly for non-copyable data (removing the place from
+the environment after use), and traditionally for copyable data. (As a first
+approximation, one can think of all data that is not a unique pointer as safely
+copyable.)
+
+There are three borrowing forms, and all work in fundamentally the same way:
+they are each used as introduction forms for references. The simplest case,
+written $\oxref{\oxcprov}{\oxmuta}{\oxplaceexpr}$, introduces an
+$\oxmuta$-reference (with region $\oxcprov$) to the location that the place
+expression $\oxplaceexpr$ evaluates to. The next form borrows from
+$\oxindex{\oxplaceexpr}{\oxexpr}$ instead of simply $\oxplaceexpr$, and is used
+to borrow an element out of an array or slice $\oxplaceexpr$ at the index given
+by $\oxexpr$. The final form borrows from
+$\oxslice{\oxplaceexpr}{\oxexpr_1}{\oxexpr_2}$, and is used to borrow a slice of
+$\oxplaceexpr$ using the range given by $\oxexpr_1$ and $\oxexpr_2$. A
+\emph{slice} is Rust terminology for a dynamically-sized subsection of an array.
+
+In these last two cases, one might wonder ``why are indexing and slicing not
+places themselves?'' The answer comes in two parts: (1)~indexing and slicing
+take arbitrary expressions, while places are entirely static, and (2)~unlike
+tuple projections which have a fine-grained notion of ownership, indexing and
+slicing affect the ownership of the array or slice overall. This second part
+means that while you can create two unique references to different projections
+of the same tuple, you cannot create two unique references to different indices
+of an array.
+
+The remainder of our expressions are standard or discussed already. These
+include sequencing, assignment, and creation of tuples and arrays. Our closure
+syntax follows the syntax of Rust, and thus uses vertical bars to denote the
+closure's parameters. As in Rust, closures are not polymorphic; only global
+functions (shown in \Fig{fig:envs}) may be polymorphic and specify where-bounds
+on regions.\footnote{In Rust, where-bounds in functions are used to constrain one
+  lifetime to outlive another, meaning that a reference with the larger lifetime
+  must be valid at least as long as a reference with the shorter lifetime.} We
+use function application when applying closures as well as global functions.
+Hence, function application additionally includes polymorphic instantiation
+written using Rust's turbofish syntax (\rusti{::<>}). An $\oxabort{\oxstring}$
+indicates irrecoverable failure; it terminates the program with the given string
+as a diagnostic message. Finally, \lang includes tagged sums, which are
+introduced using the \texttt{Left} and \texttt{Right} forms and eliminated using
+\texttt{match}.\footnote{Rust, of course, supports more general n-ary tagged sums
+  with user-definable tags (calling the whole system enumerations), but binary
+  sums suffice to get at the essence of Rust without requiring a complicated
+  formalization for pattern matching}
+
+
+\subsection{Types in \lang}
+\label{sec:types}
+
+\begin{figure}
+  \figuresize
+  \begin{bnf}
+    \oxkindgrammar \\
+    \oxbasetypegrammar \\
+  \end{bnf}
+  \begin{bnf}
+    \oxsitypegrammar \\
+  \end{bnf}
+  \begin{bnf}
+    \oxxitypegrammar \\
+    \oxsdtypegrammar \\
+    \oxsxtypegrammar \\
+    \oxtypegrammar \\
+  \end{bnf}
+
+  \vspace{-1em}
+  \caption{Type Syntax of \lang}
+  \label{fig:type-syntax}
+  \vspace{-1em}
+\end{figure}
+
+In \lang, we have five distinct categories of types (based on two features we
+need to distinguish: sized vs. unsized, and initialized vs. dead), and a kind
+system to track the three kinds of polymorphism in the language. While these
+distinctions may seem complex, they greatly simplify the well-formedness
+conditions required on types during typechecking. The grammars are all present
+in \Fig{fig:type-syntax}, and are explained in detail in the rest of the
+section.
+
+\paragraph{Sized and Unsized Types} We need to distinguish between types based
+on sizedness, which is a direct consequence of Rust itself. All bindings in Rust
+(and in \lang) must be able to fit on the stack which requires that they have a
+statically-known size. In Rust, this is dealt with using a special
+automatically-derived \emph{marker trait} called \rusti{Sized} which serves as a
+tag during typechecking to indicate that a type has a statically-knowable size.
+For pragmatic reasons (since one typically works with sized types), Rust decided
+on using \rusti{Sized?} to indicate that a type is ``possibly unsized'' (and
+thus could only be part of a type for a let binding if it is behind a
+reference). In \lang, we have a comparable syntactic distinction between
+\emph{sized} types $\oxsitype$ and \emph{maybe unsized} types $\oxxitype$. Sized
+types characterize all the types with statically-known sizes and maybe unsized
+types $\oxxitype$ include all such types \emph{and} the slice type
+$\oxtslice{\oxsitype}$ which corresponds to a dynamically-sized portion of an
+array.
+
+\paragraph{Initialized and Dead Types} We also need to distinguish between types
+based on initialization, which we use to model the 'use-once' linearity of
+variables referring to non-copyable data. To that end, we introduce two
+categories. First, \emph{dead} types $\oxsdtype$ which is either a sized and
+initialized type with a dagger on it (indicating that it is dead) or a product
+of dead types. These correspond to totally moved types. Second, we have
+\emph{maybe dead} types $\oxsxtype$ which can be either initialized, dead, or a
+product of maybe dead types, corresponding to types where some of their
+components have been moved. Though not supported directly in our formalism,
+these dead and maybe dead types also can be used directly to support
+uninitialized and partially-initialized variable bindings.
+
+\paragraph{Kinds and Polymorphism} \lang has three kinds $\oxkind$: the kind of
+ordinary types $\oxktype$, the kind of regions $\oxkprov$, and the kind of
+\emph{frame typings} $\oxkenv$. (Frame typings are relevant for closures, as
+we'll see below.) We abstract over variables of each kind in \lang and, to aid
+the reader, we have separate syntax for each: $\oxtvar$, $\oxabsprov$, and
+$\oxenvvar$, respectively. For simplicity, \lang restricts type variables
+$\oxtvar$ to being instantiated only with sized and initialized types, but this
+limitation could be addressed by enriching kinds further with a unique kind for
+each sort of type.
+
+\paragraph{The Types Themselves} The majority of types in \lang are sized \&
+initialized types, including base types $\oxbasetype$, type variables $\oxtvar$,
+tuples $\oxtprod{\oxsitype_1 \oxdotsc \oxsitype_n}$, arrays of length $n$
+$\oxtarr{\oxsitype}{\oxnum}$, binary sums $\oxtsum{\oxsitype_1}{\oxsitype_2}$,
+references $\oxtref{\oxprov}{\oxmuta}{\oxxitype}$, and function types.
+% $\oxtfunext{ \overline{\oxenvvar} \oxcomma \overline{\oxabsprov} \oxcomma \overline{\oxtvar} }{\oxsitype_1 \oxdotsc \oxsitype_n}{\oxsitype_r\;}{\oxenv}{ \;\overline{\oxabsprov_1: \oxabsprov_2} }$.
+With the exception of references, any types that occur within these types are
+themselves required to be both sized and initialized. For reference types
+$\oxtref{\oxprov}{\oxmuta}{\oxxitype}$, we include both the region $\oxprov$ and
+ownership qualifier $\oxmuta$ in the type which allow us to understand
+statically both a reference's origin as well as its aliasing requirements. We
+allow potentially unsized types under references since the reference itself will
+always have a fixed size regardless of what it points to (e.g. 64-bit on a
+64-bit machine).
+
+Function types have three notable features. First, each function type can
+possibly include a frame expression $\oxenv$ (syntax in \Fig{fig:envs}) over the
+arrow indicating what bindings, if any, were caught up in the closure
+environment (when nothing is captured, we put nothing over the arrow). Next,
+functions are polymorphic in type and region variables, as well as in frame
+variables $\oxenvvar$ to enable the use of higher-order functions. Finally,
+functions can relate types with abstract regions using outlives bounds:
+\texttt{where} $\oxabsprov_1: \oxabsprov_2$ means $\oxabsprov_1$ outlives
+$\oxabsprov_2$. These \texttt{where} bounds come directly from Rust, and are
+useful in making functions that, e.g., reborrow from one of several
+reference-typed parameters.
+
+\begin{figure}
+  \figuresize
+  \begin{bnf}
+    \oxglobalctxgrammar \\
+    \oxglobalentrygrammar \\
+  \end{bnf}
+  \begin{bnf}
+    \oxtvarctxgrammar \\
+    \oxkontctxgrammar \\
+    \oxvarctxgrammar \\
+    \oxframegrammar \\
+    \oxenvgrammar \\
+  \end{bnf}
+
+  \vspace{-1em}
+  \caption{Environments in \lang}
+  \label{fig:envs}
+  \vspace{-1em}
+\end{figure}
+
+\subsection{Environments for Typechecking}
+\label{sec:envs}
+
+With the syntax of terms and types in hand, we can look more closely at some
+example Oxide programs to understand the environments we'll be using for
+typechecking. We'll start with a simple example using reborrowing, much like our
+last example in \Sec{sec:main}.
+
+\begin{rustbk}
+  struct Obj(u32);
+  letrgn<'y, 'z> { // 'y -> {}, 'z -> {}
+    let mut x = Obj(5); // x : Obj
+    let y = &'y uniq x /* 'y -> { $\oxloanpkg{\oxmut}{x}$ } */;
+    let z = &'z uniq *y /* 'z -> { $\oxloanpkg{\oxmut}{x}$, $\oxloanpkg{\oxmut}{\oxderef{\! y}}$ } */;
+  }
+\end{rustbk}
+
+Here, we create an object named \rusti{x} and in the comment, we see how our
+stack typing (written $\oxvarctx$) will record the new binding and its type.
+Then, on line 4, we produce a unique reference to \rusti{x}. In the comment, we
+see the metadata produced by this borrow associating the region \rusti{'y} with
+the set of loans $\oxset{\oxloanpkg{\oxmut}{x}}$. This metadata means that a
+reference with the region \rusti{'y} must necessarily point to \rusti{x}. Note
+that this metadata is produced immediately after the borrow expression, and
+doesn't depend on the binding \rusti{y} being introduced for it. Then, on line
+5, we reborrow from \rusti{y} as \rusti{z}, and again, we can see the
+corresponding metadata produced associating the region \rusti{'z} with the set
+of loans
+$\oxset{ \oxloanpkg{\oxmut}{x} \oxcomma \oxloanpkg{\oxmut}{\oxderef{\! y}} }$.
+Note that borrowing $\oxderef{y}$ here means reborrowing from \rusti{y}. This
+tells us two things: (1)~that a reference with the region \rusti{'z} points to
+\rusti{x}, and (2)~that a reference with the region \rusti{'z} was created by
+reborrowing from \rusti{y}. That latter means that \rusti{y} ought to be
+rendered unusable as long as our reference \rusti{z} (with region \rusti{'z})
+exists. The two pieces of information we've seen here, in-scope bindings with
+their types and borrowing metadata, are precisely what's necessary for us to
+track in our stack typing $\oxvarctx$, and each entry follows the syntax seen
+here. In this next example, we'll see a bit more complexity by defining and
+using a closure.
+
+\begin{rustbk}
+  let x = Obj(5); // x : Obj
+  let y = Obj(9); // y : Obj
+  letrgn<'z> { // z -> {}
+    let f = |obj: &'z uniq Obj| -> Obj { Obj((*obj).0 + y.0) }; // $\oxvarctxentry{y}{\oxtuninit{Obj}}$
+    let z = &'z uniq x /* 'z -> { $\oxloanpkg{\oxmut}{x}$ } */;
+    f(z) // $\oxvarctxentry{z}{\oxtuninit{(\oxtref{'z}{\oxmut}{Obj})}}$
+  }
+\end{rustbk}
+
+We create two objects named \rusti{x} and \rusti{y} respectively. Then, on lines
+4-6, we define a closure named \rusti{f} that moves \rusti{y} from the context.
+This movement is described by the annotation on line 6 that shows the new entry
+for \rusti{y} in our stack typing $\oxvarctx$. This new entry differs in that
+the type associated with \rusti{y} is marked with a dagger indicating that it is
+now dead. On line 7, we create a reference \rusti{z} that we then pass on line 8
+as an argument for \rusti{f}. On line 7, we also see the annotation for the
+region indicating that a reference with region \rusti{'z} must point to
+\rusti{x}, much like we saw in the previous example. In the comment on line 8,
+we see that the use of \rusti{z} \emph{moved} it into the function call as well,
+thus we mark its whole type with the dagger.
+
+\begin{figure}
+  \figuresize
+  \begin{flushleft}
+    \oxmusafetyform where $\oxmusafetyshape$ means
+    $\oxmusafetyinner{\oxtvarctx}{\oxkontctx}{\oxvarctx}{\oxmuta}{\oxemptyctx}{\oxplaceexpr}{ \oxset{\overline{\oxloanpkg{\oxmuta}{\oxplaceexpr^\prime}}} }$.
+  \end{flushleft}
+
+  \begin{mathpar}
+    \OSafePlace \and \ODeref \and \ODerefAbs
+  \end{mathpar}
+
+  \vspace{-1em}
+  \caption{Ownership Safety in \lang}
+  \label{fig:safety}
+  \vspace{-1em}
+\end{figure}
+
+One question that might arise here is ``given we marked it dead, how are we
+still allowed to use \rusti{y} \emph{inside} the closure?'' This is an important
+point that leads to a key aspect of the structure of our stack typing
+$\oxvarctx$. The low-level nature of \lang means we need to actually statically
+record the frame-based structure of the stack at runtime. So, when we construct
+this closure, the moved objects (in this case, solely \rusti{y}) are recorded in
+a new frame $\oxframe$ that is tracked in the type of the closure,
+$\oxtfun{}{\oxtref{'z}{\;\oxmut\;}{\texttt{Obj}}}{\texttt{Obj}}{\oxframe}$. This
+frame provides the type information necessary to typecheck the body in the
+future, and the closure at runtime has a corresponding stack frame as part of
+its value form. When we typecheck the body of the closure, they are appended to
+the current stack typing with $\oxframesep$. So, our stack typing is really a
+collection of frames $\oxframe$ separated by $\oxframesep$ and our frames
+$\oxframe$ contain both in-scope bindings with their types and in-scope regions
+with their associated loan sets. As the language of stacks and frames may imply,
+both stack typings $\oxvarctx$ and frames $\oxframe$ are \emph{ordered} which
+makes it easier to state invariants like outlives (which we will see in
+\Sec{sec:typechecking}) and resolves many of the typical issues that arise
+formally with variable binding.
+
+This is all formally-defined in \Fig{fig:envs} which features a grammar for all
+of the environments used in the static semantics. As suggested by the grammars,
+there are two other environments that are non-conventional. First, we have a
+global environment $\oxglobalctx$ which consists of a series of top-level
+function definitions. We define the well-formedness of these function
+definitions by saying that their bodies must be well-typed assuming that all
+other functions (including itself) are well-typed at their annotated type, which
+enables a simple treatment of mutually recursive function definitions. Second,
+we have a temporary typing $\oxkontctx$ which consists of a sequence of types
+for parts of objects that will be in the continuation of the term being
+typechecked. The need for this is subtle, but we will explain it using the
+following example:
+
+\begin{rustbk}
+  letrgn<'a, 'b> {
+    let x = Obj(5);
+    let y = Obj(9);
+    let tup = (&'a uniq x, (); &'b uniq x);
+  }
+\end{rustbk}
+
+In this example, we create two objects \rusti{x} and \rusti{y} and then attempt
+to create a pair named \rusti{tup} that consists of two unique references.
+Exactly as written, we first uniquely borrow \rusti{x} with region \rusti{'a}
+and then in the second component, we sequence a unit value with a unique borrow
+of \rusti{x} with region \rusti{'b}. Of course, the very idea of having a
+product of unique references to the same data sounds like a contradiction and so
+we would hope to reject this program! However, to capture the expressivity of
+Rust's borrow-checking in \lang, we also have to clear loan sets associated with
+unused regions at sequencing points in programs. This leads to a dilemma: by
+reading the program, we know that the first reference with region \rusti{'a} is
+still used when we go to define the second one, but the naive definition of use
+would correspond to ``is there currently a reference with that region in the
+stack typing?'' The continuation typing comes in to resolve this. We don't have
+a name (yet) for the already-typechecked portions of a product, but we can
+record their types in the continuation typing to record that they are around
+since they may then be let-bound and used further in the program. We'll see
+formally how this interaction happens during typechecking in the
+\oxname{T-Tuple} rule in \Sec{sec:typechecking}.
+
+Now, we can look at the shape of our typing judgment, which we will return to
+define in \Sec{sec:typechecking}. The shape of our typing judgement is
+$\oxtypjudgeshape$. This is read: with global environment $\oxglobalctx$, type
+environment $\oxtvarctx$, temporary typing $\oxkontctx$, and stack typing
+$\oxvarctx$, $\oxexpr$ is a well-typed expression of type $\oxtype$ with an
+updated stack typing $\oxvarctx^\prime$ for use in typechecking the continuation
+of $\oxexpr$.
+
+
+\subsection{Region-Based Alias Management}
+\label{sec:regions}
+
+As discussed in \Sec{sec:terms}, borrow expressions in \lang all have
+\emph{region} annotations which are used to associate references statically with
+information about their possible referents. This information is essential to our
+formulation of borrow checking since we leverage it to determine if new
+references would be safe to create. This is done formally with a judgement
+called \emph{ownership safety} which has the form $\oxmusafetyshape$. We can
+read it as saying ``in the environments $\oxtvarctx$ and $\oxvarctx$, it is safe
+to use the place expression $\oxplaceexpr$ $\oxmuta$-ly and producing all of the
+loans in $\oxset{\overline{\oxloanpkg{\oxmuta}{\oxplaceexpr^\prime}}}$ (called
+the borrow chain).,'' where $\oxmuta$ is either $\oxmut$ or $\oximm$. That is,
+if we have a derivation where $\oxmuta$ is $\oxmut$, we know that we can use the
+place expression $\oxplaceexpr$ uniquely because we have a proof that there are
+no live loans against the section(s) of memory that $\oxplaceexpr$ represents.
+Further, when we have a derivation where $\oxmuta$ is $\oximm$, we know that we
+can use the place expression $\oxplaceexpr$ sharedly because we have a proof
+that there are no live \emph{unique} loans against the section(s) of memory that
+$\oxplaceexpr$ represents. The produced borrow chain is used to create the
+borrowing metadata to store in the environment when the ownership safety check
+is guarding a borrow expression, and in the simplest case, is just precisely
+$\oxplaceexpr$.
+
+Since it is precisely this ownership safety judgment that captures the essence
+of Rust's ownership semantics, we understand Rust's borrow checking system as
+ultimately being a system for statically building a proof that data in memory is
+either \emph{uniquely owned} (and thus able to allow unguarded mutation) or
+\emph{collectively shared}, but not both. To do so, intuitively, ownership
+safety looks at all of the concrete regions in $\oxvarctx$, and ensures that all
+the loans they map to are not in conflict with the place expression
+$\oxplaceexpr$ we are attempting to use. For a $\oxmut$ borrow, a conflict
+occurs if \emph{any} loan maps to an overlapping place, but for a $\oximm$
+borrow, a conflict occurs only when a $\oxmut$ loan maps to an overlapping
+place. Since places are abstract memory locations, we can consider two places as
+overlapping if they are equal or one is a prefix of the other (meaning that the
+the longer place corresponds to a piece of the larger object in memory that the
+shorter place refers to).
+
+Unfortunately, reborrowing complicates matters. To support reborrowing,
+ownership safety uses an expanded inner form written $\oxmusafetyinnershape$,
+which says that $\oxplaceexpr$ is $\oxmuta$-safe under $\oxtvarctx$ and
+$\oxvarctx$, with \emph{reborrow exclusion list} $\overline{\oxplace}$, and
+produces the loans
+$\oxset{\overline{\oxloanpkg{\oxmuta}{\oxplaceexpr^\prime}}}$. Intuitively, we
+use this reborrow exclusion list $\overline{\oxplace}$ to rule out precisely the
+loan conflicts that arise from reborrowing as a programming pattern --- namely,
+a reference conficting with loans from a reference it was reborrowed from.
+Reborrowing is also what causes the borrow chain to contain more than just
+$\oxplaceexpr$ for two reasons: (1)~we may be reborrowing from a reference whose
+region has already lost precision, i.e.\ contains multiple loans, and thus we
+cannot have perfect information about the reborrowed reference either, and
+(2)~the reborrowed borrow chain will include an additional loan that records
+that it was reborrowed (e.g. a unique loan for a reborrow from \rusti{x} would
+appear as $\oxloanpkg{\oxmut}{\oxderef{\! x}}$). This second point is precisely
+what produces the \emph{chain} aspect of the borrow chain since we can use this
+information in each loan set to follow a series of consecutive reborrows.
+
+Formally, the first rule, \oxname{O-SafePlace}, checks if a place $\oxplace$ is
+$\oxmuta$-safe by looking at each loan in every region $\oxcprov^\prime$ in
+$\oxvarctx$ and either (1) making sure that if either that loan or $\oxmuta$ is
+$\oxmut$ then $\oxplace$ does not overlap with the loan; or (2) checking that
+all references in $\oxvarctx$ with region $\oxcprov^{\prime}$ are in the
+reborrow exclusion list (meaning we need not check if there is overlap with
+$\oxplace$).
+
+The next two rules check if a place expression $\oxplaceexpr$ is $\oxmuta$-safe,
+decomposing the place expression into a place expression context
+$\oxplaceexprctx$ (see \Fig{fig:term-syntax}) with $\oxderef{\oxplace}$ in the
+hole. The last two lines of premises for both essentially ensure that either (1)
+or (2) holds, but each one adds to the incoming reborrow exclusion list when
+checking (2) by also including the place itself $\oxplace$ along with all of the
+places $\oxplace_j$ that $\oxplace$ was borrowed from according to the loan set
+$\oxcprov$ associated with its type. Both rules also check
+$\oxmuta \oxsubtype \oxmuta_{\oxplace}$ (defined as the reflexive closure of
+$\oximm \oxsubtype \oxmut$) in order to ensure that the reference has sufficient
+permission to be used, preventing a dereference of a $\oxmut$ reference in a
+$\oximm$ context.
+
+Unlike \oxname{O-DerefAbs}, \oxname{O-Deref} is dereferencing a reference
+$\oxplace$ with a concrete region $\oxcprov$. As such, we can look at the loans
+present for $\oxcprov$ in the stack typing. These loans consist of both direct
+loans to places $\oxplace_j$ which correspond to a possible origin for the
+reference, and indirect loans to place expressions $\oxplaceexpr_j$ which
+capture how this reference was reborrowed from other references. As such, when
+we recursively check for the safety of these regions, we append the reborrow
+origins (the $\oxplace_j$ prefixes of these $\oxplaceexpr_j$) to the reborrow
+exclusion list. This means that they will not be considered as possible
+conflicts in the rest of ownership safety. At the end, we union together the
+borrow chains from all the possible origins to determine our final borrow chain.
+We also include an additional loan
+$\oxloanpkg{\oxmuta}{ \oxplaceexprctx[\oxderef{\oxplace}] }$ to indicate that
+this use was reborrowed from $\oxderef{\oxplace}$.
+
+\subsection{Typechecking \lang Programs}
+\label{sec:typechecking}
+
+\begin{figure*}
+  \figuresize{ \vspace{-0.4em}
+    \begin{flushleft}\oxtypjudgeform\end{flushleft}
+    \begin{mathpar}
+      \TuThreeTwo \and \TMove \and \TCopy \and \TBorrow \and \TLetProv \and
+      \TBranch \qquad \TSeq \and \TLet \and \TDrop \and \TAssignDeref \and
+      \TAssign \and \TClosure \and \TTuple \and \TWhile \and \TAbort
+    \end{mathpar}
+  }
+
+  \caption{Selected \lang Typing Rules}
+  \label{fig:typing}
+\end{figure*}
+
+\Fig{fig:typing} presents a selection of \lang typing rules. In every rule, we
+highlight the expression being typechecked with a $\fbox{framebox}$. The shape
+of our typing judgement is $\oxtypjudgeshape$: we typecheck $\oxexpr$ in a
+global environment $\oxglobalctx$, type environment $\oxtvarctx$, temporary
+typing $\oxkontctx$, and stack typing $\oxvarctx$, producing an updated stack
+typing $\oxvarctx^\prime$ for typing the continuation of $\oxexpr$. These rules
+rely on the region rewriting and outlives judgments (\Fig{fig:unification}),
+which we'll discuss below, and the ownership safety judgment (\Fig{fig:safety}),
+which we discussed in \Sec{sec:regions}. We elide the various well-formedness
+judgments (for types, stack typings, etc.); \ifanonymous{see supplementary
+  material.}{ see the appendix (\Sec{sec:well-formedness}). }
+
+To best understand our typing judgment as a whole, it is useful to first know a
+bit about what lies ahead in the metatheory (\Sec{sec:metatheory}). In our type
+preservation proof, we need to maintain the well-typedness of values stored on
+the stack in \lang. Since our values include closures which themselves may
+introduce more aliasing, we then need to maintain our ownership safety judgment.
+To make this possible, there are a number of restrictions that arise throughout
+the type system on how regions annotate the program (and discussed further in
+\Sec{sec:discussion}). We urge readers to keep this in mind.
+
+\paragraph{Moving} In Oxide, as in Rust, owned values are moved or copied out of
+a place $\oxplace$ when used, just as we saw in our first example in
+\Sec{sec:ownership} where \rusti{pt} was moved to \rusti{x} and thus could not
+be bound again to \rusti{y}. In order to move $\oxplace$, three conditions must
+hold: (1)~$\oxplace$ must be able to be used $\oxmut$-ly (checked using the
+ownership safety judgment in \Fig{fig:safety} from \Sec{sec:regions});
+(2)~$\oxplace$ must have a sized and initialized (not dead) type $\oxsitype$ in
+$\oxvarctx$; and (3)~this type $\oxsitype$ must be
+$\oxkey{noncopyable}$.\footnote{We've elided definitions of $\oxkey{copyable}$
+  and $\oxkey{noncopyable}$, but they're straightforward. Intuitively, a type is
+  safe to copy if none of its constituent parts are unique. Thus, all types that
+  don't contain a unique reference are copyable. Generic types are always
+  non-copyable. In Rust, \oxkey{copyable} is actually the \rusti{Copy} trait,
+  but \oxkey{copyable} can be thought of as special casing it.} If these
+requirements hold, then we use a dagger to mark the place $\oxplace$ dead in the
+continuation stack typing, preventing further expressions from reusing it.
+Requirement~(1) is needed to ensure that we do not invalidate any existing
+references to $\oxplace$ by moving it and requirement~(2) ensures that there is
+currently data owned by $\oxplace$. If requirement~(3) does not hold, we'll copy
+rather than move which permits more programs to typecheck since \oxname{T-Copy}
+does not mark the copied place dead in the continuation stack typing as
+\oxname{T-Move} does. Further, unlike moves (which are disallowed through
+dereferences, leading to the restriction to places $\oxplace$ rather than place
+expressions $\oxplaceexpr$ in \oxname{T-Move}), the copying variant
+\oxname{T-Copy} can happen through a dereference and thus handles place
+expressions generally.
+
+\paragraph{Borrowing} As with moving, borrowing
+$\oxref{\oxcprov}{\oxmuta}{\oxplaceexpr}$ relies on our ownership safety
+judgment (\Fig{fig:safety}) with the $\oxmut$ and $\oximm$ modalities
+corresponding precisely to the invariants of unique and shared pointers. Namely,
+when $\oxmuta$ is $\oxmut$, we require that the place expression $\oxplaceexpr$
+have no extant loans in $\oxvarctx$ and when $\oxmuta$ is $\oximm$, we require
+no extant \emph{unique} loans. To actually know the type of the reference as a
+whole, we also have to know the type of the place expression itself and we rely
+on an auxillary judgment
+$\oxcomputetynoprov{\oxtvarctx}{\oxvarctx}{\oxmuta}{\oxplaceexpr}{\oxxitype}$
+(defined in the appendix) to compute the type $\oxxitype$ by starting with the
+type of its root identifier and following the sequence of projections and
+dereferences from $\oxplaceexpr$ through the type. For example, if we had the
+place expression \rusti{*(x.0)} where x is a product of references with the type
+\rusti{&'a uniq u32}, this judgment would produce the type \rusti{u32}. Much
+like how \oxname{T-Move} updates the continuation stack typing to prevent
+further uses of the moved place, \oxname{T-Borrow} updates the continuation
+stack typing to associate the region $\oxcprov$ used for the borrow with the
+loans that represent where the new reference may point (i.e.\ its provenance).
+In many simple cases (such as borrowing a binding \rusti{x} with type
+\rusti{u32}), there will be only one loan (corresponding to precise knowledge of
+where it points), but as we will see with branching, these loan sets may grow
+larger to account for information loss inherent to static analysis of reference
+provenance.
+
+\paragraph{Region Rewriting and Outlives} We examine region rewriting next
+(\Fig{fig:unification}) since some of the typing rules discussed below require
+it. The region rewriting judgment
+$\oxtunify{\oxtvarctx}{\oxkontctx}{\oxvarctx}{\oxtype_1}{\oxtype_2}{\oxvarctx^\prime}$
+says under $\oxtvarctx$, $\oxkontctx$, and $\oxvarctx$, we can rewrite the
+regions from $\oxtype_1$ into the corresponding regions in $\oxtype_2$ which
+will then be interpreted under $\oxvarctx^\prime$. We produce an output
+$\oxvarctx^\prime$ with updated regions to be used when typing the continuation
+after an appeal to region rewriting. The need for this judgment arises from the
+need for values to be given the same type, in spite of the fact that they can be
+annotated differently originally. Consider, for example, a branching term such
+as \rusti{if cond { &'a uniq x } else { &'b uniq y }}. In this case, the type of
+each side of the branch will be something like \rusti{&'a uniq u32} and
+\rusti{&'b uniq u32} respectively, but we need to give an overall type for the
+term. To deal with this, we pick one of the two types and use rewriting to write
+the other one into the chosen type. For safety reasons, we pick the region with
+the \emph{shortest} scope.
+
+The rewriting judgment itself is fairly straightforward: it is reflexive and
+transitive. Each rule for larger types recursively rewrites in any smaller
+types, threading the output environment much like our typing judgment. The
+actual rewriting portion arises, as one might expect, in the rule for references
+(\oxname{RR-Reference}) which appeals to a judgment on regions which says that
+the region from $\oxtype_1$ \emph{outlives} the region from $\oxtype_2$ while
+performing the work required to enable the rewriting.
+
+The outlives judgment (\Fig{fig:unification})
+$\oxrunify{\oxtvarctx}{\oxvarctx}{\oxprov_1}{\oxprov_2}{\oxvarctx^\prime}$ says
+under $\oxtvarctx$ and $\oxvarctx$, $\oxprov_1$ outlives $\oxprov_2$ rewriting
+the latter in $\oxvarctx^\prime$ according to the mode $\oxrewritemode$. Every
+region outlives itself (reflexivity). An abstract region outlives another if
+there's a corresponding outlives relation in $\oxtvarctx$
+(\oxname{OL-BothAbstract}) or if we can transitively put together outlives
+relations from $\oxtvarctx$ (\oxname{OL-Trans}).\footnote{We do not need
+  transitivity for concrete regions beyond what we can already conclude from the
+  remaining \oxname{OL} rules.} \oxname{OL-CombineConcrete} (in $\oxcombine$
+mode) says that $\oxcprov_1$ outlives $\oxcprov_2$ if it occurs earlier than
+$\oxcprov_2$ in $\oxvarctx$. It also requires that there not exist any
+references with either region which have been reborrowed
+($\oxnotreborrowed{\oxvarctx}{\oxcprov_1}$ and
+$\oxnotreborrowed{\oxvarctx}{\oxcprov_2}$, where \oxkey{rnrb} is an abbreviation
+for region-not-reborrowed). This invariant ensures that value typing is
+preserved under region rewriting. When this is the case, the output typing
+$\oxvarctx^\prime$ is updated to associate $\oxcprov_2$ with the union of the
+loans from both $\oxcprov_1$ and $\oxcprov_2$. The variant
+\oxname{OL-CheckConcrete} (in $\oxnoop$ mode) has the same obligations, but
+instead leaves the output unchanged. The behavioral difference between these
+rules is the reason for the rewriting modes.
+
+The last two rules say when a concrete region outlives an abstract one and vice
+versa. In essence, a concrete region $\oxcprov$ can only outlive an abstract
+region $\oxabsprov$ (\oxname{OL-ConcreteAbstract}) if $\oxcprov$ was
+\emph{reborrowed}. The first two premises check for reborrowing: $\oxcprov$'s
+loan set must be non-empty (otherwise there is no reborrow), and must consist
+solely of place expressions $\overline{\oxplaceexpr}$ (since place expressions,
+unlike places, contain dereferences, which identifies this as a reborrow instead
+of a borrow). The third premise collects all the regions $\overline{\oxprov_i}$
+that annotate any references dereferenced in each place expression
+$\oxplaceexpr_i$ (see the type-computation judgment $\oxcomputetyshape$ in the
+\ifanonymous{supplementary material}{appendix
+  (\Sec{sec:additional-judgments})}), while the last premise ensures that all of
+these outlive $\oxabsprov$. The final rule, \oxname{OL-AbstractConcrete}, says
+that an abstract region \emph{always} outlives a concrete region. This is subtle
+but makes sense because any abstract region $\oxabsprov$ is bound in a top-level
+function (recall that closures don't abstract over regions), while a concrete
+region $\oxcprov$ must be bound by $\oxkey{letrgn}$s \emph{inside} the function
+body. Ultimately, any concrete region $\oxcprov^\prime$ that gets substituted
+for $\oxabsprov$ upon application will already exist before $\oxcprov$ (even for
+recursive calls), meaning it outlives $\oxcprov$.
+
+\begin{figure*}
+  \figuresize
+  \begin{bnf}
+    \oxrewritemodegrammar
+  \end{bnf}
+
+%\vspace{-3ex}
+
+  \begin{flushleft}\oxtunifyform\end{flushleft}
+
+  \begin{mathpar}
+    \URefl \and \UTrans \and \UUninit \and \UTuple \and \USharedRef
+  \end{mathpar}
+
+  \vspace{1ex}
+  \begin{flushleft}\oxrunifyform\end{flushleft}
+  \vspace{-1ex}
+  \begin{mathpar}
+    \UReflProv \and \UTransProv \and \UAbsProvs \and \UCombineLocalProvs \and
+    \UCombineLocalProvsUnrest \and \UCheckLocalProvs \and \OLocalAbsProvs \and
+    \OAbsLocalProvs
+  \end{mathpar}
+
+  \vspace{-1em}
+  \caption{Region Rewriting and Outlives Relations in \lang}
+  \label{fig:unification}
+  \vspace{-1em}
+\end{figure*}
+
+\paragraph{Branching and Sequencing} The next two rules illustrate how stack
+typings are threaded through larger programs since the form of our typing
+judgment requires each rule to specify its continuation's stack typing.
+\oxname{T-Branch} uses the stack typing $\oxvarctx_1$ that we get from typing
+the conditional $\oxexpr_1$ when typing each of the two branches. The type
+$\oxsitype$ ascribed to the overall expression must be a supertype of the types
+$\oxsitype_2$ and $\oxsitype_3$ of each branch and equal to one of them.
+Additionally, branching uses a union operation $\oxintersect$ to combine the
+output stack typings from each branch to produce the final stack typing
+$\oxvarctx^{\prime}$ for the overall expression. $\oxintersect$ requires that
+types of bound variables in the two stack typings be equal (which potentially
+demands use of \oxname{T-Drop} when typing the branches), and unions the loan
+sets for each region $\oxcprov$ from both stack typings (full definition in
+technical appendix). Note that we only need to union stack typings with
+identical domains --- we typecheck both branches under $\oxvarctx_1$ so they
+produce output stack typings with the same domains (since $\oxkey{let}$ and
+$\oxkey{letrgn}$ are the only means for introducing variables and regions, but
+both are lexically-scoped), and region rewriting does not change the domain of
+stack typings between its input and its output.
+
+When typing $\oxseq{\oxexpr_1}{\oxexpr_2}$, we typecheck $\oxexpr_2$ under the
+stack typing $\oxvarctx_1$ we got from typechecking $\oxexpr_1$. But,
+importantly, we apply a metafunction $\oxgcloans{\oxkontctx}{\cdot}$ to
+$\oxvarctx_1$ to empty out the loan sets of regions not used in $\oxvarctx_1$
+before typing $\oxexpr_2$ because $\oxexpr_1$ may have been a unique reference
+that is thrown away at runtime before moving on to $\oxexpr_2$. Without
+\emph{garbage collecting} loans, \lang would reject programs that are safe and
+accepted by Rust. Namely, this clearing allows us to handle the sort of ``early
+dropping of references'' inherent to non-lexical lifetimes. Specifically,
+$\oxgcloans{\oxkontctx}{\oxvarctx}$ empties out the loan set of each $\oxcprov$
+that does not appear in any of the types in $\oxvarctx$ or $\oxkontctx$. The
+full formal definition is present in the technical appendix.
+
+\paragraph{Binding} In \lang, \oxname{T-Let} is interesting in three ways.
+First, we allow rewriting in \oxname{T-Let} to a specified annotated type. This
+rewriting allows us to change the regions in the computed type to match the
+annotated type by conservatively combining the loans associated with each region
+into the output, as described earlier in the section on region rewriting. Then,
+similar to sequencing, \oxname{T-Let} uses the metafunction
+$\oxgcloans{\oxkontctx}{\cdot}$ to eliminate any loans that might be unnecessary
+as a result of $\oxexpr_1$ potentially being promoted to the annotated type
+$\oxsitype_a$. Additionally, in the output stack typing from $\oxexpr_2$, we see
+that our binding for $\oxid$ must have a dead type $\oxsdtype$ with the whole
+binding being dropped in the overall stack typing $\oxvarctx_2$ output from
+\oxname{T-Let} (since the scope of $\oxid$ ends at that point). The requirement
+that the type be dead means we must have either used \oxname{T-Move} to move out
+of that binding or we must have explicitly used \oxname{T-Drop} on $\oxid$ in
+the derivation for $\oxexpr_2$, and can be thought of as a formalization of the
+``resource acquisition is initialization'' pattern~\cite{stroustrup94:raii}
+since we are explicitly requiring a first-in-last-out allocation/deallocation
+pattern and require everything to have been used in either a move or a drop
+before we can end its scope.
+
+\paragraph{Drop} As alluded to in the previous two paragraphs, \lang has a rule
+called \oxname{T-Drop} which is used non-deterministically during typechecking
+to mark a particular place $\oxplace$ as being dead. This rule corresponds
+roughly to a conventional weakening rule where $\oxplace$ ``doesn't exist'' (in
+this case, is dead) in the premise, but exists in the conclusion. The main
+difference is that while the data is thought to be deallocated, the name is
+still in-scope to be dropped when its scope ends in \oxname{T-Let}.
+
+\paragraph{Assignment} Assignment is interesting in a few ways. First,
+assignment is broken up into two rules \oxname{T-Assign} and
+\oxname{T-AssignDeref} where the former is able to assign to a place $\oxplace$
+that is dead, and the latter is able to assign to a place through a reference
+(i.e. by using dereferencing). The basic structure of each rule is the same. For
+both rules, we typecheck the new expression to be assigned, look up the type of
+the place we're assigning to (a lookup in \oxname{T-Assign} and a type
+computation in \oxname{T-AssignDeref}), check compatibility of the new
+expression's type with the type of the place we're assigning to, and then
+finally check that it's safe to use the place we're assigning to uniquely
+according to ownership safety.
+
+The differences between the two play a fundamental role in allowing us to
+appropriately model how assignment works in Rust. Notably, the region rewriting
+judgment in \oxname{T-Assign} uses the checking mode (denoted $\oxnoop$) to
+limit how conservative the borrow checker need be after an assignment. As
+discussed earlier, this mode does not change its output environment (thus,
+$\oxvarctx^\prime = \oxrsub{\oxvarctx_1}{\oxderef{\oxplace}}$ in
+\oxname{T-Assign}). This is okay in context because after the typing rule is
+done, the type of $\oxplace$ is updated to $\oxsitype$ (the type of its new
+value) in the continuation. A similar update in \oxname{T-AssignDeref} would
+entail updating the types of arbitrarily many bindings, and so instead the more
+conservative combine mode (denoted $\oxcombine$) is used. Further, in
+\oxname{T-Assign}, we employ the operation
+$\oxrsub{\oxvarctx_1}{\oxderef{\oxplace}}$ for the input environment to the
+region rewriting judgment. This operation is defined to remove any loans
+prefixed by $\oxderef{\oxplace}$ from every loan set in $\oxvarctx_1$. The
+$\rsub$ operation (informally called the ``kill rules'' in Rust) amounts to
+erasing reborrowing relationships that no longer hold as a result of this
+assignment.
+
+Concretely, consider an environment with two references, one named \rusti{x}
+with type \rusti{&'x uniq u32} and another named \rusti{y} reborrowed from
+\rusti{x} with type \rusti{&'y uniq u32}. This means in our environment we would
+have loan sets that look something like
+$\oxloanctxentry{\rusti{'x}}{\oxset{\overline{\oxloan}}}$ and
+$\oxloanctxentry{\rusti{'y}}{ \oxset{\overline{\oxloan} \oxcomma \oxloanpkg{\oxmut}{\oxderef{\!\oxid}}} }$.
+If we were to then assign to \rusti{x} some unrelated reference, the kill rules
+would delete the loan $\oxderef{\oxid}$ in the loan set of \rusti{'y} since
+after the assignment ran, the two would represent distinct and disjoint
+references.
+
+The last difference between the two assignment rules is presence of an
+additional obligation in \oxname{T-Assign}:
+$\oxrgnuniqueto{\oxsxtype}{\oxplace}{\oxvarctx_1}$. This obligation means that
+there are not any places in $\oxvarctx_1$ that share the outermost region of
+$\oxsxtype$ (i.e. if $\oxsxtype = \oxtref{\oxcprov}{\oxmuta}{\oxxitype}$, then
+$\oxcprov$ would be its outermost region). This allows us to guarantee that the
+garbage collection discussed for the sequencing rule will always clear out this
+outermost region $\oxcprov$ before the subsequent expression is typechecked,
+helping us greatly in our proofs. It's important to note that this obligation
+pertains to annotations added to the \lang program compared to Rust, and so it
+only limits the patterns of region annotation that can be applied, rather than
+the space of Rust programs that can be typechecked in \lang.
+
+\begin{figure*}
+  \figuresize
+  \begin{mathpar}
+    \TAppClosure
+  \end{mathpar}
+
+  \vspace{-1em}
+  \caption{\lang Typing Rule for Application}
+  \label{fig:typing-app}
+  \vspace{-1em}
+\end{figure*}
+
+\paragraph{Closures and Application}
+Closures in \lang correspond to \emph{move closures} in Rust which move or copy
+their free variables from the outer environment into the
+closure.\footnote{Rust's standard closures implicitly introduce borrowed
+  temporaries for all the free variables. We can recover this behavior via a
+  simple, local transformation to move closures.} As such, \oxname{T-Closure}
+must compute the captured frame by looking at the free variables (and free
+regions) of the closure's body, and it must mark dead (add daggers to the types
+of) any variables in the stack typing with \emph{non-copyable} types. The
+captured frame is suspended over the arrow in the function type to keep track of
+the fact that the data caught up in the closure is still alive (and thus must be
+considered in ownership safety). We elide the rule for top-level function
+definitions, which gives a function $\oxfnname$ the type that $\oxfnname$ is
+annotated with in $\oxglobalctx$, relying on well-formedness of $\oxglobalctx$
+to know that this is okay.
+
+The rule for application (\oxname{T-AppClosure} in \Fig{fig:typing-app}) is
+roughly as one would expect: we typecheck the function, and then the arguments,
+threading through the environments. However, at each step, we do a region
+rewriting using the unrestricted combine mode (denoted $\oxcombineunrest$) for
+the computed argument types to the annotated parameter types. This unrestricted
+mode allows us to push loans from the surrounding context into the regions used
+in the closure's signature, a behavior ruled out by the conventional combine
+mode ($\oxcombine$) because they would enable degenerate annotation patterns
+that make it difficult to prove soundness. For top-level functions, we have an
+additional rule \oxname{T-AppFunction} in the technical appendix that does not
+use a rewriting for the types, but (1)~substitutes all frame, type, and region
+variables in the types and (2)~checks that any outlives bounds specified on the
+function signature hold (via outlives in \Fig{fig:unification}). This does not
+appear in \oxname{T-AppClosure} since closures cannot be polymorphic, nor can
+they possess where bounds.
+
+\paragraph{Values and Aggregates} The typing rules for base types
+(\oxname{T-u32}, \oxname{T-True}, \oxname{T-False}, etc.) are standard, and
+leave the type environment unchanged in their output. Aggregate structures like
+tuples check the types of their components while threading through the
+environments in left-to-right order. This left-to-right ordering for
+typechecking corresponds to the ordering implemented by Rust's typechecker and
+borrow checker. One subtlety to note (discussed already with the last example in
+\Sec{sec:envs}) is that when typechecking a component $e_i$ of the tuple, we add
+the types of all earlier tuple components to the temporary typing $\oxkontctx$.
+This is needed because $e_i$ might be a let-binding or sequencing expression
+that invokes $\oxgcloans{\oxkontctx}{\cdot}$ on its environment during
+typechecking. If the types of the earlier tuple components we've just
+typechecked aren't present in the environment, to serve as roots for the
+regions mentioned in those types, we may end up incorrectly garbage collecting
+the loans that these regions map to. This would make programs with subsequent
+borrows typecheck even when the borrow should not be allowed. The elided typing
+rule for arrays is similar.
+
+The formalism of \lang omits a specific treatment of structs, but we note that
+they are essentially the same as tuples, only featuring a tag that must also be
+checked. Our implementation which we discuss in \Sec{sec:tested-semantics}
+relies on exactly this approach to support structs.
+
+\paragraph{Remaining Rules} The remaining rules in \Fig{fig:typing} are
+straightforward or covered earlier. Elided typing rules all concern arrays and
+are given in the \ifanonymous{supplementary material}{ technical appendix
+  (\Sec{sec:typing}) }.
+
+\subsection{Operational Semantics}
+\label{sec:dynamics}
+
+\begin{figure}
+  \figuresize
+  \begin{bnf}
+    \oxreferentgrammar \\[0em]
+    \oxptrexprgrammar \\[0em]
+    \oxevalctxgrammar \\[1em]
+    \oxvaluegrammar \oxptrextension \\[0em]
+    \oxvaluectxgrammar \\[0em]
+    \oxstoregrammar \\[0em]
+    \oxstackframegrammar \\
+  \end{bnf}
+
+  \vspace{-1em}
+  \caption{\lang Syntax Extensions for Dynamics}
+  \label{fig:dynamics-syntax}
+  \vspace{-1em}
+\end{figure}
+
+\begin{figure*}
+  \figuresize
+  \begin{flushleft}\oxnormform \hspace{2em}
+    % read: ``$\oxplaceexpr$ computes to $\oxreferent$, which maps to
+    % $\oxvalue$ in $\oxstore$.'' \\[1em]
+    $\oxnorm{\oxstore}{\oxplaceexprctx[\oxid]}
+    {\oxreferent}{\oxvaluectx}{\oxvalue} ~~\defeq~~
+    \oxnorminner{\oxstore}{\oxplaceexprctx}{\oxid}
+    {\oxreferent}{\oxvaluectx}{\oxvalue}$.
+  \end{flushleft}
+
+  \begin{flushleft}\oxnorminnerform \hspace{1em}
+    read: ``$\oxreferent$ in a context $\oxplaceexprctx$ computes to
+    $\oxreferent^\prime$ which maps to $\oxvalue$ in
+    $\oxstore$.''\end{flushleft}
+  \begin{mathpar}
+    \PId \qquad \PProj \qquad \PDerefPtr
+  \end{mathpar}
+
+  \vspace{0.5em}
+
+  \begin{flushleft}\oxreduceform\end{flushleft}
+
+  \begin{mathpar}
+    \EMove \and \ECopy \and \EBorrow \and \ESeq \quad \ELetProv \quad \EAssign
+    \and \ELet \and \EShift \and \EClosure \and \EApp \and \EFramed \and \EWhile
+  \end{mathpar}
+
+  \vspace{-1em}
+  \caption{Selected Place Expression Evaluation Rules (top) and Reduction Rules
+    (bottom)}
+  \label{fig:dynamics}
+  \vspace{-1em}
+\end{figure*}
+
+For our operational semantics, we extend the syntax of \lang in
+\Fig{fig:dynamics-syntax} with terms that only arise at runtime. First, to be
+able to specify what ``address'' a pointer points to, we introduce an abstract
+form of memory addresses called \emph{referents}. Referents $\oxreferent$
+essentially record what the offsets are from a variable on the stack in order to
+specify a precise ``memory address,'' (e.g., a particular element of an array or
+tuple, or a particular slice of an array). We also include some administrative
+forms: (1)~$\oxframed{\oxexpr}$ and $\oxshift{\oxexpr}$ which are used when
+evaluating application and let bindings discussed below, (2)~$\oxuninit$ (the
+dead value), and (3)~$\oxsliceval{\oxvalue_1 \oxdotsc \oxvalue_n}$ which is a
+dynamically-sized slice of an array. Then, we introduce value forms including
+pointers to referents, and closures packaged with their environment
+$\oxstackframe$. \Fig{fig:dynamics-syntax} also includes stacks $\oxstore$ as
+a sequence of stack frames $\oxstackframe$, and value contexts $\oxvaluectx$
+which allow array values to be decomposed with multiple holes when dealing with
+slices.
+
+In \Fig{fig:dynamics}, we present a selection of our small-step operational
+semantics which is defined using Felleisen and Hieb-style left-to-right
+evaluation contexts~\cite{felleisen92:eval-contexts} over configurations of the
+form $\oxconfigurationshape$. Since our semantics uses referents $\oxreferent$
+as an abstract version of memory addresses, some of our rules rely on a notion
+of place-expression evaluation,
+$\oxnorm{\oxstore}{\oxplaceexpr}{\oxreferent}{\oxvaluectx}{\oxvalue}$
+(\Fig{fig:dynamics}, top), which should be read as: $\oxplaceexpr$ evaluates to
+$\oxreferent$, which maps to $\oxvalue$ with a surrounding context $\oxvaluectx$
+in $\oxstore$.
+
+The evaluation rules are straightforward: \oxname{E-Move} returns a value by
+moving it off of the stack $\oxstore$, replacing it with $\oxuninit$.
+\oxname{E-Copy} copies the value from the stack. \oxname{E-Borrow} creates a
+pointer value to the referent $\oxreferent$. Branching is completely standard,
+hence elided. Assignment, similar to \oxname{E-Copy} and \oxname{E-Borrow}, uses
+the place-expression evaluation rules, but instead cares specifically about the
+value context $\oxvaluectx$, rather than the value $\oxvalue$. Assignment also
+decomposes the computed referent $\oxreferent$ to get its root identifier
+$\oxid$. Then, it updates the stack by maintaining this value context when it
+updates $\oxid$ (mapping it to $\oxvaluectx[\oxvalue]$).
+
+\paragraph{Binding and the Stack} Bindings are interesting in that they
+introduce our two administrative forms, $\oxframed{\oxexpr}$ and
+$\oxshift{\oxexpr}$. For instance, in \oxname{E-Let}, we step to
+$\oxshift{\oxexpr}$ rather than $\oxexpr$ alone in order to ensure that the
+binding for $\oxid$ is well-scoped and ends when it should (seen in
+\oxname{E-Shift}). In \oxname{E-AppClosure}, we similarly step to
+$\oxframed{\oxexpr}$ to ensure that after evaluating the body of the closure we
+drop the stack frame from that function call (seen in \oxname{E-Framed}). Both
+\oxname{E-Shift} and \oxname{E-Framed} rely crucially on the fact that our stack
+$\oxstore$ is ordered --- they must match the most recent entry.
+
+\subsection{Well-typed \lang programs won't go wrong!}
+\label{sec:metatheory}
+
+We prove syntactic type safety for \lang using progress and
+preservation~\cite{wright92:progress-preservation}.
+
+\begin{oxlemma}{Progress}{lemmap:progress}
+  If \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{\oxvarctx}{\oxexpr}
+  {\oxsitype}{\oxvarctx^\prime} and
+  \oxstorevalidity{\oxglobalctx}{\oxvarctx}{\oxstore}, then either $\oxexpr$ is
+  a value, $\oxexpr$ is an \oxabort{\,\dots\,}, or
+  $\oxexists \oxstore^\prime, \oxexpr^\prime. \;
+  \oxreduce{\oxglobalctx}{\oxstore}{\oxexpr}{\oxstore^\prime}{\oxexpr^\prime}$.
+\end{oxlemma}
+
+The Progress lemma says that if we can typecheck $\oxexpr$ under a valid global
+environment $\oxglobalctx$, temporary typing $\oxkontctx$, and stack typing
+$\oxvarctx$, \emph{and} we have a stack $\oxstore$ that satisfies this stack
+typing $\oxvarctx$, then either $\oxexpr$ is a value, an \rusti{abort!}
+expression, or we can take a step. Our stack typing judgment
+$\oxstorevalidity{\oxglobalctx}{\oxvarctx}{\oxstore}$ says that each value in
+the stack $\oxstore$ has the corresponding type attributed to it in the typing
+$\oxvarctx$. The proof proceeds by induction on the typing derivation for
+$\oxexpr$, and relies on a Canonical Forms lemma and
+\Lemma{lemmap:place-exprs-reduce} which says that place expressions can be
+reduced at runtime to values with their computed types. This lets us apply the
+rules for moves, copies, borrowing, and assignment.
+
+\begin{oxlemma}{Place Expressions Reduce}{lemmap:place-exprs-reduce}
+  If $\oxcomputetynoprov{\oxtvarctx}{\oxvarctx}{\oxmuta}
+  {\oxplaceexpr}{\oxxitype}$ and
+  $\oxstorevalidity{\oxglobalctx}{\oxvarctx}{\oxstore}$, then
+  $\oxnorm{\oxstore}{\oxplaceexpr}{\oxreferent}{\oxvaluectx}{\oxvalue}$ and
+  $\oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxvarctx}
+  {\oxvalue}{\oxxitype}{\oxvarctx}$.
+\end{oxlemma}
+
+Our proof of \Lemma{lemmap:place-exprs-reduce} (ifanonymous{Lemma 5.3}{\Lemma{lemma:place-exprs-reduce}} in appendix) relies on
+the shared inductive structure of type computation
+$\oxcomputetynoprov{\oxtvarctx}{\oxvarctx}{\oxmuta}{\oxplaceexpr}{\oxxitype}$
+and place expression evaluation
+$\oxnorm{\oxstore}{\oxplaceexpr}{\oxreferent}{\oxvaluectx}{\oxvalue}$.
+
+\begin{oxlemma}{Preservation}{lemmap:preservation}
+  If \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{\oxvarctx}{\oxexpr}
+  {\oxsitype_1}{\oxvarctx_f} and
+  \oxstorevalidity{\oxglobalctx}{\oxvarctx}{\oxstore} and
+  $\oxwfkontctx{\oxglobalctx}{\oxvarctx}{\overline{\oxvalue}}{\oxkontctx}$ and
+  \oxreduce{\oxglobalctx}{\oxstore}{\oxexpr}{\oxstore^\prime}{\oxexpr^\prime}, then there
+  exists $\oxvarctx_i$ such that
+  \oxstorevalidity{\oxglobalctx}{\oxvarctx_i}{\oxstore^\prime} and
+  $\oxwfkontctx{\oxglobalctx}{\oxvarctx_i}{\overline{\oxvalue}}{\oxkontctx}$ and
+  \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{\oxvarctx_i}{\oxexpr^\prime}
+  {\oxsitype_2}{\oxvarctx_f^\prime} and
+  $\oxtunify[\oxcombine]{\oxemptyctx}{\oxvarctx_f^\prime}
+  {\oxsitype_2}{\oxsitype_1}{\oxvarctx_s}$ and there exists $\oxvarctx_o$ such
+  that $\oxvarctx_f = \oxvarctx_s \oxintersect \oxvarctx_o$.
+\end{oxlemma}
+
+The Preservation lemma says that if $\oxexpr$ has type $\oxsitype_1$ under a
+valid global environment $\oxglobalctx$, temporary typing $\oxkontctx$, and
+stack typing $\oxvarctx$, \emph{and} we have a stack $\oxstore$ that satisfies
+$\oxvarctx$ and a sequence of values $\overline{\oxvalue}$ that satisfies the
+temporary typing $\oxkontctx$, \emph{and} we know that $\oxexpr$ can take a step
+under $\oxstore$ to the new configuration
+$\oxconfiguration{\oxstore^\prime}{\oxexpr^\prime}$, then the following conditions hold.
+Our updated stack $\oxstore^\prime$ satisfies $\oxvarctx_i$, our sequence of
+temporary values $\overline{\oxvalue}$ continue to satisfy $\oxkontctx$, and our
+new expression $\oxexpr^\prime$ typechecks with the type $\oxsitype_2$. In each of
+these judgments, we use an intermediate stack typing $\oxvarctx_i$ that
+corresponds to the changes the evaluated portion of code made to the
+environment. Rather than constrain the type to be the same as the type of our
+original $\oxexpr$, our Preservation lemma allows $\oxsitype_2$ to differ in its
+regions by the region rewriting judgment, since evaluation potentially can lead
+to a type having more precise regions. Further, the output stack typing from
+typechecking $\oxexpr^\prime$ is threaded through the rewriting and then ultimately
+said to union with some other stack typing $\oxvarctx_o$ in order to capture the
+relationship between the old output environment $\oxvarctx_f$ and the new one
+$\oxvarctx_f^\prime$ when we have taken a step into one side or the other of a
+branch.
+
+As discussed in \Sec{sec:typechecking}, the most challenging part of proving
+preservation is in showing that the various changes to the environment preserve
+the well-typedness of values, with closures in particular posing the greatest
+issue. Indeed, we believe it's clear that a formalization of Rust without
+closures misses a significant piece of the language's essence since closures
+interact consistently with all parts of the formalism. To that end, the
+proof of preservation uses several families of lemmas that
+follow the same pattern: since our preservation theorem has to maintain the
+well-typedness of the stack $\oxstore$ and temporary values
+$\overline{\oxvalue}$, we must show that various judgments in our system
+preserve the well-typedness of values. We will highlight these lemmas here,
+noting that each require sublemmas for expressions in closure bodies
+remaining well-typed which subsequently requires that region rewriting and
+ownership safety judgments are preserved by these judgments.
+
+\begin{oxlemma}{Values are Well-Typed after Region Rewriting}
+  {lemmap:value-typing-region-rewriting}
+  \ifanonymous{(Lemma 5.12}{(\Lemma{lemma:subtyping-value-typing}} in appendix) \hfill \\
+  If \ $\oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxvarctx}
+  {\oxvalue}{\oxtype}{\oxvarctx}$ and
+  $\oxtunify{\oxtvarctx}{\oxvarctx}{\oxtype_2}{\oxtype_1}{\oxvarctx^\prime}$
+  then $\oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxvarctx^\prime}
+  {\oxvalue}{\oxtype}{\oxvarctx^\prime}$.
+\end{oxlemma}
+
+\begin{oxlemma}{Values are Well-Typed after Drop/GC-Loans}
+  {lemmap:value-typing-related-envs}
+  (\ifanonymous{Lemma 5.25}{\Lemma{lemma:value-typing-related-envs}}) \hfill \\
+  If \ $\oxsubtypectx{\oxglobalctx}{\oxemptyctx}{\oxvarctx} {\oxvarctx^\prime}$ and
+  $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxemptyctx}{\oxvarctx}
+  {\oxvalue}{\oxvarctx(x)}{\oxvarctx}$, then
+  $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxemptyctx}{\oxvarctx^\prime} {\oxvalue}{\oxvarctx^\prime(x)}{\oxvarctx^\prime}$.
+\end{oxlemma}
+
+\begin{oxlemma}{Values are Well-Typed under Well-Typed Extensions}
+  {lemmap:value-typing-extension}
+  (\ifanonymous{Lemma 5.34}{\Lemma{lemma:values-well-typed-extension}}) \hfill \\
+  If \ $\oxtypevalidity{\oxglobalctx}{\oxemptyctx}{\oxvarctx}{\oxsitype_\oxid}$ and
+  $\forall \oxcprov \in \oxfprovs{\oxsitype_\oxid}. \;
+  \oxnotreborrowed{\oxvarctx}{\oxcprov}$ and
+  $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{\oxvarctx}
+  {\oxvalue}{\oxsitype}{\oxvarctx}$, then
+  $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{ \oxextendctx{\oxvarctx}{
+      \oxvarctxentry{\oxid}{\oxsitype_\oxid} } }{\oxvalue}{\oxsitype}{
+    \oxextendctx{\oxvarctx}{ \oxvarctxentry{\oxid}{\oxsitype_\oxid} } }$.
+\end{oxlemma}
+
+\begin{oxlemma}{Values are Well-Typed after Assignment}
+  {lemmap:values-well-typed-assignment}
+  (\ifanonymous{Lemma 5.40}{\Lemma{lemma:values-well-typed-assignment}}) \hfill \\
+  If \ $\oxlookup{\oxvarctx}{\oxplace_a}{\oxsxtype}$ $\wedge$
+  $\oxtunify[\oxnoop]{\oxtvarctx}{\oxkontctx}{
+    \oxrsub{\oxvarctx}{\oxderef{\oxplace_a}}
+  }{\oxsitype}{\oxsxtype}{\oxvarctx^\prime}$ $\wedge$
+  $\oxmusafety{\oxemptyctx}{\oxkontctx}{\oxvarctx^\prime}{\oxmut}{\oxplace_a}{
+    \oxset{\oxloanpkg{\oxmut}{\oxplace_a}}
+  }$ $\wedge$
+  $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{\oxvarctx}
+  {\oxvalue}{\oxtype}{\oxvarctx}$, then
+  $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{
+    \oxgcloans{\oxkontctx}{\oxtupdate{\oxvarctx^\prime}{\oxplace_a}{\oxsitype}}
+  }{
+    \oxvalue
+  }{\oxtype}{
+    \oxgcloans{\oxkontctx}{\oxtupdate{\oxvarctx^\prime}{\oxplace_a}{\oxsitype}}
+  }$.
+\end{oxlemma}
+
+\begin{oxlemma}{Values are Well-Typed under Safe Loan Updates}
+  {lemmap:value-typing-loan-update}
+  (\ifanonymous{Lemma 5.62}{\Lemma{lemma:values-well-typed-loan-update}}) \hfill \\
+  If \ $\oxmusafety{\oxemptyctx}{\oxkontctx}{\oxvarctx}{\oxmuta}{\oxplaceexpr}{
+    \oxset{\overline{\oxloan}} }$ and
+  $\oxnotinclosure{\oxkontctx}{\oxvarctx}{\oxcprov}$ and
+  $\oxlookup{\oxvarctx}{\oxcprov}{\emptyset}$ and
+  $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{\oxvarctx}
+  {\oxvalue}{\oxsitype}{\oxvarctx}$, then
+  $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{ \oxupdate{\oxvarctx}{
+      \oxloanctxentry{\oxcprov}{ \oxset{\overline{\oxloan}} } }
+  }{\oxvalue}{\oxsitype}{ \oxupdate{\oxvarctx}{ \oxloanctxentry{\oxcprov}{
+        \oxset{\overline{\oxloan}} } } }$.
+\end{oxlemma}
+
+This pattern of a value typing lemma demanding a whole family of related lemmas
+is consistent throughout the supporting lemmas, and they eventually rely on an
+ownership safety lemma where we need to actually consider how the various
+judgments each change the environment and argue that the separation provided by
+closures --- including for regions --- is sufficient to prevent those changes
+from breaking ownership safety derivations in the closure bodies themselves. In
+each case, the hardest part of proving each family is ensuring that the
+induction hypothesis for the ownership safety lemma was rich enough to address
+the changes effects on the loans in the environment and the reborrow exclusion
+list discussed in \Sec{sec:regions}.
+
+With \Lemma{lemmap:progress} and \Lemma{lemmap:preservation} in hand, we also
+prove a conventional type safety theorem as a corollary. However, we note that
+Preservation itself represents a more interesting metatheoretic result because
+it requires us to show that all of the type system invariants (namely, the
+aliasing requirements) are maintained throughout the execution of well-typed
+programs.
+
+\begin{figure*}
+  \figuresize
+  \include{test-table}
+
+  \vspace{-1em}
+  \caption{Tested Semantics Results}
+  \label{fig:test-results}
+  \vspace{-1em}
+\end{figure*}
+
+\subsection{Tested Semantics}
+\label{sec:tested-semantics}
+
+We set out at the onset to solve a particular problem --- there is no high-level
+specification of the Rust programming language and its borrowchecker. If there
+were, this would be the point where we might present a proof that every
+expression that typechecks in \lang also typechecks in Rust and vice versa.
+Since doing that is not possible, we follow \citet{guha10:essence-js} in
+developing a \emph{tested semantics} for \lang. We built an implementation of
+our \lang typechecking algorithm, \typechecker, alongside a compiler, \compiler,
+from a subset of Rust (with a small number of additional annotations) to \lang.
+In addition to the features described in \Sec{sec:formalization}, our
+implementation supports \rusti{struct}s by treating them as tagged tuples or
+records. Together, \compiler and \typechecker allowed us to use tests from the
+official borrow checker (\rusti{borrowck}) and non-lexical lifetime
+(\rusti{nll}) test suites to validate \lang against Rust's implementation,
+\rustc. The results of this testing are summarized in \Fig{fig:test-results}.
+
+For the 208 passing tests, we can compile the test case into \lang with
+\compiler and then use \typechecker to either successfully typecheck the
+program or to produce a type error. We compare this typechecking result to the
+expected behavior according to the \rustc test suite. All 208 tests either type
+check when \rustc does so, or produce an error corresponding to the error
+produced by \rustc.
+
+The remaining 407 tests were taken out of consideration on the basis of being
+out-of-scope for this work. There were 20 categories for exclusion, the majority
+of which had fewer than 10 applicable tests. \Fig{fig:test-results} includes the
+6 largest categories: (1)~heap allocation, (2)~out-of-scope libraries,
+(3)~enumerations, (4)~statics and constants, (5)~traits, and (6)~uninitialized
+variables. One specialized category (multithreading) was folded into
+out-of-scope libraries in this table, with miscellaneous aggregating the
+remaining smaller categories: control flow, casting, first-class constructors,
+compiler internals dumping, function mutability, inline assembly, macros, slice
+patterns, two-phase borrows, uninitialized variables, universal function-call
+syntax, unsafe, and variable mutability.
+
+Combined, heap allocation and out-of-scope libraries (of which the former is a
+specialization of the latter) make up for the largest excluded category with 103
+tests, and can be extended in future work using the strategy outlined by
+\citet{weiss19:oxide}. The next largest category, traits, accounts for 93 tests.
+Though the trait system is in some ways novel, the bulk of its design is rooted
+in the work on Haskell typeclasses and their extensions. As such, we feel that
+they are not an \emph{essential} part of Rust, though exploring the
+particularities of their design may be a fruitful avenue for future work on
+typeclasses. We are working on extending our implementation with sums to support
+enumerations, and they are already present in the formalism. Many of the other
+categories describe features (e.g., macros, control flow, casting, statics, and
+constants) that are well-studied in the literature, and in which we believe Rust
+has made relatively standard design choices.
+
+The last issue to discuss involving the tested semantics is the aforementioned
+annotation burden. This burden comes directly out of the syntactic differences
+between \lang and Rust, and so are overall rather minor. The most immediately
+apparent need is to provide a region annotation on borrow expressions, which we
+handle using Rust's compiler annotation support. In our tests, a borrow
+expression like $\oxref{\texttt{'a}}{\,\oxmut\,}{\texttt{x}}$ appears as
+\rusti{#[lft="a"] &mut x}. However, we reduce the need for this by automatically
+generating a fresh local region for borrow expressions without an annotation.
+This suffices for the majority of expressions without change. Relatedly, one
+might also expect to see the introduction of \oxkey{letrgn} throughout. To
+alleviate the need for this, our implementation automatically binds free region
+at the beginning of each function body.
+
+The other main change we had to make relates to the use of explicit environment
+polymorphism in \lang. In Rust, every closure has a unique type without a syntax
+for writing it down. To work with higher-order functions, these closures
+implement one of three language-defined traits (\rusti{Fn}, \rusti{FnMut}, and
+\rusti{FnOnce}) which can be used as bounds in higher-order functions. We
+compile the use of these trait bounds to environment polymorphism in a
+straight-forward manner (turning instances of the same \rusti{Fn}-bound
+polymorphic type into uses of function types with the same environment
+variable), but need to introduce a way of writing down which environment to use
+at instantiation. We use a compiler annotation (\rusti{#[envs(c1, ..., cn)]}) on
+applications which says to instantiate the environment variables with the
+captured environments of the types of these bindings. If the bindings are
+unbound or not at a function type, we produce an error indicating as much.
+
+Aside from these two changes, there are a handful of smaller changes that we
+made by hand to simplify implementation of \compiler and \typechecker, though
+the need for these could be obviated with more work. Our implementation does not
+support method call syntax, and so we translate method definitions (which take
+\rusti{self}, \rusti{&self}, or \rusti{&mut self} as their first argument) into
+function definitions with a named first argument at the method receiver's type.
+Relatedly, some of the tests used traits in a trivial way to define methods
+polymorphic in their receiver type. Like other methods, we translated these into
+function definitions, but used a polymorphic type for the receiver. \rustc also
+allows for a number of convenient programming patterns (like borrowing from a
+constant, e.g. \rusti{&0}) which are not supported by our implementation. To
+deal with these cases, we manually introduced temporaries (a process that \rustc
+does automatically). As a simplification for the typechecker, \typechecker only
+reports the first error that occurs in the program. To ensure that we find a
+correspondence between all errors, we split up test files with multiple errors
+into one file per test.
+
+Finally, an earlier version of our implementation required type annotations on
+all let bindings, and so currently many tests include fully-annotated types. We
+later realized our typing judgment is very-nearly a type \emph{synthesis}
+judgment as in bidirectional typechecking, and changed the implementation to
+support unannotated bindings by using the type synthesized for the expression
+being bound. This works for all expressions except \oxkey{abort!} which can
+produce any type and so requires annotation.
+
+\ifanonymous{
+  We provide a snapshot of the tooling as anonymized supplementary materials to
+  our submission, including the entire \rusti{borrowck} and \rusti{nll} test
+  suites and all disqualified tests categorized appropriately. The test suite
+  features a full, anonymized \oxkey{git} history that captures the changes
+  summarized above.
+}{}
+
+%%% Local Variables:
+%%% mode: latex
+%%% fill-column: 80
+%%% End:

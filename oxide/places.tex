@@ -1,0 +1,11 @@
+\begin{lstlisting}
+  $\texttt{places} \oxspace (\oxemptyctx) \oxspace = \oxspace \emptyset$
+  $\texttt{places} \oxspace (\oxextendctx{\oxvarctx}{
+    \oxloanctxentry{\oxcprov}{\oxset{\overline{\oxloanpkg{\oxmuta}{\oxplaceexpr}}}}
+  }) \oxspace = \oxspace \oxset{\oxplace \; | \; \oxloanpkg{\oxmuta_i}{\oxplaceexpr_i} \in
+    \oxset{\overline{\oxloanpkg{\oxmuta}{\oxplaceexpr}}} \wedge (\oxplaceexpr_i
+    = \oxplace \vee \oxplaceexpr_i = \oxplaceexprctx[\oxderef{\oxplace}]) } \oxspace \cup \oxspace \texttt{places}
+  \oxspace \oxvarctx$
+  $\texttt{places} \oxspace (\oxextendctx{\oxvarctx}{\oxvarctxentry{\oxid}{\oxtype}}) =
+   \texttt{places} \oxspace (\oxnewframe{\oxvarctx}{\oxemptyctx}) = \texttt{places} \oxspace (\oxvarctx)$
+\end{lstlisting}

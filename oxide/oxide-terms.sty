@@ -1,0 +1,101 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Mutability Quantifiers %%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\newcommand{\oximm}{\oxkey{shrd}}
+\newcommand{\oxmut}{\oxkey{uniq}}
+
+%%%%%%%%%%%%
+%% Places %%
+%%%%%%%%%%%%
+
+\newcommand{\oxderef}[1]{* #1}
+\newcommand{\oxproj}[2]{#1 . #2}
+\newcommand{\oxindex}[2]{#1 [ #2 ]}
+\newcommand{\oxslice}[3]{\oxindex{#1}{#2 .. #3}}
+
+%%%%%%%%%%%%%%%%
+%% Primitives %%
+%%%%%%%%%%%%%%%%
+
+\newcommand{\oxtrue}{\oxkey{true}}
+\newcommand{\oxfalse}{\oxkey{false}}
+\newcommand{\oxunit}{\oxkey{(\,)}}
+
+%%%%%%%%%%%%%%
+%% Patterns %%
+%%%%%%%%%%%%%%
+
+\newcommand{\oxpwild}{\_}
+\newcommand{\oxptup}[1]{(#1)}
+\newcommand{\oxptupstruct}[2]{#1 (#2)}
+\newcommand{\oxprecstruct}[2]{#1 \oxscope{#2}}
+\newcommand{\oxptupvariant}[3]{#1 \oxsep #2 (#3)}
+\newcommand{\oxprecvariant}[3]{#1 \oxsep #2 \oxscope{#3}}
+
+%%%%%%%%%%%%%%%%%
+%% Expressions %%
+%%%%%%%%%%%%%%%%%
+
+\newcommand{\oxabort}[1]{
+  \oxkey{abort!} (#1)
+}
+
+\newcommand{\oxlet}[4]{
+  \oxkey{let} \oxspace \oxascribe{#1}{#2} = #3 \oxsemicolon #4
+}
+\newcommand{\oxletrgn}[2]{
+  \oxkey{letrgn} \oxspace \oxangle{#1} \oxscope{#2}
+}
+\newcommand{\oxassign}[2]{#1 \coloneq #2 }
+
+\newcommand{\oxfunction}[4]{
+  \oxkey{forall} \oxangle{#1} \oxspace | #2 | \oxspace \rightarrow \oxspace #3  \oxscope{#4}
+}
+
+\newcommand{\oxclosure}[3]{
+  \ensuremath{| #1 | \oxspace \rightarrow \oxspace #2  \oxscope{#3}}
+}
+
+\newcommand{\oxapp}[3]{\oxturbofish{#1}{#2}(#3)}
+
+\newcommand{\oxseq}[2]{#1 \oxsemicolon #2}
+\newcommand{\oxbranch}[3]{
+  \oxkey{if} \oxspace #1 \oxscope{#2} \oxkey{else} \oxscope{#3}
+}
+
+\newcommand{\oxfor}[3]{
+  \oxkey{for} \oxspace #1 \oxspace \oxkey{in} \oxspace #2 \oxscope{#3}
+}
+
+\newcommand{\oxwhile}[2]{
+  \oxkey{while} \oxspace #1 \oxscope{#2}
+}
+
+\newcommand{\oxref}[3]{\&#1 \oxspace #2 \oxspace #3}
+\newcommand{\oxsliceval}[1]{\llbracket #1 \rrbracket}
+\newcommand{\oxarr}[1]{[#1]}
+\newcommand{\oxprod}[1]{(#1)}
+\newcommand{\oxrecstruct}[2]{#1 \oxspace \oxscope{#2}}
+\newcommand{\oxtupstruct}[2]{#1 (#2)}
+\newcommand{\oxrecvariant}[3]{#1 \oxsep #2 \oxspace \oxscope{#3}}
+\newcommand{\oxtupvariant}[3]{#1 \oxsep #2 (#3)}
+
+\newcommand{\oxinl}[3]{\oxturbofish{\oxkey{Left}}{#1 \oxcomma #2}(#3)}
+\newcommand{\oxinlpat}[1]{\oxkey{Left}(#1)}
+\newcommand{\oxinr}[3]{\oxturbofish{\oxkey{Right}}{#1 \oxcomma #2}(#3)}
+\newcommand{\oxinrpat}[1]{\oxkey{Right}(#1)}
+\newcommand{\oxmatch}[5]{\oxkey{match} \oxspace #1 \oxspace \oxscope{ \oxinlpat{#2} \Rightarrow #3 \oxcomma \oxinrpat{#4} \Rightarrow #5 }}
+
+%%%%%%%%%%%%%%%%%%%
+%% Runtime Terms %%
+%%%%%%%%%%%%%%%%%%%
+
+\newcommand{\oxclosureval}[4]{\langle #1 \oxcomma \oxspace \oxclosure{#2}{#3}{#4} \rangle}
+\newcommand{\oxfunctionval}[5]{\langle #1 \oxcomma \oxspace \oxfunction{#2}{#3}{#4}{#5} \rangle}
+\newcommand{\oxptr}[1]{\oxkey{ptr} \oxspace #1}
+\newcommand{\oxindexptr}[2]{\oxptr{\oxindex{#1}{#2}}}
+\newcommand{\oxsliceptr}[3]{\oxptr{\oxindex{#1}{#2 .. #3}}}
+\newcommand{\oxframed}[1]{\oxkey{framed} \oxspace #1}
+\newcommand{\oxshift}[1]{\oxkey{shift} \oxspace #1}
+\newcommand{\oxshiftprov}[1]{\oxkey{shiftprov} \oxspace #1}

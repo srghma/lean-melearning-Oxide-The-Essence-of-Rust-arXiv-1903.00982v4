@@ -1,0 +1,1027 @@
+%%%%%%%%%%%%%%%%%%%
+%% Judgment Form %%
+%%%%%%%%%%%%%%%%%%%
+
+\newcommand{\oxtypjudgeraw}[4]{
+  \ensuremath{#1 \vdash #2 : #3 \Rightarrow #4}
+}
+
+\newcommand{\oxtypjudge}[7]{
+  \oxtypjudgeraw{#1; \, #2; \, #4; \, #3}{\framebox{$#5$}}{#6}{#7}
+}
+
+\newcommand{\oxtypjudgeOLD}[8]{
+  \oxtypjudgeraw{#1; \, #2; \, #3 \oxenvsep #4}{\framebox{$#5$}}{#6}{#7 \oxenvsep #8}
+}
+
+\newcommand{\oxtypjudgenobox}[7]{
+  \oxtypjudgeraw{#1; \, #2; \, #4; \, #3}{#5}{#6}{#7}
+}
+
+\newcommand{\oxtypjudgeshape}{
+  \ensuremath{
+    \oxtypjudgenobox{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxvarctx}{
+      \oxexpr
+    }{\oxtype}{\oxvarctx^\prime}
+  }
+}
+
+\newcommand{\oxtypjudgeform}{
+  \framebox{\oxtypjudgeshape}
+}
+
+\newcommand{\oxshapetype}[6]{
+  \ensuremath{
+    #1; \, #2; \, #3 \vdash \oxstoreentry{#4}{#5} : #6
+  }
+}
+
+\newcommand{\oxshapetypeform}{
+  \framebox{
+    \oxshapetype{\oxglobalctx}{\oxtvarctx}{\oxvarctx}{\oxplace}{\oxshape}{\oxtype}
+  }
+}
+
+\newcommand{\oxvaluetype}[4]{
+  \ensuremath{
+    #1 \vdash #2 <: #3 \leadsto #4
+  }
+}
+
+\newcommand{\oxvaluetypeform}{
+  \framebox{\oxvaluetype{\oxglobalctx}{\oxvalue}{\oxtype}{\oxsub}}
+}
+
+\newcommand{\oxrelatedsub}[2]{
+  \ensuremath{
+    #1 <: #2
+  }
+}
+
+\newcommand{\oxrelatedsubform}{
+  \framebox{\oxrelatedsub{\oxsub^\prime}{\oxsub}}
+}
+
+\newcommand{\oxrelatedenv}[3]{
+  \ensuremath{#1 \vdash #2 \rhd #3}
+}
+
+\newcommand{\oxrelatedenvform}{
+  \framebox{\oxrelatedenv{\oxglobalctx}{\oxvarctx^\prime}{\oxvarctx}}
+}
+
+%%%%%%%%%%%%%%%%%%
+%% Typing Rules %%
+%%%%%%%%%%%%%%%%%%
+
+\newcommand{\TDrop}{
+  \inferrule[T-Drop]{
+    %% premises
+    \oxlookup{\oxvarctx}{\oxplace}{\oxsitype_\oxplace} \\
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{
+      \oxvarctx[\oxplace \mapsto \oxsidtype_\oxplace]
+    }{\oxexpr}{\oxsxtype}{\oxvarctx_f} \\
+  }{
+    %% conclusions
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxvarctx}{
+      \oxexpr
+    }{\oxsxtype}{\oxvarctx_f}
+  }
+}
+
+\newcommand{\TGCLoans}{
+  \inferrule[T-GarbageCollectLoans]{
+    %% premises
+    \oxcprov\text{ does not occur in } \oxsxtype \\
+    \forall \oxplace \in \oxdomain{\oxvarctx}, \ \oxcprov\text{ does not occur in }\oxvarctx(\oxplace) \\\\
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{
+      \oxvarctx[\oxcprov \mapsto \emptyset]
+    }{\oxexpr}{\oxsxtype}{\oxvarctx_f}
+  }{
+    %% conclusions
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxvarctx}{\oxexpr}{\oxsxtype}{\oxvarctx_f}
+  }
+}
+
+\newcommand{\TBorrow}{
+  \inferrule[T-Borrow]{
+    %% premises
+    \oxlookup{\oxvarctx}{\oxcprov}{\emptyset} \\
+    \oxnotinclosure{\oxkontctx}{\oxvarctx}{\oxcprov} \\\\
+    \oxmusafety{\oxtvarctx}{\oxkontctx}{\oxvarctx}{\oxmuta}{\oxplaceexpr}{
+      \oxset{\overline{\oxloan}}
+    } \\
+    \oxcomputetynoprov{\oxtvarctx}{\oxvarctx}{\oxmuta}{\oxplaceexpr}{\oxxitype} \\
+  }{
+    %% conclusions
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxvarctx}{
+      \oxref{\oxcprov}{\oxmuta}{\oxplaceexpr}
+    }{
+      \oxtref{\oxcprov}{\oxmuta}{\oxxitype}
+    }{
+      \oxupdate{\oxvarctx}{
+        \oxloanctxentry{\oxcprov}{
+          \oxset{\overline{\oxloan}}
+        }
+      }
+    }
+  }
+}
+
+\newcommand{\TBorrowIndex}{
+  \inferrule[T-BorrowIndex]{
+    %% premises
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxvarctx}
+    {\oxexpr}{\oxtnum}{\oxvarctx^\prime} \\
+    \oxlookup{\oxvarctx^\prime}{\oxcprov}{\emptyset} \\
+    \oxnotinclosure{\oxkontctx}{\oxvarctx^\prime}{\oxcprov} \\\\
+    \oxmusafety{\oxtvarctx}{\oxkontctx}{\oxvarctx^\prime}{\oxmuta}{
+      \oxplaceexpr
+    }{
+      \oxset{\overline{\oxloan}}
+    } \\
+    \oxcomputetynoprov{\oxtvarctx}{\oxvarctx^\prime}{\oxmuta}{\oxplaceexpr}{\oxxitype} \\\\
+    \oxxitype = \oxtarr{\oxsitype}{\oxnum} \vee \oxxitype =
+    \oxtslice{\oxsitype} \\
+  }{
+    %% conclusions
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxvarctx}{
+      \oxref{\oxcprov}{\oxmuta}{\oxindex{\oxplaceexpr}{\oxexpr}}
+    }{
+      \oxtref{\oxcprov}{\oxmuta}{\oxsitype}
+    }{
+      \oxupdate{\oxvarctx^\prime}{
+        \oxloanctxentry{\oxcprov}{
+          \oxset{\overline{\oxloan}}
+        }
+      }
+    }
+  }
+}
+
+\newcommand{\TBorrowSlice}{
+  \inferrule[T-BorrowSlice]{
+    %% premises
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxvarctx}
+    {\oxexpr_1}{\oxtnum}{\oxvarctx_1} \\
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxvarctx_1}
+    {\oxexpr_2}{\oxtnum}{\oxvarctx_2} \\\\
+    \oxlookup{\oxvarctx_2}{\oxcprov}{\emptyset} \\
+    \oxnotinclosure{\oxkontctx}{\oxvarctx_2}{\oxcprov} \\
+    \oxmusafety{\oxtvarctx}{\oxkontctx}{\oxvarctx_2}{\oxmuta}{\oxplaceexpr}{
+      \oxset{\overline{\oxloan}}
+    } \\
+    \oxcomputetynoprov{\oxtvarctx}{\oxvarctx_2}{\oxmuta}{\oxplaceexpr}{\oxtslice{\oxsitype}}
+  }{
+    %% conclusions
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxvarctx}{
+      \oxref{\oxcprov}{\oxmuta}{\oxslice{\oxplaceexpr}{\oxexpr_1}{\oxexpr_2}}
+    }{
+      \oxtref{\oxcprov}{\oxmuta}{\oxtslice{\oxsitype}}
+    }{
+      \oxupdate{\oxvarctx_2}{
+        \oxloanctxentry{\oxcprov}{
+          \oxset{\overline{\oxloan}}
+        }
+      }
+    }
+  }
+}
+
+\newcommand{\TSeq}{
+  \inferrule[T-Seq]{
+    %% premises
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxvarctx}{
+      \oxexpr_1
+    }{\oxsitype_1}{\oxvarctx_1} \\\\
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{
+      \oxgcloans{\oxkontctx}{\oxvarctx_1}
+    }{
+      \oxexpr_2
+    }{\oxsitype_2}{\oxvarctx_2} \\
+  }{
+    %% conclusions
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxvarctx}{
+      \oxseq{\oxexpr_1}{\oxexpr_2}
+    }{\oxsitype_2}{\oxvarctx_2}
+  }
+}
+
+\newcommand{\TIndexCopy}{
+  \inferrule[T-IndexCopy]{
+    %% premises
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxvarctx}{\oxexpr}
+    {\oxtnum}{\oxvarctx^\prime} \\
+    \oxmusafety{\oxtvarctx}{\oxkontctx}{\oxvarctx^\prime}{\oximm}
+    {\oxplaceexpr}{
+      \oxset{\overline{\oxloan}}
+    } \\\\
+    \oxcomputetynoprov{\oxtvarctx}{\oxvarctx^\prime}{\oximm}{\oxplaceexpr}{\oxxitype} \\
+    \oxxitype = \oxtarr{\oxsitype}{\oxnum} \vee \oxxitype = \oxtslice{\oxsitype} \\
+    \oxcopyable{\oxglobalctx}{\oxsitype} \\
+  }{
+    %% conclusions
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{
+      \oxvarctx
+    }{
+      \oxindex{\oxplaceexpr}{\oxexpr}
+    }{\oxsitype}{\oxvarctx^\prime}
+  }
+}
+
+\newcommand{\TBranch}{
+  \inferrule[T-Branch]{
+    %% premises
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxvarctx}{
+      \oxexpr_1
+    }{\oxtbool}{\oxvarctx_1} \\
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxvarctx_1}{
+      \oxexpr_2
+    }{\oxsitype_2}{\oxvarctx_2} \\\\
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxvarctx_1}{
+      \oxexpr_3
+    }{\oxsitype_3}{\oxvarctx_3} \\
+    \oxsitype = \oxsitype_2 \vee \oxsitype = \oxsitype_3 \\\\
+    \oxtunify[\oxcombine]{\oxtvarctx}{\oxkontctx}{\oxvarctx_2}
+    {\oxsitype_2}{\oxsitype}{\oxvarctx_2^\prime} \\
+    \oxtunify[\oxcombine]{\oxtvarctx}{\oxkontctx}{\oxvarctx_3}
+    {\oxsitype_3}{\oxsitype}{\oxvarctx_3^\prime} \\
+    \oxvarctx_2^\prime \oxintersect \oxvarctx_3^\prime = \oxvarctx^\prime \\
+  }{
+    %% conclusions
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxvarctx}{
+      \oxbranch{\oxexpr_1}{\oxexpr_2}{\oxexpr_3}
+    }{\oxsitype}{\oxvarctx^\prime}
+  }
+}
+
+\newcommand{\TMove}{
+  \inferrule[T-Move]{
+    %% premises
+    \oxmusafety{\oxtvarctx}{\oxkontctx}{\oxvarctx}{\oxmut}{\oxplace}{
+      \oxset{\oxloanpkg{\oxmut}{\oxplace}}
+    } \\\\
+    \oxlookup{\oxvarctx}{\oxplace}{\oxsitype} \\
+    \oxnoncopyable{\oxglobalctx}{\oxsitype} \\
+  }{
+    %% conclusions
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{
+      \oxvarctx
+    }{
+      \oxplace
+    }{\oxsitype}{\oxtupdate{\oxvarctx}{\oxplace}{\oxsidtype}}
+  }
+}
+
+\newcommand{\TCopy}{
+  \inferrule[T-Copy]{
+    %% premises
+    \oxmusafety{\oxtvarctx}{\oxkontctx}{\oxvarctx}{\oximm}{\oxplaceexpr}{
+      \oxset{\overline{\oxloan}}
+    } \\\\
+    \oxcomputetynoprov{\oxtvarctx}{\oxvarctx}{\oximm}{\oxplaceexpr}{\oxsitype} \\
+    \oxcopyable{\oxglobalctx}{\oxsitype} \\
+  }{
+    %% conclusions
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{
+      \oxvarctx
+    }{
+      \oxplaceexpr
+    }{\oxsitype}{\oxvarctx}
+  }
+}
+
+\newcommand{\TLet}{
+  \inferrule[T-Let]{
+    %% premises
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxvarctx}{
+      \oxexpr_1
+    }{\oxsitype_1}{\oxvarctx_1} \\
+    \oxtunify[\oxcombine]{\oxtvarctx}{\oxkontctx}{\oxvarctx_1}
+    {\oxsitype_1}{\oxsitype_a}{\oxvarctx_1^\prime} \\
+    \forall \oxcprov \in \oxfprovs{\oxsitype_a}. \;
+    \oxnotreborrowed{\oxvarctx_1^\prime}{\oxcprov} \\
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{
+      \oxgcloans{\oxkontctx}{
+        \oxextendctx{\oxvarctx_1^\prime}{\oxvarctxentry{\oxid}{\oxsitype_a}}
+      }
+    }{
+      \oxexpr_2
+    }{\oxsitype_2}{
+      \oxextendctx{\oxvarctx_2}{
+        \oxvarctxentry{\oxid}{\oxsdtype}
+      }
+    } \\
+  }{
+    %% conclusions
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxvarctx}{
+      \oxlet{\oxid}{\oxsitype_a}{\oxexpr_1}{\oxexpr_2}
+    }{\oxsitype_2}{
+      \oxvarctx_2
+    }
+  }
+}
+
+\newcommand{\TLetProv}{
+  \inferrule[T-LetRegion]{
+    %% premises
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{
+      \oxextendctx{\oxvarctx}{
+        \oxloanctxentry{\oxcprov}{\{\}}
+      }
+    }{\oxexpr}{\oxsitype}{
+      \oxextendctx{\oxvarctx^\prime}{
+        \oxloanctxentry{\oxcprov}{\{\overline{\oxloan}\}}
+      }
+    } \\
+  }{
+    %% conclusions
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxvarctx}{
+      \oxletrgn{\oxcprov}{\oxexpr}
+    }{\oxsitype}{\oxvarctx^\prime} }
+}
+
+\newcommand{\TAssign}{
+  \inferrule[T-Assign]{
+    %% premises
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxvarctx}{
+      \oxexpr
+    }{\oxsitype}{\oxvarctx_1} \\
+    \oxvarctx_1(\oxplace) = \oxsxtype \\
+    \oxsxtype = \oxtref{\oxcprov}{\oxmuta}{\oxxitype} \implies
+    \oxrgnuniqueto{\oxcprov}{\oxplace}{\oxvarctx_1} \\
+    \oxtunify[\oxnoop]{\oxtvarctx}{\oxkontctx}{
+      \oxrsub{\oxvarctx_1}{\oxderef{\oxplace}}
+    }{\oxsitype}{\oxsxtype}{\oxvarctx^\prime} \\
+    (\oxsxtype = \oxsdtype \vee
+    \oxmusafety{\oxtvarctx}{\oxkontctx}{\oxvarctx^\prime}{\oxmut}{\oxplace}{
+      \oxset{\oxloanpkg{\oxmut}{\oxplace}}
+    }) \\
+  }{
+    %% conclusions
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxvarctx}{
+      \oxassign{\oxplace}{\oxexpr}
+    }{\oxtunit}{
+      \oxtupdate{\oxvarctx^\prime}{\oxplace}{\oxsitype}
+    }
+  }
+}
+
+\newcommand{\TAssignDeref}{
+  \inferrule[T-AssignDeref]{
+    %% premises
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxvarctx}{
+      \oxexpr
+    }{\oxsitype_n}{\oxvarctx_1} \\
+    \oxcomputetynoprov{\oxtvarctx}{\oxvarctx_1}{\oxmut}{\oxplaceexpr}{\oxsitype_o} \\\\
+    \oxtunify[\oxcombine]{\oxtvarctx}{\oxkontctx}{\oxvarctx_1}
+    {\oxsitype_n}{\oxsitype_o}{\oxvarctx^\prime} \\
+    \oxmusafety{\oxtvarctx}{\oxkontctx}{\oxvarctx^\prime}{\oxmut}{\oxplaceexpr}{
+      \oxset{\overline{\oxloan}}
+    } \\
+  }{
+    %% conclusions
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxvarctx}{
+      \oxassign{\oxplaceexpr}{\oxexpr}
+    }{\oxtunit}{\oxvarctx^\prime}
+  }
+}
+
+\newcommand{\TWhile}{
+  \inferrule[T-While]{
+    %% premises
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxvarctx}{
+      \oxexpr_1
+    }{\oxtbool}{\oxvarctx_1} \\
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxvarctx_1}{
+      \oxexpr_2
+    }{\oxtunit}{\oxvarctx_2} \\\\
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxvarctx_2}{
+      \oxexpr_1
+    }{\oxtbool}{\oxvarctx_2} \\
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxvarctx_2}{
+      \oxexpr_2
+    }{\oxtunit}{\oxvarctx_2} \\
+  }{
+    %% conclusions
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxvarctx}{
+      \oxwhile{\oxexpr_1}{\oxexpr_2}
+    }{\oxtunit}{\oxvarctx_2}
+  }
+}
+
+\newcommand{\TForArray}{
+  \inferrule[T-ForArray]{
+    %% premises
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxvarctx}{
+      \oxexpr_1
+    }{\oxtarr{\oxsitype}{\oxnum}}{\oxvarctx_1} \\
+    \forall \oxcprov \in \oxfprovs{\oxsitype}. \;
+    \oxnotreborrowed{\oxvarctx_1}{\oxcprov} \\\\
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{
+      \oxextendctx{\oxvarctx_1}{
+        \oxvarctxentry{\oxid}{\oxsitype}
+      }
+    }{
+      \oxexpr_2
+    }{\oxtunit}{
+      \oxextendctx{\oxvarctx_1}{
+        \oxvarctxentry{\oxid}{\oxsdtype}
+      }
+    } 
+  }{
+    %% conclusions
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxvarctx}{
+      \oxfor{\oxid}{\oxexpr_1}{\oxexpr_2}
+    }{\oxtunit}{\oxvarctx_1}
+  }
+}
+
+\newcommand{\TForSlice}{
+  \inferrule[T-ForSlice]{
+    %% premises
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxvarctx}{
+      \oxexpr_1
+    }{\oxtref{\oxprov}{\oxmuta}{\oxtslice{\oxsitype}}}{\oxvarctx_1} \\
+    \forall \oxcprov \in \oxfprovs{\oxtref{\oxprov}{\oxmuta}{\oxsitype}}. \;
+    \oxnotreborrowed{\oxvarctx_1}{\oxcprov} \\\\
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{
+      \oxextendctx{\oxvarctx_1}{
+        \oxvarctxentry{\oxid}{\oxtref{\oxprov}{\oxmuta}{\oxsitype}}
+      }
+    }{
+      \oxexpr_2
+    }{\oxtunit}{
+      \oxextendctx{\oxvarctx_1}{
+        \oxvarctxentry{\oxid}{\oxsxtype_1}
+      }
+    } 
+  }{
+    %% conclusions
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxvarctx}{
+      \oxfor{\oxid}{\oxexpr_1}{\oxexpr_2}
+    }{\oxtunit}{\oxvarctx_2}
+  }
+}
+
+\newcommand{\TFunction}{
+  \inferrule[T-Function]{
+    %% premises
+    \oxlookup{\oxglobalctx}{\oxfnname}{
+      \oxfuncdef{\oxfnname}{
+        \overline{\oxenvvar} \oxcomma \overline{\oxabsprov} \oxcomma \overline{\oxtvar}
+      }{
+        \oxascribe{\oxid_1}{\oxsitype_1} \oxdotsc
+        \oxascribe{\oxid_n}{\oxsitype_n}
+      }{\oxsitype_r}{\overline{\oxabsprov_1: \oxabsprov_2}}{\oxexpr}
+    } \\
+  }{
+    %% conclusions
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxvarctx}{\oxfnname}{
+      \oxtfunext{
+        \overline{\oxenvvar} \oxcomma \overline{\oxabsprov} \oxcomma \overline{\oxtvar}
+      }{
+        \oxsitype_1 \oxdotsc \oxsitype_n
+      }{\oxsitype_r}{}{\overline{\oxabsprov_1: \oxabsprov_2}}
+    }{\oxvarctx}
+  }
+}
+
+\newcommand{\TClosure}{
+  \inferrule[T-Closure]{
+    %% premises
+    \oxfvars{\oxexpr} \setminus \overline{\oxid} = \overline{\oxid_f} \\
+    \oxfncvars{\oxvarctx}{\oxexpr} \setminus \overline{\oxid} = \overline{\oxid_{nc}} \\\\
+    \overline{\oxcprov} = \overline{\oxfprovs{\oxvarctx(\oxid_f)}} \oxcomma (\oxfprovs{\oxexpr} \setminus (\overline{\oxfprovs{\oxsitype}}, \oxfprovs{\oxsitype_r}))  \\\\
+    \oxframe_c = \overline{\oxloanctxentry{\oxcprov}{\oxvarctx(\oxcprov)}} \oxcomma
+    \overline{\oxvarctxentry{\oxid_f}{\oxvarctx(\oxid_f)}} \\
+    \forall \oxcprov_p \in \underset{i=1}{\overset{n}{\bigcup}} \; \oxfprovs{\oxsitype_i} \cup
+    \oxfprovs{\oxsitype_r}. \; \oxlookup{\oxvarctx}{\oxcprov_p}{\emptyset} \\
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}
+    {
+      \oxnewframe{
+        \oxtupdatemany{\oxvarctx}{\oxid_{nc}}{\oxtuninit{\oxvarctx(\oxid_{nc})}}
+      }{
+        \oxframe_c \oxcomma
+        \oxvarctxentry{\oxid_1}{\oxsitype_1}
+        \oxdotsc
+        \oxvarctxentry{\oxid_n}{\oxsitype_n}
+      }
+    }{
+      \oxexpr
+    }{\oxsitype_r}{\oxnewframe{\oxvarctx^\prime}{\oxframe}} \\
+  }{
+    %% conclusions
+    \begin{array}{rr}
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxvarctx}{
+      \oxclosure{
+        \oxascribe{\oxid_1}{\oxsitype_1} \oxdotsc
+        \oxascribe{\oxid_n}{\oxsitype_n}
+      }{\oxsitype_r}{
+        \oxexpr
+      }
+    }{
+      \oxtclosure{
+        \oxsitype_1 \oxdotsc \oxsitype_n
+      }{\oxsitype_r}{\oxframe_c}
+      }{\oxvarctx^\prime}
+      \end{array}
+  }
+}
+
+\newcommand{\TApp}{
+  \inferrule[T-AppFunction]{
+    %% premises
+    \overline{\oxenvwellformed{\oxglobalctx}{\oxtvarctx}{\oxvarctx}{\oxenv}} \\
+    \overline{\oxrgnvalidity{\oxtvarctx}{\oxvarctx}{\oxprov}} \\
+    \overline{\oxtypevalidity{\oxglobalctx}{\oxtvarctx}{\oxvarctx}{\oxsitype}} \\
+    \delta = \oxsubstmany{
+      \oxsubstmany{
+        \oxsubstmany{\cdot}{\oxenv}{\oxenvvar}
+      }{\oxprov}{\oxabsprov}
+    }{\oxsitype}{\oxtvar} \\\\
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxvarctx}{
+      \oxexpr_f
+    }{
+      \oxtfunext{
+        \overline{\oxenvvar} \oxcomma \overline{\oxabsprov} \oxcomma \overline{\oxtvar}
+      }{
+        \oxsitype_1 \oxdotsc \oxsitype_n
+      }{\oxsitype_f}{}{\overline{\oxabsprov_1: \oxabsprov_2}}
+    }{\oxvarctx_0} \\\\
+    \forall i \in \oxset{1 \oxdots n}. \;
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{
+      \oxextendctx{\oxkontctx}{
+        \delta(\oxsitype_1) \oxdots \delta(\oxsitype_{i-1})
+      }
+    }{\oxvarctx_{i-1}}{
+      \oxexpr_i
+    }{
+      \delta(\oxsitype_i)
+    }{\oxvarctx_i} \\
+    \forall i \in \oxset{ 1 \oxdots n }. \;
+    \forall \oxcprov \in \oxfprovs{\oxsitype_i}. \;
+    \oxnotreborrowed{\oxvarctx_n^\prime}{\oxcprov} \\
+    \oxrunifymany{\oxtvarctx}{\oxkontctx}{\oxvarctx_n}{
+      \oxsubstmany{\oxabsprov_2}{\oxprov}{\oxabsprov}
+    }{
+      \oxsubstmany{\oxabsprov_1}{\oxprov}{\oxabsprov}
+    }{\oxvarctx_b} \\
+  }{
+    %% conclusions
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxvarctx}{
+      \oxapp{\oxexpr_f}{
+        \overline{\oxenv} \oxcomma \overline{\oxprov} \oxcomma \overline{\oxsitype}
+      }{
+        \oxexpr_1 \oxdotsc \oxexpr_n
+      }
+    }{
+      \delta(\oxsitype_f)
+    }{\oxvarctx_b}
+  }
+}
+
+\newcommand{\TAppClosure}{
+  \inferrule[T-AppClosure]{
+    %% premises
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxvarctx}{
+      \oxexpr_f
+    }{
+      \oxtfun{}{
+        \oxsitype_1 \oxdotsc \oxsitype_n
+      }{\oxsitype_f}{\oxenv_c}
+    }{\oxvarctx_0} \\\\
+    \forall i \in \oxset{1 \oxdots n}. \;
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{
+      \oxextendctx{\oxkontctx}{
+        \oxsitype_1 \oxdots \oxsitype_{i-1}
+      }
+    }{\oxvarctx_{i-1}}{
+      \oxexpr_i
+    }{
+      \oxsitype_{i^\prime}
+    }{\oxvarctx_i} \\
+    \oxtunify[\oxcombineunrest]{\oxtvarctx}{\oxkontctx}{\oxvarctx_i}
+    {\oxsitype_{i^\prime}}{\oxsitype_i}{\oxvarctx_i^\prime} \\\\
+    \forall i \in \oxset{ 1 \oxdots n }. \;
+    \forall \oxcprov \in \oxfprovs{\oxsitype_i}. \;
+    \oxnotreborrowed{\oxvarctx_n^\prime}{\oxcprov} \\
+  }{
+    %% conclusions
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxvarctx}{
+      \oxapply{\oxexpr_f}{
+        \oxexpr_1 \oxdotsc \oxexpr_n
+      }
+    }{
+      \oxsitype_f
+    }{\oxvarctx_n^\prime}
+  }
+}
+
+\newcommand{\TUnit}{
+  \inferrule[T-Unit]{
+    %% premises
+  }{
+    %% conclusions
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxvarctx}{
+      \oxunit
+    }{\oxtunit}{\oxvarctx}
+  }
+}
+
+\newcommand{\TuThreeTwo}{
+  \inferrule[T-u32]{
+    %% premises
+  }{
+    %% conclusions
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxvarctx}{
+      \oxnum
+    }{\oxtnum}{\oxvarctx}
+  }
+}
+
+\newcommand{\TTrue}{
+  \inferrule[T-True]{
+    %% premises
+  }{
+    %% conclusions
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxvarctx}{
+      \oxtrue
+    }{\oxtbool}{\oxvarctx}
+  }
+}
+
+\newcommand{\TFalse}{
+  \inferrule[T-False]{
+    %% premises
+  }{
+    %% conclusions
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxvarctx}{
+      \oxfalse
+    }{\oxtbool}{\oxvarctx}
+  }
+}
+
+\newcommand{\TTuple}{
+  \inferrule[T-Tuple]{
+    %% premises
+    \forall i \in \oxset{1 \oxdots n}. \;
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{
+      \oxextendctx{\oxkontctx}{
+        \oxkontctxentry{\oxsitype_1} \oxdotsc \oxkontctxentry{\oxsitype_{i-1}}
+      }
+    }{\oxvarctx_{i-1}}{
+      \oxexpr_i
+    }{\oxsitype_i}{\oxvarctx_i} \\
+  }{
+    %% conclusions
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxvarctx_0}{
+      \oxprod{\oxexpr_1 \oxdotsc \oxexpr_n}
+    }{\oxtprod{\oxsitype_1 \oxdotsc \oxsitype_n}}{
+      \oxvarctx_n
+    }
+  }
+}
+
+\newcommand{\TArray}{
+  \inferrule[T-Array]{
+    %% premises
+    \forall i \in \oxset{1 \oxdots n}. \;
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{
+      \oxextendctx{\oxkontctx}{
+        \oxkontctxentry{\oxsitype_1} \oxdotsc \oxkontctxentry{\oxsitype_{i-1}}
+      }
+    }{\oxvarctx_{i-1}}{
+      \oxexpr_i
+    }{\oxsitype_i}{\oxvarctx_i} \\
+  }{
+    %% conclusions
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxvarctx}{
+      \oxarr{\oxexpr_1 \oxdotsc \oxexpr_n}
+    }{\oxtarr{\oxsitype}{n}}{\oxvarctx_n}
+  }
+}
+
+\newcommand{\TSlice}{
+  \inferrule[T-Slice]{
+    %% premises
+    \forall i \in \oxset{1 \oxdots n}. \;
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{
+      \oxextendctx{\oxkontctx}{
+        \oxkontctxentry{\oxsitype_1} \oxdotsc \oxkontctxentry{\oxsitype_{i-1}}
+      }
+    }{\oxvarctx_{i-1}}{
+      \oxexpr_i
+    }{\oxsitype_i}{\oxvarctx_i} \\
+  }{
+    %% conclusions
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxvarctx}{
+      \oxsliceval{\oxexpr_1 \oxdotsc \oxexpr_n}
+    }{\oxtslice{\oxsitype}}{\oxvarctx_n}
+  }
+}
+
+\newcommand{\TAbort}{
+  \inferrule[T-Abort]{
+    %% premises
+  }{
+    %% conclusions
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxvarctx}{
+      \oxabort{\oxstring}
+    }{\oxsxtype}{\oxvarctx}
+  }
+}
+
+\newcommand{\TPointer}{
+  \inferrule[T-Pointer]{
+    %% premises
+    \oxreferentvalidity{\oxglobalctx}{\oxvarctx}{\oxreferentctx[\oxplace]}{\oxxitype} \\
+    \oxloanpkg{\oxmuta}{\oxplace} \in \oxvarctx(\oxcprov) \\
+  }{
+    %% conclusions
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxvarctx}{
+      \oxptr{\oxreferentctx[\oxplace]}
+    }{
+      \oxtref{\oxcprov}{\oxmuta}{\oxxitype}
+    }{\oxvarctx}
+  }
+}
+
+\newcommand{\TClosureVal}{
+  \inferrule[T-ClosureValue]{
+    %% premises
+    \oxfvars{\oxexpr} \setminus \overline{\oxid} = \overline{\oxid_f} =
+    \oxdomain{\oxframe_c}|_{\textsc{var}} \\\\
+    \overline{\oxcprov} = \overline{\oxfprovs{\oxvarctx(\oxid_f)}} \oxcomma
+    (\oxfprovs{\oxexpr} \setminus (\overline{\oxfprovs{\oxsitype}}, \oxfprovs{\oxsitype_r}))
+    = \oxdomain{\oxframe_c}|_{\textsc{rgn}} \\\\
+    \oxsubstorevalidity{\oxglobalctx}{\oxvarctx}{\oxstackframe_c}{\oxframe_c}
+    \\
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{
+      \oxnewframe{\oxvarctx}{
+        \oxframe_c \oxcomma
+        \oxvarctxentry{\oxid_1}{\oxsitype_1} \oxdotsc
+        \oxvarctxentry{\oxid_n}{\oxsitype_n}
+      }
+    }{\oxexpr}{\oxsitype_r}{\oxnewframe{\oxvarctx^\prime}{\oxframe}}
+  }{
+    %% conclusions
+    \begin{array}{rr}
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxvarctx}{
+      \oxclosureval{\oxstackframe_c}{
+        \oxascribe{\oxid_1}{\oxsitype_1} \oxdotsc
+        \oxascribe{\oxid_n}{\oxsitype_n}
+      }{\oxsitype_r}{\oxexpr}
+      }{
+      \oxtclosure{
+        \oxsitype_1 \oxdotsc \oxsitype_n
+      }{\oxsitype_r}{\oxframe_c}
+      }{\oxvarctx}
+    \end{array}
+  }
+}
+
+\newcommand{\TFramed}{
+  \inferrule[T-Framed]{
+    %% premises
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxvarctx}{
+      \oxexpr
+    }{\oxsitype}{
+      \oxnewframe{\oxvarctx^\prime}{
+        \oxframe^\prime
+      }
+    } 
+  }{
+    %% conclusions
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxvarctx}{
+      \oxframed{\oxexpr}
+    }{\oxsitype}{
+      \oxvarctx^\prime
+    }
+  }
+}
+
+\newcommand{\TShift}{
+  \inferrule[T-Shift]{
+    %% premises
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxvarctx}{
+      \oxexpr
+    }{\oxsitype}{
+      \oxextendctx{\oxvarctx^\prime}{
+        \oxvarctxentry{\oxid}{\oxsdtype}
+      }
+    } 
+  }{
+    %% conclusions
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxvarctx}{
+      \oxshift{\oxexpr}
+    }{\oxsitype}{\oxvarctx^\prime}
+  }
+}
+
+\newcommand{\TShiftProv}{
+  \inferrule[T-ShiftProv]{
+    %% premises
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxvarctx}{
+      \oxexpr
+    }{\oxsitype}{
+      \oxextendctx{\oxvarctx^\prime}{
+        \oxloanctxentry{\oxcprov}{\oxset{\overline{\oxloan}}}
+      }
+    } 
+  }{
+    %% conclusions
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxvarctx}{
+      \oxshiftprov{\oxexpr}
+    }{\oxsitype}{\oxvarctx^\prime}
+  }
+}
+
+\newcommand{\TUninit}{
+  \inferrule[T-Dead]{
+    %% premises
+  }{
+    %% conclusions
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxvarctx}{
+      \oxvalue
+    }{\oxsidtype}{\oxvarctx}
+  }
+}
+
+\newcommand{\TInl}{
+  \inferrule[T-Left]{
+    %% premises
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxvarctx}{\oxexpr}
+    {\oxsitype_1}{\oxvarctx^\prime} \\
+  }{
+    %% conclusions
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxvarctx}{
+      \oxinl{\oxsitype_1}{\oxsitype_2}{\oxexpr}
+    }{\oxtsum{\oxsitype_1}{\oxsitype_2}}{\oxvarctx^\prime}
+  }
+}
+
+\newcommand{\TInr}{
+  \inferrule[T-Right]{
+    %% premises
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxvarctx}{\oxexpr}
+    {\oxsitype_2}{\oxvarctx^\prime} \\
+  }{
+    %% conclusions
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxvarctx}{
+      \oxinr{\oxsitype_1}{\oxsitype_2}{\oxexpr}
+    }{\oxtsum{\oxsitype_1}{\oxsitype_2}}{\oxvarctx^\prime}
+  }
+}
+
+\newcommand{\TMatch}{
+  \inferrule[T-Match]{
+    %% premises
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxvarctx}{
+      \oxexpr
+    }{\oxtsum{\oxsitype_l}{\oxsitype_r}}{\oxvarctx^\prime} \\
+    \forall \oxcprov \in \oxfprovs{\oxtsum{\oxsitype_l}{\oxsitype_r}}. \;
+    \oxnotreborrowed{\oxvarctx^\prime}{\oxcprov} \\\\
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{
+      \oxextendctx{\oxvarctx^\prime}{
+        \oxvarctxentry{\oxid_1}{\oxsitype_l}
+      }
+    }{
+      \oxexpr_1
+    }{\oxsitype_1}{
+      \oxextendctx{\oxvarctx_1}{
+        \oxvarctxentry{\oxid_1}{\oxsdtype_l}
+      }
+    } \\\\
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{
+      \oxextendctx{\oxvarctx^\prime}{
+        \oxvarctxentry{\oxid_2}{\oxsitype_r}
+      }
+    }{
+      \oxexpr_2
+    }{\oxsitype_2}{
+      \oxextendctx{\oxvarctx_2}{
+        \oxvarctxentry{\oxid_2}{\oxsdtype_r}
+      }
+    } \\
+    \oxsitype = \oxsitype_1 \vee \oxsitype = \oxsitype_2 \\\\
+    \oxtunify[\oxcombine]{\oxtvarctx}{\oxkontctx}{\oxvarctx_1}
+    {\oxsitype_1}{\oxsitype}{\oxvarctx_1^\prime} \\
+    \oxtunify[\oxcombine]{\oxtvarctx}{\oxkontctx}{\oxvarctx_2}
+    {\oxsitype_2}{\oxsitype}{\oxvarctx_2^\prime} \\
+    \oxvarctx_1^\prime \oxintersect \oxvarctx_2^\prime = \oxvarctx^\prime \\
+  }{
+    %% conclusions
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxvarctx}{
+      \oxmatch{\oxexpr}{\oxid_1}{\oxexpr_1}{\oxid_2}{\oxexpr_2}
+    }{\oxsitype}{\oxvarctx^\prime}
+  }
+}
+
+\newcommand{\TTupleStruct}{
+  \inferrule[T-TupleStruct]{
+    %% premises
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxvarctx}{
+      \oxexpr_1
+    }{\oxsitype_1}{\oxvarctx_1} \\
+    \oxdots \\
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxvarctx_{n-1}}{
+      \oxexpr_n
+    }{\oxsitype_n}{\oxvarctx_n} \\\\
+    \oxstructtyvalidity{\oxglobalctx}{
+      \oxtupstruct{
+        \oxturbofish{\oxdatatype}{\overline{\oxprov} \oxcomma \overline{\oxsitype}}
+      }{\oxsitype_1 \oxdotsc \oxsitype_n}
+    } \\
+  }{
+    %% conclusions
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxvarctx}{
+      \oxtupstruct{
+        \oxturbofish{\oxdatatype}{\overline{\oxprov} \oxcomma \overline{\oxsitype}}
+      }{\oxexpr_1 \oxdotsc \oxexpr_n}
+    }{
+      \oxturbofish{\oxdatatype}{\overline{\oxprov} \oxcomma \overline{\oxsitype}}
+    }{\oxvarctx_n}
+  }
+}
+
+\newcommand{\TRecordStruct}{
+  \inferrule[T-RecordStruct]{
+    %% premises
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxvarctx}{
+      \oxexpr_1
+    }{\oxsitype_1}{\oxvarctx_1} \\
+    \oxdots \\
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxvarctx_{n-1}}{
+      \oxexpr_n
+    }{\oxsitype_n}{\oxvarctx_n} \\\\
+    \oxstructtyvalidity{\oxglobalctx}{
+      \oxrecstruct{
+        \oxturbofish{\oxdatatype}{\overline{\oxprov} \oxcomma \overline{\oxsitype}}
+      }{\oxid_1 \oxcolon \oxsitype_1 \oxdotsc \oxid_n \oxcolon \oxsitype_n}
+    } \\
+  }{
+    %% conclusions
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxvarctx}{
+      \oxrecstruct{
+        \oxturbofish{\oxdatatype}{\overline{\oxprov} \oxcomma \overline{\oxsitype}}
+      }{\oxid_1 \oxcolon \oxexpr_1 \oxdotsc \oxid_n \oxcolon \oxexpr_n}
+    }{
+      \oxturbofish{\oxdatatype}{\overline{\oxprov} \oxcomma \overline{\oxsitype}}
+    }{\oxvarctx_n}
+  }
+}
+
+\newcommand{\TTupleVariant}{
+  \inferrule[T-TupleVariant]{
+    %% premises
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxvarctx}{
+      \oxexpr_1
+    }{\oxsitype_1}{\oxvarctx_1} \\
+    \oxdots \\
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxvarctx_{n-1}}{
+      \oxexpr_n
+    }{\oxsitype_n}{\oxvarctx_n} \\\\
+    \oxstructtyvalidity{\oxglobalctx}{
+      \oxtupvariant{
+        \oxturbofish{\oxdatatype}{\overline{\oxprov} \oxcomma \overline{\oxsitype}}
+      }{\oxvariant}{\oxsitype_1 \oxdotsc \oxsitype_n}
+    } \\
+  }{
+    %% conclusions
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxvarctx}{
+      \oxtupvariant{
+        \oxturbofish{\oxdatatype}{\overline{\oxprov} \oxcomma \overline{\oxsitype}}
+      }{\oxvariant}{\oxexpr_1 \oxdotsc \oxexpr_n}
+    }{
+      \oxturbofish{\oxdatatype}{\overline{\oxprov} \oxcomma \overline{\oxsitype}}
+    }{\oxvarctx_n}
+  }
+}
+
+\newcommand{\TRecordVariant}{
+  \inferrule[T-RecordVariant]{
+    %% premises
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxvarctx}{
+      \oxexpr_1
+    }{\oxsitype_1}{\oxvarctx_1} \\
+    \oxdots \\
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxvarctx_{n-1}}{
+      \oxexpr_n
+    }{\oxsitype_n}{\oxvarctx_n} \\\\
+    \oxstructtyvalidity{\oxglobalctx}{
+      \oxrecvariant{
+        \oxturbofish{\oxdatatype}{\overline{\oxprov} \oxcomma \overline{\oxsitype}}
+      }{\oxvariant}{\oxid_1 \oxcolon \oxsitype_1 \oxdotsc \oxid_n \oxcolon \oxsitype_n}
+    } \\
+  }{
+    %% conclusions
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxvarctx}{
+      \oxrecvariant{
+        \oxturbofish{\oxdatatype}{\overline{\oxprov} \oxcomma \overline{\oxsitype}}
+      }{\oxvariant}{\oxid_1 \oxcolon \oxexpr_1 \oxdotsc \oxid_n \oxcolon \oxexpr_n}
+    }{
+      \oxturbofish{\oxdatatype}{\overline{\oxprov} \oxcomma \overline{\oxsitype}}
+    }{\oxvarctx_n}
+  }
+}

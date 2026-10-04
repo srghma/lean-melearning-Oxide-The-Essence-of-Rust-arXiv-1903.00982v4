@@ -1,0 +1,26 @@
+\begin{lstlisting}
+  $\texttt{places-typ}_{\,\oxglobalctx}$ $\oxplace$ $\oxbasetype$ = $
+  \oxvarctxentry{\oxplace}{\oxbasetype}$
+  $\texttt{places-typ}_{\,\oxglobalctx}$ $\oxplace$ $\oxtvar$ = $
+  \oxvarctxentry{\oxplace}{\oxtvar}$
+  $\texttt{places-typ}_{\,\oxglobalctx}$ $\oxplace$ ($\oxtref{\oxprov}{\oxmuta}{
+    \oxtype
+  }$) = $\oxvarctxentry{\oxplace}{\oxtref{\oxprov}{\oxmuta}{\oxtype}}$
+  $\texttt{places-typ}_{\,\oxglobalctx}$ $\oxplace$ ($\oxtfun{
+    \overline{\oxprov} \oxcomma \overline{\oxtvar}
+  }{\overline{\oxtype_a}}{\oxtype_r}{\oxvarctx}$) = $
+  \oxvarctxentry{\oxplace}{
+    \oxtfun{
+      \overline{\oxprov} \oxcomma \overline{\oxtvar}
+    }{\overline{\oxtype_a}}{\oxtype_r}{\oxvarctx}
+  }$
+  $\texttt{places-typ}_{\,\oxglobalctx}$ $\oxplace$ $\oxtarr{\oxtype}{\oxnum}$ = $
+  \oxvarctxentry{\oxplace}{\oxtarr{\oxtype}{\oxnum}}
+  $
+  $\texttt{places-typ}_{\,\oxglobalctx}$ $\oxplace$ $\oxtprod{\oxtype_0 \oxdotsc
+    \oxtype_n}$ =
+      $\oxvarctxentry{\oxplace}{\oxtprod{\oxtype_0 \oxdotsc \oxtype_n}} \oxcomma$ ($
+  \texttt{places-typ}_{\,\oxglobalctx}$ $\oxproj{\oxplace}{0}$ $\oxtype_0$)$
+  \oxcomma$ $\oxdots\oxcomma$ ($
+  \texttt{places-typ}_{\,\oxglobalctx}$ $\oxproj{\oxplace}{n}$ $\oxtype_n$)
+\end{lstlisting}

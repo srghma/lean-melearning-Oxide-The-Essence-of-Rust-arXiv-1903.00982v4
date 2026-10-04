@@ -1,0 +1,75 @@
+\newcommand{\TVecNew}{
+  \inferrule[T-VecNew]{
+    %% premises
+  }{
+    %% conclusions
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxvarctx}{
+      \oxvecnew{\oxtype}
+    }{\oxtvec{\oxtype}}{\oxvarctx}
+  }
+}
+
+\newcommand{\TVecPush}{
+  \inferrule[T-VecPush]{
+    %% premises
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxvarctx}{
+      \oxexpr_1
+    }{\oxtref{\oxprov}{\oxmut}{\oxtvec{\oxtype}}}{\oxvarctx_1} \\
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxvarctx_1}{
+      \oxnoseqexpr_2
+    }{\oxtype}{\oxvarctx_2} \\
+  }{
+    %% conclusions
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxvarctx}{
+      \oxvecpush{\oxexpr_1}{\oxnoseqexpr_2}
+    }{\oxtunit}{\oxvarctx_2}
+  }
+}
+
+\newcommand{\TVecPop}{
+  \inferrule[T-VecPop]{
+    %% premises
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxvarctx}{
+      \oxexpr
+    }{\oxtref{\oxprov}{\oxmut}{\oxtvec{\oxtype}}}{\oxvarctx^\prime} \\
+  }{
+    %% conclusions
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxvarctx}{
+      \oxvecpop{\oxexpr}
+    }{\oxtype}{\oxvarctx^\prime}
+  }
+}
+
+\newcommand{\TVecSwap}{
+  \inferrule[T-VecSwap]{
+    %% premises
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxvarctx}{
+      \oxexpr_1
+    }{\oxtref{\oxprov}{\oxmut}{\oxtvec{\oxtype}}}{\oxvarctx_1} \\
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxvarctx_1}{
+      \oxnoseqexpr_2
+    }{\oxtnum}{\oxloanctx_2}{\oxvarctx_2} \\
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxvarctx_2}{
+      \oxnoseqexpr_3
+    }{\oxtnum}{\oxvarctx_3} \\
+  }{
+    %% conclusions
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxvarctx}{
+      \oxvecswap{\oxexpr_1}{\oxnoseqexpr_2}{\oxnoseqexpr_3}
+    }{\oxtunit}{\oxvarctx_3}
+  }
+}
+
+\newcommand{\TVecLen}{
+  \inferrule[T-VecLen]{
+    %% premises
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxvarctx}{
+      \oxexpr
+    }{\oxtref{\oxprov}{\oximm}{\oxtvec{\oxtype}}}{\oxvarctx^\prime} \\
+  }{
+    %% conclusions
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxvarctx}{
+      \oxveclen{\oxexpr}
+    }{\oxtnum}{\oxvarctx^\prime}
+  }
+}

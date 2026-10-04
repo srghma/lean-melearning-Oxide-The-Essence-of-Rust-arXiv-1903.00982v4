@@ -1,0 +1,31 @@
+%%%%%%%%%%%%%
+%% Vectors %%
+%%%%%%%%%%%%%
+
+\newcommand{\oxvecnew}[1]{
+  \oxturbofish{\oxkey{Vec}}{#1} \oxsep \oxkey{new}()
+}
+
+\newcommand{\oxvecpush}[2]{
+  #1 . \oxkey{push} (#2)
+}
+
+\newcommand{\oxvecswap}[3]{
+  #1 . \oxkey{swap} (#2, #3)
+}
+
+\newcommand{\oxvecpop}[1]{
+  #1 . \oxkey{pop} ()
+}
+
+\newcommand{\oxveclen}[1]{
+  #1 . \oxkey{len} ()
+}
+
+%%%%%%%%%%%%
+%% Shapes %%
+%%%%%%%%%%%%
+
+\newcommand{\oxvecshape}[1]{
+  \oxkey{Vec}(#1)
+}

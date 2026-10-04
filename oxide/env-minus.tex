@@ -1,0 +1,19 @@
+\begin{lstlisting}
+  $\oxemptyctx \oxspace \oxenvminus\oxspace \oxid$ = $\oxemptyctx$
+  $(\oxnewframe{\oxvarctx}{\oxemptyctx}) \oxspace \oxenvminus \oxspace \oxid$ = $\oxnewframe{\oxvarctx \oxspace \oxenvminus\oxspace \oxid}{\oxemptyctx}$
+  $(\oxextendctx{\oxvarctx}{\oxvarctxentry{\oxid^\prime}{\oxtype}}) \oxspace \oxenvminus\oxspace \oxid$ = $
+  \begin{cases}
+    \oxvarctx \oxspace \oxenvminus\oxspace \oxid & \oxid = \oxid^\prime\\
+    \oxextendctx{(\oxvarctx \oxspace \oxenvminus\oxspace \oxid)}{\oxvarctxentry{\oxid^\prime}{\oxtype}} & \oxid \neq \oxid^\prime
+  \end{cases}$
+  $\oxextendctx{\oxvarctx}{\oxloanctxentry{\oxcprov}{\oxset{\overline{\oxloan}}}}) \oxspace \oxenvminus\oxspace \oxid$ = $
+  \begin{cases}
+    \oxextendctx{(\oxvarctx \oxspace \oxenvminus\oxspace \oxid)}{\oxloanctxentry{\oxcprov}{\oxset{\overline{\oxloan}}}} &
+    \oxforall \oxloan \in \oxset{\overline{\oxloan}}. \;
+    \oxrootof{\oxloan} \neq \oxid \wedge
+    (\oxcprov \not\in \oxvarctx(\oxid) \vee
+    \exists \oxtype \in \oxcodomain{\oxvarctx^\prime}. \; \oxcprov \in \oxtype)
+    \\
+    \oxvarctx \oxspace \oxenvminus\oxspace \oxid & \texttt{else}
+  \end{cases}$
+\end{lstlisting}

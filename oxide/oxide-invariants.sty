@@ -1,0 +1,1276 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Additional Judgments %%
+%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%fix stack subset well formed notation
+
+\newcommand{\oxtvarctxwellformed}[1]{
+  \ensuremath{\vdash #1}
+}
+
+\newcommand{\oxtvarctxwellformedform}{
+  \framebox{
+    $\oxtvarctxwellformed{\oxtvarctx}$
+  }
+}
+
+\newcommand{\oxvarctxwellformed}[3]{
+  \ensuremath{#1; \, #2 \vdash #3}
+}
+
+\newcommand{\oxvarctxwellformedform}{
+  \framebox{
+    $\oxvarctxwellformed{\oxglobalctx}{\oxtvarctx}{\oxvarctx}$
+  }
+}
+
+\newcommand{\oxkontctxwellformed}[4]{
+  \ensuremath{#1; \, #2; \, #3 \vdash #4}
+}
+
+\newcommand{\oxkontctxwellformedform}{
+  \framebox{
+    $\oxkontctxwellformed{\oxglobalctx}{\oxtvarctx}{\oxvarctx}{\oxkontctx}$
+  }
+}
+
+\newcommand{\oxstorevalidity}[3]{
+  \ensuremath{#1 \vdash #3 : #2}
+}
+
+\newcommand{\oxstorevalidityOLD}[4]{
+  \ensuremath{#1 \vdash #4 : #2 \oxenvsep #3}
+}
+
+\newcommand{\oxstorevalidityform}{
+  \framebox{
+    $\oxstorevalidity{\oxglobalctx}{\oxvarctx}{\oxstore}$
+  }
+}
+
+\newcommand{\oxsubstorevalidity}[4]{
+  \ensuremath{#1; \oxspace #2 \vdash #3 : #4}
+}
+
+\newcommand{\oxsubstorevalidityOLD}[5]{
+  \ensuremath{#1; \oxspace #2 \oxenvsep #3 \vdash #4 : #5}
+}
+
+\newcommand{\oxsubstorevalidityform}{
+  \framebox{
+    $\oxsubstorevalidity{\oxglobalctx}{\oxvarctx}{\oxstackframe}{\oxframe_c}$
+  }
+}
+
+\newcommand{\oxstructtyvalidity}[2]{
+  \ensuremath{#1 \vdash #2}
+}
+
+\newcommand{\oxstructtyvalidityform}{
+  \framebox{
+    $\oxstructtyvalidity{\oxglobalctx}{\oxdatatype\oxtype}$
+  }
+}
+
+\newcommand{\oxmusafety}[6]{
+  \ensuremath{#1; \oxspace #3; \oxspace #2 \vdash_{#4} #5 \Rightarrow #6}
+}
+
+\newcommand{\oxmusafetyOLDD}[5]{
+  \ensuremath{#1; \oxspace #2 \vdash_{#3} #4 \Rightarrow #5}
+}
+
+
+\newcommand{\oxmusafetyOLD}[7]{
+  \ensuremath{#1; \oxspace #2 \oxenvsep #3 \vdash_{#4} \oxvarctxentry{#5}{#6} \Rightarrow #7}
+}
+
+\newcommand{\oxmusafetyinner}[7]{
+  \ensuremath{#1; \oxspace #3; \oxspace #2 \vdash^{#5}_{#4} #6 \Rightarrow #7}
+}
+
+\newcommand{\oxmusafetyinnerOLDD}[6]{
+  \ensuremath{#1; \oxspace #2 \vdash^{#4}_{#3} #5 \Rightarrow #6}
+}
+
+\newcommand{\oxmusafetyshape}{
+  \ensuremath{
+    \oxmusafety{\oxtvarctx}{\oxkontctx}{\oxvarctx}{\oxmuta}{\oxplaceexpr}{
+      \oxset{\overline{\oxloanpkg{\oxmuta}{\oxplaceexpr^\prime}}}
+    }
+  }
+}
+
+\newcommand{\oxmusafetyinnershape}{
+  \ensuremath{
+    \oxmusafetyinner{\oxtvarctx}{\oxkontctx}{\oxvarctx}{\oxmuta}{
+      \overline{\oxplace}
+    }{\oxplaceexpr}{
+      \oxset{\overline{\oxloanpkg{\oxmuta}{\oxplaceexpr^\prime}}}
+    }
+  }
+}
+
+\newcommand{\oxmusafetyform}{
+  \framebox{\oxmusafetyinnershape}
+}
+
+\newcommand{\oxcomputety}[6]{
+  \ensuremath{
+    #1; \; #2 \vdash_{#3} #4 : #5, \; #6
+  }
+}
+
+\newcommand{\oxcomputetynoprov}[5]{
+  \ensuremath{
+    #1; \; #2 \vdash_{#3} #4 : #5
+  }
+}
+\newcommand{\oxcomputetyOLD}[7]{
+  \ensuremath{
+    #1; \; #2 \oxenvsep #3 \vdash_{#4} #5 : #6, \; #7
+  }
+}
+
+\newcommand{\oxcomputetyshape}{
+  \ensuremath{
+    \oxcomputety{\oxtvarctx}{\oxvarctx}{\oxmuta}{\oxplaceexpr}{\oxtype}
+    {\oxset{\overline{\oxprov}}}
+  }
+}
+
+\newcommand{\oxcomputetyform}{
+  \framebox{\oxcomputetyshape}
+}
+
+\newcommand{\oxcomputetynoprovform}{
+  \framebox{\oxcomputetynoprov{\oxtvarctx}{\oxvarctx}{\oxmuta}{\oxplaceexpr}{\oxtype}}
+}
+
+\newcommand{\oxtypesmutuallysafe}[3]{
+  \ensuremath{#1 \oxenvsep #2 \vdash #3}
+}
+
+\newcommand{\oxtypesmutuallysafeshape}{
+  \ensuremath{\oxtypesmutuallysafe{\oxloanctx}{\oxvarctx}{\oxtype_1 \oxdotsc \oxtype_n}}
+}
+
+\newcommand{\oxtypesmutuallysafeform}{
+  \framebox{\oxtypesmutuallysafeshape}
+}
+
+\newcommand{\oxtypevalidity}[4]{
+  \ensuremath{#1; \, #2; \, #3 \vdash #4}
+}
+
+\newcommand{\oxtypevalidityOLD}[5]{
+  \ensuremath{#1; \, #2; \, #3 \oxenvsep #4 \vdash #5}
+}
+
+\newcommand{\oxtypevalidityform}{
+  \framebox{\oxtypevalidity{\oxglobalctx}{\oxtvarctx}{\oxvarctx}{\oxtype}}
+}
+
+\newcommand{\oxrettypevalidity}[6]{
+  \ensuremath{#1; \, #2; \, #3 \oxenvsep #4 \vdash^{#5} #6}
+}
+
+\newcommand{\oxrettypevalidityform}{
+  \framebox{\oxrettypevalidity{\oxglobalctx}{\oxtvarctx}{\oxloanctx}{\oxvarctx}{
+      \overline{\oxid}
+    }{\oxtype}}
+}
+
+\newcommand{\oxreferentvalidity}[4]{
+  \ensuremath{#1; \, #2 \vdash #3 : #4}
+}
+
+\newcommand{\oxreferentvalidityform}{
+  \framebox{
+    \oxreferentvalidity{\oxglobalctx}{\oxvarctx}{\oxreferent}{\oxxitype}
+  }
+}
+
+\newcommand{\oxrgnvalidity}[3]{
+  \ensuremath{#1; \, #2 \vdash #3}
+}
+
+\newcommand{\oxrgnvalidityform}{
+  \framebox{\oxrgnvalidity{\oxtvarctx}{\oxvarctx}{\oxprov}}
+}
+
+\newcommand{\oxglobalctxvalidity}[1]{
+  \ensuremath{\vdash #1}
+}
+
+\newcommand{\oxglobalctxvalidityform}{
+  \framebox{\oxglobalctxvalidity{\oxglobalctx}}
+}
+
+\newcommand{\oxglobalentryvalidity}[2]{
+  \ensuremath{#1 \vdash #2}
+}
+
+\newcommand{\oxglobalentryvalidityform}{
+  \framebox{\oxglobalentryvalidity{\oxglobalctx}{\oxglobalentry}}
+}
+
+\newcommand{\oxenvwellformedOLD}[5]{
+  \ensuremath{#1; \; #2; \; #3 \oxenvsep #4 \vdash #5}
+}
+
+\newcommand{\oxenvwellformed}[4]{
+  \ensuremath{#1; \; #2; \; #3 \vdash #4}
+}
+
+\newcommand{\oxenvwellformedform}{
+  \framebox{\oxenvwellformed{\oxglobalctx}{\oxtvarctx}{\oxvarctx}{\oxenv}}
+}
+
+\newcommand{\oxctxswellformed}[4]{
+  \ensuremath{\vdash #1; \, #2; \, #3; \, #4}
+}
+
+\newcommand{\oxctxswellformedOLD}[4]{
+  \ensuremath{\vdash #1; \, #2; \, #3 \oxenvsep #4}
+}
+
+\newcommand{\oxctxswellformedform}{
+  \framebox{\oxctxswellformed{\oxglobalctx}{\oxtvarctx}{\oxvarctx}{\oxkontctx}}
+}
+
+\newcommand{\oxgoodaliasing}[3]{
+  \ensuremath{#1; \; #2 \vDash #3}
+}
+
+\newcommand{\oxgoodaliasingOLD}[4]{
+  \ensuremath{#1; \; #2 \oxenvsep #3 \vDash #4}
+}
+
+\newcommand{\oxgoodaliasingform}{
+  \framebox{\oxgoodaliasing{\oxglobalctx}{\oxvarctx}{\oxstore}}
+}
+
+\newcommand{\oxwellaliasedframe}[3]{
+  \ensuremath{#1; \; #2 \Vdash #3}
+}
+
+\newcommand{\oxwellaliasedframeform}{
+  \framebox{\oxwellaliasedframe{\oxglobalctx}{\oxvarctx}{\oxstore}}
+}
+
+\newcommand{\oxwfkontctx}[4]{
+  \ensuremath{#1; \; #2 \vdash #3 : #4}
+}
+
+\newcommand{\oxwfkontctxform}{
+  \framebox{\oxwfkontctx{\oxglobalctx}{\oxvarctx}{\overline{\oxvalue}}{\oxkontctx}}
+}
+
+\newcommand{\oxnotreborrowed}[2]{
+  \ensuremath{#1 \vdash #2 \ \oxkey{rnrb}}
+}
+
+\newcommand{\oxnotreborrowedform}{
+  \framebox{\oxnotreborrowed{\oxvarctx}{\oxcprov}}
+}
+
+\newcommand{\oxnotinclosure}[3]{
+  \ensuremath{#2; \; #1 \vdash #3 \ \oxkey{rnic}}
+}
+
+\newcommand{\oxnotinclosureform}{
+  \framebox{\oxnotinclosure{\oxkontctx}{\oxvarctx}{\oxcprov}}
+}
+
+\newcommand{\oxclosrestriction}[3]{
+  \ensuremath{#2; \; #1 \vdash \oxset{#3} \ \oxkey{clrs}}
+}
+
+\newcommand{\oxclosrestrictionform}{
+  \framebox{\oxclosrestriction{\oxkontctx}{\oxvarctx}{\overline{\oxcprov}}}
+}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Environment Expression Well-Formed %%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+
+\newcommand{\WFEnvVar}{
+  \inferrule[WF-EnvVar]{
+    %% premises
+    \oxlookup{\oxtvarctx}{\oxenvvar}{\oxkenv}
+  }{
+    %% conclusions
+    \oxenvwellformed{\oxglobalctx}{\oxtvarctx}{\oxvarctx}{
+      \oxenvvar
+    }
+  }
+}
+
+\newcommand{\WFEnv}{
+  \inferrule[WF-Env]{
+    %% premises
+    \oxvarctxwellformed{\oxglobalctx}{\oxtvarctx}{
+      \oxnewframe{\oxvarctx}{\oxframe_c}
+    } 
+  }{
+    %% conclusions
+    \oxenvwellformed{\oxglobalctx}{\oxtvarctx}{\oxvarctx}{
+      \oxframe_c
+    }
+  }
+}
+
+%%%%%%%%%%%%%%%%%%%%%%%%
+%% Aliasing Invariant %%
+%%%%%%%%%%%%%%%%%%%%%%%%
+
+\newcommand{\DefAliasing}{
+  \input{oxide/aliasing-inv.tex}
+}
+
+\newcommand{\ABase}{
+  \inferrule[A-Base]{
+    %% premises 
+  }{
+    %% conclusions
+    \oxgoodaliasing{\oxglobalctx}{\oxemptyctx}{\oxstore}
+  }
+}
+
+\newcommand{\AExtend}{
+  \inferrule[A-Extend]{
+    %% premises
+    \oxgoodaliasing{\oxglobalctx}{\oxvarctx}{\oxstore}\\
+    \oxwellaliasedframe{\oxglobalctx}{\oxnewframe{\oxvarctx}{\oxframe}}{\oxnewframe{\oxstore}{\oxstackframe}}
+  }{
+    %% conclusions
+    \oxgoodaliasing{\oxglobalctx}{\oxnewframe{\oxvarctx}{\oxframe}}{\oxnewframe{\oxstore}{\oxstackframe}}
+  }
+}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Contexts Well Formed %%
+%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\newcommand{\WFCtx}{
+  \inferrule[WF-Environments]{
+    %% premises
+    \oxglobalctxvalidity{\oxglobalctx} \\
+    \oxtvarctxwellformed{\oxtvarctx} \\
+    \oxvarctxwellformed{\oxglobalctx}{\oxtvarctx}{\oxvarctx} \\
+    \oxkontctxwellformed{\oxglobalctx}{\oxtvarctx}{\oxvarctx}{\oxkontctx} \\
+  }{
+    %% conclusions
+    \oxctxswellformed{\oxglobalctx}{\oxtvarctx}{\oxvarctx}{\oxkontctx}
+  }
+}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Global Context Validity %%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+
+\newcommand{\WFGlobalCtx}{
+  \inferrule[WF-GlobalEnv]{
+    %% premises
+    \forall \oxglobalentry \in \oxglobalctx. \;
+    \oxglobalentryvalidity{\oxglobalctx}{\oxglobalentry}
+  }{
+    %% conclusions
+    \oxglobalctxvalidity{\oxglobalctx}
+  }
+}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+%% Global Entry Validity %%
+%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+
+\newcommand{\WFFunctionDefn}{
+  \inferrule[WF-FunctionDefinition]{
+    %% premises
+    \oxtvarctx =
+    \overline{\oxtvarctxentry{\oxenvvar}{\oxkenv}} \oxcomma
+    \overline{\oxtvarctxentry{\oxabsprov}{\oxkprov}} \oxcomma
+    \overline{\oxabsprov_1 \oxoutlives \oxabsprov_2} \oxcomma
+    \overline{\oxtvarctxentry{\oxtvar}{\oxktype}} \\
+    \oxset{\overline{\oxabsprov_1}} \subseteq \oxset{\overline{\oxabsprov}} \\
+    \oxset{\overline{\oxabsprov_2}} \subseteq \oxset{\overline{\oxabsprov}} \\\\
+    \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxemptyctx}{
+      \oxnewframe{\oxemptyctx}
+      {\oxvarctxentry{\oxid_1}{\oxsitype_1} \oxdotsc
+        \oxvarctxentry{\oxid_n}{\oxsitype_n}}
+    }{
+      \oxexpr
+    }{\oxsitype_f}{\oxvarctx^\prime} \\
+    \oxtunify{\oxtvarctx}{\oxkontctx}{\oxemptyctx}{\oxsitype_f}{\oxsitype_r}{\oxemptyctx} \\
+  }{
+    %% conclusions
+    \oxglobalentryvalidity{\oxglobalctx}{
+      \oxfuncdef{\oxfnname}{
+        \overline{\oxenvvar} \oxcomma \overline{\oxabsprov} \oxcomma \overline{\oxtvar}
+      }{
+        \oxascribe{\oxid_1}{\oxsitype_1} \oxdotsc
+        \oxascribe{\oxid_n}{\oxsitype_n}
+      }{\oxsitype_r}{\overline{\oxabsprov_1 : \oxabsprov_2}}{\oxexpr}
+    }
+  }
+}
+
+\newcommand{\WFTupStructDefn}{
+  \inferrule[WF-TupleStructDefinition]{
+    %% premise
+    \oxtvarctx = \overline{\oxtvarctxentry{\oxabsprov}{\oxkprov}} \oxcomma
+    \overline{\oxtvarctxentry{\oxtvar}{\oxktype}} \\
+    \oxtypevalidity{\oxglobalctx}{\oxtvarctx}{\oxemptyctx}{\oxsitype_1} \\
+    \oxdots \\
+    \oxtypevalidity{\oxglobalctx}{\oxtvarctx}{\oxemptyctx}{\oxsitype_n} \\
+  }{
+    %% conclusions
+    \oxglobalentryvalidity{\oxglobalctx}{
+      \oxtupstructdef{\oxdatatype}{
+        \overline{\oxabsprov} \oxcomma \overline{\oxtvar}
+      }{\oxsitype_1 \oxdotsc \oxsitype_n}
+    }
+  }
+}
+
+\newcommand{\WFRecStructDefn}{
+  \inferrule[WF-RecordStructDefinition]{
+    %% premise
+    \oxtvarctx = \overline{\oxtvarctxentry{\oxabsprov}{\oxkprov}} \oxcomma
+    \overline{\oxtvarctxentry{\oxtvar}{\oxktype}} \\
+    \oxtypevalidity{\oxglobalctx}{\oxtvarctx}{\oxemptyctx}{\oxsi_1} \\
+    \oxdots \\
+    \oxtypevalidity{\oxglobalctx}{\oxtvarctx}{\oxemptyctx}{\oxsi_n} \\
+  }{
+    %% conclusions
+    \oxglobalentryvalidity{\oxglobalctx}{
+      \oxrecstructdef{\oxdatatype}{
+        \overline{\oxabsprov} \oxcomma \overline{\oxtvar}
+      }{
+        \oxascribe{\oxid_1}{\oxsi_1} \oxdotsc
+        \oxascribe{\oxid_n}{\oxsi_n}
+      }
+    }
+  }
+}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Provenance Validity %%
+%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\newcommand{\VLocalProv}{
+  \inferrule[WF-ConcreteRegion]{
+    %% premises
+    \oxcprov \in \oxdomain{\oxvarctx} \\
+  }{
+    %% conclusions
+    \oxrgnvalidity{\oxtvarctx}{\oxvarctx}{
+      \oxcprov
+    }
+  }
+}
+
+\newcommand{\VAbsProv}{
+  \inferrule[WF-AbstractRegion]{
+    %% premises
+    \oxlookup{\oxtvarctx}{\oxabsprov}{\oxkprov} \\
+  }{
+    %% conclusions
+    \oxrgnvalidity{\oxtvarctx}{\oxvarctx}{
+      \oxabsprov
+    }
+  }
+}
+
+%%%%%%%%%%%%%%%%%%%%
+%% Store Validity %%
+%%%%%%%%%%%%%%%%%%%%
+
+\newcommand{\VStackEmpty}{
+  \inferrule[WF-StackEmpty]{
+    %% premises
+  }{
+    %% conclusions
+    \oxstorevalidity{\oxglobalctx}{\oxemptyctx}{\oxemptyctx}
+  }
+}
+
+\newcommand{\VStack}{
+  \inferrule[WF-StackFrame]{
+    %% premises
+    \oxstorevalidity{\oxglobalctx}{\oxvarctx}{\oxstore}\\
+    \oxdomain{\oxstackframe} = \oxdomain{\oxframe}|_\oxid \\\\
+    \forall \oxid \in
+    \oxdomain{\oxstackframe}. \;
+    \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxemptyctx}{\oxnewframe{\oxvarctx}{\oxframe}}{
+      (\oxnewframe{\oxstore}{\oxstackframe})(\oxid)
+    }{(\oxnewframe{\oxvarctx}{\oxframe})(\oxid)}{\oxnewframe{\oxvarctx}{\oxframe}}
+  }{
+    %% conclusions
+    \oxstorevalidity{\oxglobalctx}{\oxnewframe{\oxvarctx}{\oxframe}}{\oxnewframe{\oxstore}{\oxstackframe}}
+  }
+}
+
+
+\newcommand{\VSubStack}{
+  \inferrule[WF-Frame]{
+    %% premises
+    \oxdomain{\oxstackframe} = \oxdomain{\oxframe_c}|_\oxid \\
+    \forall \oxid \in
+    \oxdomain{\oxstackframe}. \; \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxemptyctx}{
+      \oxnewframe{\oxvarctx}{\oxframe_c}
+    }{\oxstackframe(\oxid)}{\oxframe_c(\oxid)}{\oxnewframe{\oxvarctx}{\oxframe_c}}
+  }{
+    %% conclusions
+    \oxsubstorevalidity{\oxglobalctx}{\oxvarctx}{\oxstackframe}
+    {\oxframe_c}
+  }
+}
+
+%%%%%%%%%%%%%%%%%%%%%%%
+%% Referent Validity %%
+%%%%%%%%%%%%%%%%%%%%%%% 
+
+\newcommand{\WFRefId}{
+  \inferrule[WF-RefId]{
+    %% premises
+    \oxlookup{\oxvarctx}{\oxid}{\oxsitype}
+  }{
+    %% conclusions
+    \oxreferentvalidity{\oxglobalctx}{\oxvarctx}{\oxid}{\oxsitype}
+  }
+}
+
+\newcommand{\WFRefProj}{
+  \inferrule[WF-RefProjection]{
+    %% premises
+    \oxreferentvalidity{\oxglobalctx}{\oxvarctx}{\oxreferent}{
+      \oxtprod{\oxsitype_0 \oxdotsc \oxsitype_i \oxdotsc \oxsitype_n}
+    }
+  }{
+    %% conclusions
+    \oxreferentvalidity{\oxglobalctx}{\oxvarctx}{
+      \oxproj{\oxreferent}{i}
+    }{\oxsitype_i}
+  }
+}
+
+\newcommand{\WFRefIndexArray}{
+  \inferrule[WF-RefIndexArray]{
+    %% premises
+    \oxreferentvalidity{\oxglobalctx}{\oxvarctx}{\oxreferent}{
+      \oxtarr{\oxsitype}{\oxnum}
+    } \\
+    0 \leq i < \oxnum \\
+  }{
+    %% conclusions
+    \oxreferentvalidity{\oxglobalctx}{\oxvarctx}{
+      \oxindex{\oxreferent}{i}
+    }{\oxsitype}
+  }
+}
+
+\newcommand{\WFRefIndexSlice}{
+  \inferrule[WF-RefIndexSlice]{
+    %% premises
+    \oxreferentvalidity{\oxglobalctx}{\oxvarctx}{\oxreferent}{
+      \oxtslice{\oxsitype}
+    } \\
+  }{
+    %% conclusions
+    \oxreferentvalidity{\oxglobalctx}{\oxvarctx}{
+      \oxindex{\oxreferent}{i}
+    }{\oxsitype}
+  }
+}
+
+\newcommand{\WFRefSliceArray}{
+  \inferrule[WF-RefSliceArray]{
+    %% premises
+    \oxreferentvalidity{\oxglobalctx}{\oxvarctx}{\oxreferent}{
+      \oxtarr{\oxsitype}{\oxnum}
+    } \\
+    0 \leq i \leq j < \oxnum \\
+  }{
+    %% conclusions
+    \oxreferentvalidity{\oxglobalctx}{\oxvarctx}{
+      \oxslice{\oxreferent}{i}{j}
+    }{\oxtslice{\oxsitype}}
+  }
+}
+
+\newcommand{\WFRefSliceSlice}{
+  \inferrule[WF-RefSliceSlice]{
+    %% premises
+    \oxreferentvalidity{\oxglobalctx}{\oxvarctx}{\oxreferent}{
+      \oxtslice{\oxsitype}
+    } \\
+    i \leq j \\
+  }{
+    %% conclusions
+    \oxreferentvalidity{\oxglobalctx}{\oxvarctx}{
+      \oxslice{\oxreferent}{i}{j}
+    }{\oxtslice{\oxsitype}}
+  }
+}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Struct Type Validity %%
+%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\newcommand{\WFTupleStruct}{
+  \inferrule[WF-TupleStruct]{
+    %% premises
+    |\overline{\oxabsprov}| = |\overline{\oxprov^\prime}| \\
+    |\overline{\oxtvar}| = |\overline{\oxsitype}| \\
+    \oxsubst{\oxsubst{\oxsitype_1}{\overline{\oxprov^\prime}}{\overline{\oxabsprov}}}
+    {\overline{\oxsitype}}{\overline{\oxtvar}} = \oxtype_1 \\
+    \oxdots  \\
+    \oxsubst{\oxsubst{\oxsitype_n}{\overline{\oxprov^\prime}}{\overline{\oxabsprov}}}
+    {\overline{\oxsitype}}{\overline{\oxtvar}} = \oxtype_n \\
+  }{
+    %% conclusions
+    \oxstructtyvalidity{
+      \oxextendctx{\oxglobalctx}{
+        \oxtupstructdef{\oxdatatype}{
+          \overline{\oxabsprov} \oxcomma \overline{\oxtvar}
+        }{\oxsitype_1 \oxdotsc \oxsitype_n}
+      }
+    }{
+      \oxtupstruct{
+        \oxdatatype \oxsep \oxangle{
+          \overline{\oxprov^\prime} \oxcomma \overline{\oxsitype}
+        }
+      }{\oxtype_1 \oxdotsc \oxtype_n}
+    }
+  }
+}
+
+\newcommand{\WFRecordStruct}{
+  \inferrule[WF-RecordStruct]{
+    %% premises
+    |\overline{\oxabsprov}| = |\overline{\oxprov^\prime}| \\
+    |\overline{\oxtvar}| = |\overline{\oxsitype}| \\
+    \oxsubst{\oxsubst{\oxsitype_1}{\overline{\oxprov^\prime}}{\overline{\oxabsprov}}}
+    {\overline{\oxsitype}}{\overline{\oxtvar}} = \oxtype_1 \\
+    \oxdots  \\
+    \oxsubst{\oxsubst{\oxsitype_n}{\overline{\oxprov^\prime}}{\overline{\oxabsprov}}}
+    {\overline{\oxsitype}}{\overline{\oxtvar}} = \oxtype_n \\
+  }{
+    %% conclusions
+    \oxstructtyvalidity{
+      \oxextendctx{\oxglobalctx}{
+        \oxrecstructdef{\oxdatatype}{
+          \overline{\oxabsprov} \oxcomma \overline{\oxtvar}
+        }{\oxsitype_1 \oxdotsc \oxsitype_n}
+      }
+    }{
+      \oxrecstruct{
+        \oxdatatype \oxsep \oxangle{
+          \overline{\oxprov^\prime} \oxcomma \overline{\oxsitype}
+        }
+      }{\oxid_1 \oxcolon \oxtype_1 \oxdotsc \oxid_n \oxcolon \oxtype_n}
+    }
+  }
+}
+
+\newcommand{\WFTupleVariant}{
+  \inferrule[WF-TupleVariant]{
+    %% premises
+    |\overline{\oxabsprov}| = |\overline{\oxprov^\prime}| \\
+    |\overline{\oxtvar}| = |\overline{\oxsitype}| \\
+    \oxsubst{\oxsubst{\oxsitype_1}{\overline{\oxprov^\prime}}{\overline{\oxabsprov}}}
+    {\overline{\oxsitype}}{\overline{\oxtvar}} = \oxtype_1 \\
+    \oxdots  \\
+    \oxsubst{\oxsubst{\oxsitype_n}{\overline{\oxprov^\prime}}{\overline{\oxabsprov}}}
+    {\overline{\oxsitype}}{\overline{\oxtvar}} = \oxtype_n \\
+  }{
+    %% conclusions
+    \oxstructtyvalidity{
+      \oxextendctx{\oxglobalctx}{
+        \oxenumdef{\oxdatatype}{
+          \overline{\oxabsprov} \oxcomma \overline{\oxtvar}
+        }{
+          \oxenumvar_1 \oxdotsc
+          \oxtupstruct{\oxvariant}{
+            \oxsitype_1 \oxdotsc \oxsitype_n
+          }
+          \oxdotsc \oxenumvar_n
+        }
+      }
+    }{
+      \oxtupvariant{
+        \oxdatatype \oxsep \oxangle{
+          \overline{\oxprov^\prime} \oxcomma \overline{\oxsitype}
+        }
+      }{\oxvariant}{\oxtype_1 \oxdotsc \oxtype_n}
+    }
+  }
+}
+
+\newcommand{\WFRecordVariant}{
+  \inferrule[WF-RecordVariant]{
+    %% premises
+    |\overline{\oxabsprov}| = |\overline{\oxprov^\prime}| \\
+    |\overline{\oxtvar}| = |\overline{\oxsitype}| \\
+    \oxsubst{\oxsubst{\oxsitype_1}{\overline{\oxprov^\prime}}{\overline{\oxabsprov}}}
+    {\overline{\oxsitype}}{\overline{\oxtvar}} = \oxtype_1 \\
+    \oxdots  \\
+    \oxsubst{\oxsubst{\oxsitype_n}{\overline{\oxprov^\prime}}{\overline{\oxabsprov}}}
+    {\overline{\oxsitype}}{\overline{\oxtvar}} = \oxtype_n \\
+  }{
+    %% conclusions
+    \oxstructtyvalidity{
+      \oxextendctx{\oxglobalctx}{
+        \oxenumdef{\oxdatatype}{
+          \overline{\oxabsprov} \oxcomma \overline{\oxtvar}
+        }{
+          \oxenumvar_1 \oxdotsc
+          \oxrecstruct{\oxvariant}{
+            \oxascribe{\oxid_1}{\oxsitype_1} \oxdotsc
+            \oxascribe{\oxid_n}{\oxsitype_n}
+          }
+          \oxdotsc \oxenumvar_n
+        }
+      }
+    }{
+      \oxrecvariant{
+        \oxdatatype \oxsep \oxangle{
+          \overline{\oxprov^\prime} \oxcomma \overline{\oxsitype}
+        }
+      }{\oxvariant}{\oxid_1 \oxcolon \oxtype_1 \oxdotsc \oxid_n \oxcolon \oxtype_n}
+    }
+  }
+}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Ownership Safety Judgment %%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\newcommand{\OSafePlace}{
+  \inferrule[O-SafePlace]{
+    %% premises
+    \forall \oxcprov^\prime \mapsto \oxset{\overline{\oxloan}} \in \oxloanmappings{\oxvarctx}{\oxkontctx}. \;
+    (\forall \oxloanpkg{\oxmuta^\prime}{\oxplaceexprctx[\oxplace^\prime]} \in \oxset{\overline{\oxloan}}.
+      (\oxmuta = \oxmut \vee \oxmuta^\prime = \oxmut)
+    \implies
+    \oxrelevant{\oxplace^\prime}{\oxplace}) \\
+    \vee \;
+    (\exists \oxvarctxentry{\oxplace^\prime}{\oxtref{\oxcprov^\prime}{\oxmuta^\prime}{\oxtype^\prime}} \in \oxexplode{\oxvarctx} \;
+      \wedge \not \exists \oxtref{\oxcprov^\prime}{\oxmuta^\prime}{\oxtype^\prime} \in \oxkontctx \; \wedge
+      (\forall \oxvarctxentry{\oxplace^\prime}{\oxtref{\oxcprov^\prime}{\oxmuta^\prime}{\oxtype^\prime}} \in \oxexplode{\oxvarctx}. \;
+      \oxplace^\prime \in \oxset{
+        \overline{\oxplace_e} 
+      })) \\
+  }{
+    %% conclusions
+    \oxmusafetyinner{\oxtvarctx}{\oxkontctx}{\oxvarctx}{\oxmuta}{
+      \overline{\oxplace_e}
+    }{
+      \oxplace
+    }{
+      \oxset{\oxloanpkg{\oxmuta}{\oxplace}}
+    }
+  }
+}
+
+\newcommand{\ODeref}{
+  \inferrule[O-Deref]{
+    %% premises
+    \oxlookup{\oxvarctx}{\oxplace}{
+      \oxtref{\oxcprov}{\oxmuta_\oxplace}{\oxtype_\oxplace}
+    } \\
+    \oxlookup{\oxvarctx}{\oxcprov}{
+      \oxset{\overline{\oxloanpkg{\oxmuta^\prime}{\oxplaceexpr}}^n}
+    } \\
+    \textrm{excl} = \oxset{\oxplace_j \text{ where } j \in \oxset{1, \oxdots n} \ | \ \oxplaceexpr_j = \oxplaceexprctx_j[\oxderef{\oxplace_j}]} \\
+    \oxmuta \oxsubtype \oxmuta_\oxplace \\\\
+    \forall i \in \oxset{1 \oxdots n}. \;
+    \oxmusafetyinner{\oxtvarctx}{\oxkontctx}{\oxvarctx}{\oxmuta}{
+      \overline{\oxplace_e} \oxcomma \textrm{excl} \oxcomma \oxplace
+    }{
+      \oxplaceexprctx[\oxplaceexpr_i]
+    }{
+      \oxset{\overline{\oxloanpkg{\oxmuta}{\oxplaceexpr_i^\prime}}}
+    } \\\\
+    \forall \oxcprov^\prime \mapsto \oxset{\overline{\oxloan}} \in \oxloanmappings{\oxvarctx}{\oxkontctx}. \;
+    (\forall \oxloanpkg{\oxmuta^\prime}{\oxplaceexpr^{\prime\prime}} \in \oxset{\overline{\oxloan}}.
+      (\oxmuta = \oxmut \vee \oxmuta^\prime = \oxmut)
+    \implies
+    \oxrelevant{\oxplaceexpr^{\prime\prime}}{\oxplaceexprctx[\oxderef{\oxplace}]}) \\
+    \vee \;
+    (\exists \oxvarctxentry{\oxplace^\prime}{\oxtref{\oxcprov^\prime}{\oxmuta^\prime}{\oxtype^\prime}} \in \oxexplode{\oxvarctx} \;
+      \wedge  \not \exists \oxtref{\oxcprov^\prime}{\oxmuta^\prime}{\oxtype^\prime} \in \oxkontctx \; \wedge
+      (\forall \oxvarctxentry{\oxplace^\prime}{\oxtref{\oxcprov^\prime}{\oxmuta^\prime}{\oxtype^\prime}} \in \oxexplode{\oxvarctx}. \;
+      \oxplace^\prime \in \oxset{
+        \overline{\oxplace_e} \oxcomma \textrm{excl} \oxcomma \oxplace
+      })) \\
+  }{
+    %% conclusions
+    \oxmusafetyinner{\oxtvarctx}{\oxkontctx}{\oxvarctx}{\oxmuta}{
+      \overline{\oxplace_e}
+    }{
+      \oxplaceexprctx[\oxderef{\oxplace}]
+    }{
+      \oxset{
+        \overline{\oxloanpkg{\oxmuta}{\oxplaceexpr^\prime_1}} \oxcomma
+        \oxdots
+        \overline{\oxloanpkg{\oxmuta}{\oxplaceexpr^\prime_n}} \oxcomma
+        \oxloanpkg{\oxmuta}{\oxplaceexprctx[\oxderef{\oxplace}]}
+      }
+    }
+  }
+}
+
+\newcommand{\ODerefAbs}{
+  \inferrule[O-DerefAbs]{
+    %% premises
+    \oxlookup{\oxvarctx}{\oxplace}{
+      \oxtref{\oxabsprov}{\oxmuta_\oxplace}{\oxtype_\oxplace}
+    } \\
+    \oxcomputetynoprov{\oxtvarctx}{\oxvarctx}{\oxmuta}{
+      \oxplaceexprctx[\oxderef{\oxplace}]
+    }{\oxtype} \\
+    \oxmuta \oxsubtype \oxmuta_\oxplace \\\\
+    \forall \oxcprov^\prime \mapsto \oxset{\overline{\oxloan}} \in \oxloanmappings{\oxvarctx}{\oxkontctx}. \;
+    (\forall \oxloanpkg{\oxmuta^\prime}{\oxplaceexpr} \in \oxset{\overline{\oxloan}}.
+      (\oxmuta = \oxmut \vee \oxmuta^\prime = \oxmut) \implies
+    \oxrelevant{\oxplaceexpr}{\oxplaceexprctx[\oxderef{\oxplace}]}) \\
+    \vee \;
+    (\exists \oxvarctxentry{\oxplace^\prime}{\oxtref{\oxcprov^\prime}{\oxmuta^\prime}{\oxtype^\prime}} \in \oxexplode{\oxvarctx} \;
+      \wedge  \not \exists \oxtref{\oxcprov^\prime}{\oxmuta^\prime}{\oxtype^\prime} \in \oxkontctx \; \wedge
+      (\forall \oxvarctxentry{\oxplace^\prime}{\oxtref{\oxcprov^\prime}{\oxmuta^\prime}{\oxtype^\prime}} \in \oxexplode{\oxvarctx}. \;
+      \oxplace^\prime \in \oxset{
+        \overline{\oxplace_e} \oxcomma \oxplace
+      })) \\
+  }{
+    %% conclusions
+    \oxmusafetyinner{\oxtvarctx}{\oxkontctx}{\oxvarctx}{\oxmuta}{
+      \overline{\oxplace_e}
+    }{
+      \oxplaceexprctx[\oxderef{\oxplace}]
+    }{
+      \oxset{\oxloanpkg{\oxmuta}{\oxplaceexprctx[\oxderef{\oxplace}]}}
+    }
+  }
+}
+
+%%%%%%%%%%%%%%%%%%%%%% 
+%% Type Computation %%
+%%%%%%%%%%%%%%%%%%%%%% 
+
+\newcommand{\TCVar}{
+  \inferrule[TC-Var]{
+    %% premises
+    \oxlookup{\oxvarctx}{\oxid}{\oxsitype} \\
+  }{
+    %% conclusions
+    \oxcomputety{\oxtvarctx}{\oxvarctx}{\oxmuta}{
+      \oxid
+    }{\oxsitype}{\emptyset}
+  }
+}
+
+\newcommand{\TCProj}{
+  \inferrule[TC-Proj]{
+    %% premises
+    \oxcomputety{\oxtvarctx}{\oxvarctx}{\oxmuta}{
+      \oxplaceexpr
+    }{
+      \oxtprod{\oxsitype_1 \oxdotsc \oxsitype_i \oxdotsc \oxsitype_n}
+    }{\oxset{\overline{\oxprov_p}}} \\
+  }{
+    %% conclusions
+    \oxcomputety{\oxtvarctx}{\oxvarctx}{\oxmuta}{
+      \oxproj{\oxplaceexpr}{i}
+    }{\oxsitype_i}{\oxset{\overline{\oxprov_p}}}
+  }
+}
+
+\newcommand{\TCDeref}{
+  \inferrule[TC-Deref]{
+    %% premises
+    \oxcomputety{\oxtvarctx}{\oxvarctx}{\oxmuta}{
+      \oxplaceexpr
+    }{
+      \oxtref{\oxprov}{\oxmuta^\prime}{\oxxitype}
+    }{\oxset{\overline{\oxprov_p}}} \\
+    \oxmuta \oxsubtype \oxmuta^\prime \\
+  }{
+    %% conclusions
+    \oxcomputety{\oxtvarctx}{\oxvarctx}{\oxmuta}{
+      \oxderef{\oxplaceexpr}
+    }{\oxxitype}{\oxset{\overline{\oxprov_p} \oxcomma \oxprov}}
+  }
+}
+
+%%%%%%%%%%%%%%%%%%%
+%% Type Validity %%
+%%%%%%%%%%%%%%%%%%%
+
+\newcommand{\VBaseType}{
+  \inferrule[WF-BaseType]{
+    %% premises
+  }{
+    %% conclusions
+    \oxtypevalidity{\oxglobalctx}{\oxtvarctx}{\oxvarctx}{\oxbasetype}
+  }
+}
+
+\newcommand{\VTVar}{
+  \inferrule[WF-TVar]{
+    %% premises
+    \oxlookup{\oxtvarctx}{\oxtvar}{\oxktype} \\
+  }{
+    %% conclusions
+    \oxtypevalidity{\oxglobalctx}{\oxtvarctx}{\oxvarctx}{\oxtvar}
+  }
+}
+
+\newcommand{\VRef}{
+  \inferrule[WF-Ref]{
+    %% premises
+   \oxrgnvalidity{\oxtvarctx}{\oxvarctx}{\oxprov} \\
+    \oxtypevalidity{\oxglobalctx}{\oxtvarctx}{\oxvarctx}{\oxxitype}
+  }{
+    %% conclusions
+    \oxtypevalidity{\oxglobalctx}{\oxtvarctx}{\oxvarctx}{
+      \oxtref{\oxprov}{\oxmuta}{\oxxitype}
+    }
+  }
+}
+
+%% This isn't quite correct (what if loan sets are empty?), but it's a start towards some kind of semantic uniqueness property
+%% \bigg( \oxmuta = \oxmut \wedge \forall \oxcprov^\prime. \oxvarctx(\oxcprov) \cap \oxvarctx(\oxcprov^\prime) \neq \emptyset \\\\
+%%     \Rightarrow \exists \oxloanpkg{\oxmuta^\prime}{\oxplaceexpr}. (\oxvarctx(\oxplaceexpr) = \oxref{\oxcprov}{\oxmuta^\prime}{\oxtype^\prime} \wedge \oxloanpkg{\oxmuta^\prime}{\oxplaceexpr} \in \oxvarctx(\oxcprov) \wedge \oxloanpkg{\oxmuta^\prime}{\oxderef{\oxplaceexpr}} \in \oxvarctx(\oxcprov^\prime)) \\\\
+%%     \vee\ (\oxvarctx(\oxplaceexpr) = \oxref{\oxcprov^\prime}{\oxmuta^\prime}{\oxtype^\prime} \wedge \oxloanpkg{\oxmuta^\prime}{\oxplaceexpr} \in \oxvarctx(\oxcprov^\prime) \wedge \oxloanpkg{\oxmuta^\prime}{\oxderef{\oxplaceexpr}} \in \oxvarctx(\oxcprov)) \bigg)
+
+\newcommand{\VSliceRef}{
+  \inferrule[WF-SliceRef]{
+    %% premises
+    \forall \oxloanpkg{\oxmuta}{\oxplaceexpr} \in \oxvarctx(\oxcprov). \;
+    \oxcomputetynoprov{\oxtvarctx}{\oxvarctx}{\oxmuta}{\oxplaceexpr}
+    {\oxxitype} \\\\
+    \oxxitype = \oxtarr{\oxsitype}{\oxnum} \vee \oxtype = \oxtslice{\oxsitype} \\\\
+    \oxtypevalidity{\oxglobalctx}{\oxtvarctx}{\oxvarctx}{\oxxitype} \\
+    \oxtypevalidity{\oxglobalctx}{\oxtvarctx}{\oxvarctx}{\oxtslice{\oxsitype}}\\
+  }{
+    %% conclusions
+    \oxtypevalidity{\oxglobalctx}{\oxtvarctx}{\oxvarctx}{
+      \oxtref{\oxcprov}{\oxmuta}{\oxtslice{\oxsitype}}
+    }
+  }
+}
+
+\newcommand{\VFunction}{
+  \inferrule[WF-Function]{
+    %% premises
+    \forall \oxcprov \in \oxfprovs{\oxsitype_r}.\ \forall \oxtype^\prime \in
+    \oxdomain{\oxvarctx}.\ \oxcprov\text{ does not occur outside of a closure in }\oxtype^\prime \\\\
+    \oxenvwellformed{\oxglobalctx}{\oxtvarctx}{\oxvarctx}{
+      \oxenv
+    } \\
+    \oxtypevalidity{\oxglobalctx}{
+      \oxextendctx{\oxtvarctx}{
+        \overline{\oxtvarctxentry{\oxenvvar}{\oxkenv}} \oxcomma
+        \overline{\oxtvarctxentry{\oxabsprov}{\oxkprov}} \oxcomma
+        \overline{\oxabsprov_1 \oxoutlives \oxabsprov_2} \oxcomma
+        \overline{\oxtvarctxentry{\oxtvar}{\oxktype}}
+      }
+    }{\oxvarctx}{\oxsitype_r} \\\\
+    \forall i \in \oxset{1 \oxdots n}. \; \oxtypevalidity{\oxglobalctx}{
+      \oxextendctx{\oxtvarctx}{
+        \overline{\oxtvarctxentry{\oxenvvar}{\oxkenv}} \oxcomma
+        \overline{\oxtvarctxentry{\oxabsprov}{\oxkprov}} \oxcomma
+        \overline{\oxabsprov_1 \oxoutlives \oxabsprov_2} \oxcomma
+        \overline{\oxtvarctxentry{\oxtvar}{\oxktype}}
+      }
+    }{\oxvarctx}{\oxsitype_i} \\
+  }{
+    %% conclusions
+    \oxtypevalidity{\oxglobalctx}{\oxtvarctx}{\oxvarctx}{
+      \oxtfunext{
+        \overline{\oxenvvar} \oxcomma \overline{\oxabsprov} \oxcomma \overline{\oxtvar}
+      }{
+        \oxsitype_1 \oxdotsc \oxsitype_n
+      }{\oxsitype_r}{\oxenv}{\overline{\oxabsprov_1 : \oxabsprov_2}}
+    }
+  }
+}
+
+\newcommand{\VArray}{
+  \inferrule[WF-Array]{
+    %% premises
+    \oxtypevalidity{\oxglobalctx}{\oxtvarctx}{\oxvarctx}{\oxsitype} \\
+  }{
+    %% conclusions
+    \oxtypevalidity{\oxglobalctx}{\oxtvarctx}{\oxvarctx}{
+      \oxtarr{\oxsitype}{\oxnum}
+    }
+  }
+}
+
+\newcommand{\VSlice}{
+  \inferrule[WF-Slice]{
+    %% premises
+    \oxtypevalidity{\oxglobalctx}{\oxtvarctx}{\oxvarctx}{\oxsitype} \\
+  }{
+    %% conclusions
+    \oxtypevalidity{\oxglobalctx}{\oxtvarctx}{\oxvarctx}{
+      \oxtslice{\oxsitype}
+    }
+  }
+}
+
+\newcommand{\VTuple}{
+  \inferrule[WF-Tuple]{
+    %% premises
+    \forall i \in \oxset{1 \oxdots n}. \;
+    \oxtypevalidity{\oxglobalctx}{\oxtvarctx}{\oxvarctx}{\oxsxtype_i} \\
+  }{
+    %% conclusions
+    \oxtypevalidity{\oxglobalctx}{\oxtvarctx}{\oxvarctx}{
+      \oxtprod{\oxsxtype_1 \oxdotsc \oxsxtype_n}
+    }
+  }
+}
+
+\newcommand{\VStruct}{
+  \inferrule[WF-Struct]{
+    %% premises
+    \oxlookup{\oxglobalctx}{\oxdatatype}{
+      \oxdots \oxdatatype \oxangle{\overline{\oxabsprov} \oxcomma \overline{\oxtvar}} \oxdots
+    } \\\\
+    |\overline{\oxabsprov}| = |\overline{\oxprov^\prime}| \\
+    |\overline{\oxtvar}| = |\overline{\oxsitype}| \\
+    \overline{\oxrgnvalidity{\oxtvarctx}{\oxvarctx}{\oxprov^\prime}} \\
+    \overline{\oxtypevalidity{\oxglobalctx}{\oxtvarctx}{\oxvarctx}{\oxsxtype}} \\
+  }{
+    %% conclusions
+    \oxtypevalidity{\oxglobalctx}{\oxtvarctx}{\oxvarctx}{
+      \oxdatatype \oxangle{\overline{\oxprov^\prime} \oxcomma \overline{\oxsxtype}}
+    }
+  }
+}
+
+\newcommand{\VUninit}{
+  \inferrule[WF-Uninit]{
+    %% premises
+  }{
+    %% conclusions
+    \oxtypevalidity{\oxglobalctx}{\oxtvarctx}{\oxvarctx}{
+      \oxsidtype
+    }
+  }
+}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Type Environment Well Formedness %%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\newcommand{\WFTVarEmpty}{
+  \inferrule[WF-TVarEmpty]{
+    %% premises
+  }{
+    %% conclusions
+    \oxtvarctxwellformed{\oxemptyctx}
+  }
+}
+
+\newcommand{\WFTVarExtendType}{
+  \inferrule[WF-TVarExtendType]{
+    %% premises
+  }{
+    %% conclusions
+    \oxtvarctxwellformed{
+      \oxextendctx{\oxtvarctx}{
+        \oxtvarctxentry{\oxtvar}{\oxktype}
+      }
+    }
+  }
+}
+
+\newcommand{\WFTVarExtendProv}{
+  \inferrule[WF-TVarExtendRegion]{
+    %% premises
+  }{
+    %% conclusions
+    \oxtvarctxwellformed{
+      \oxextendctx{\oxtvarctx}{
+        \oxtvarctxentry{\oxabsprov}{\oxkprov}
+      }
+    }
+  }
+}
+
+\newcommand{\WFTVarExtendEnv}{
+  \inferrule[WF-TVarExtendEnv]{
+    %% premises
+  }{
+    %% conclusions
+    \oxtvarctxwellformed{
+      \oxextendctx{\oxtvarctx}{
+        \oxtvarctxentry{\oxenvvar}{\oxkenv}
+      }
+    }
+  }
+}
+
+\newcommand{\WFTVarExtendConstraint}{
+  \inferrule[WF-TVarExtendOutlives]{
+    %% premises
+    \oxtvarctxentry{\oxabsprov_1}{\oxkprov} \in \oxtvarctx \\
+    \oxtvarctxentry{\oxabsprov_2}{\oxkprov} \in \oxtvarctx \\
+  }{
+    %% conclusions
+    \oxtvarctxwellformed{
+      \oxextendctx{\oxtvarctx}{
+        \oxabsprov_1 \oxoutlives \oxabsprov_2
+      }
+    }
+  }
+}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Temporary Typing Well Formedness %%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\newcommand{\WFEmptyTemporaryTyping}{
+  \inferrule[WF-EmptyTemporaryTyping]{
+    %% premises
+  }{
+    %% conclusions
+    \oxkontctxwellformed{\oxglobalctx}{\oxtvarctx}{\oxvarctx}{\oxemptyctx}
+  }
+}
+
+\newcommand{\WFTemporaryTyping}{
+  \inferrule[WF-TemporaryTyping]{
+    %% premises
+    \oxkontctxwellformed{\oxglobalctx}{\oxtvarctx}{\oxvarctx}{\oxkontctx} \\
+    \oxtypevalidity{\oxglobalctx}{\oxtvarctx}{\oxvarctx}{\oxtype} \\\\
+    \forall \oxcprov \in \oxfprovs{\oxsitype}.\;
+    \not\exists \oxsitype_b \in \oxcodomain{\oxvarctx}. \;
+    \oxcprov \in \oxfprovs{\oxsitype_b} \wedge \oxlookup{\oxvarctx}{\oxcprov}{\emptyset} \\
+  }{
+    %% conclusions
+    \oxkontctxwellformed{\oxglobalctx}{\oxtvarctx}{\oxvarctx}{
+      \oxextendctx{\oxkontctx}{
+        \oxsitype
+      }
+    }
+  }
+}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Place Environment Well Formedness %%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\newcommand{\WFEmptyVarCtx}{
+  \inferrule[WF-EmptyStackTyping]{
+    %% premises
+  }{
+    %% conclusions
+    \oxvarctxwellformed{\oxglobalctx}{\oxtvarctx}{\oxemptyctx}
+  }
+}
+
+\newcommand{\WFVarCtx}{
+  \inferrule[WF-StackTyping]{
+    %% premises
+    \oxvarctxwellformed{\oxglobalctx}{\oxtvarctx}{\oxvarctx} \\
+    \oxplaces{\oxframe} \subseteq \oxdomain{\oxnewframe{\oxvarctx}{\oxframe}} \\\\
+    \oxrelevant{\oxdomain{\oxframe}}{\oxdomain{\oxvarctx}} \\
+    \forall \oxvarctxentry{\oxid}{\oxtype} \in \oxframe. \;
+    \oxtypevalidity{\oxglobalctx}{\oxtvarctx}{
+      \oxnewframe{\oxvarctx}{\oxframe}
+    }{\oxtype} \\\\
+    \forall \oxtype \in \oxcodomain{\oxframe}.\
+    \forall \oxcprov \in \oxfprovs{\oxtype}.\ \forall \oxtype^\prime \in
+    \oxdomain{\oxvarctx}.\ \oxcprov\text{ does not occur outside of a closure in }\oxtype^\prime
+    \\\\
+    \forall \oxloanctxentry{\oxcprov}{\oxset{\overline{\oxloan}}} \in \oxframe. \;
+    \forall \oxloanpkg{\oxmuta}{\oxplaceexpr} \in \oxset{\overline{\oxloan}}.\;
+    \exists \oxxitype. \;
+    \oxcomputetynoprov{\oxtvarctx}{
+      \oxnewframe{\oxvarctx}{\oxframe}
+    }{\oxmuta}{\oxplaceexpr}{\oxxitype} \\
+  }{
+    %% conclusions
+    \oxvarctxwellformed{\oxglobalctx}{\oxtvarctx}{\oxnewframe{\oxvarctx}{\oxframe}}
+  }
+}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Continuation Typing Well Formedness %%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+
+\newcommand{\WFKontCtx}{
+  \inferrule[WF-Temporaries]{
+    %% premises
+    \forall i \in 1 \oxdots n. \;
+    \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxsitype_1 \oxdotsc \oxsitype_{i-1}}{\oxvarctx}{
+      \oxvalue_i
+    }{\oxsitype_i}{\oxvarctx} \\
+  }{
+    %% conclusions
+    \oxwfkontctx{\oxglobalctx}{\oxvarctx}{
+      \oxvalue_1 \oxdotsc \oxvalue_n
+    }{
+      \oxsitype_1 \oxdotsc \oxsitype_n
+    }
+  }
+}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Origin Not Reborrowed %%
+%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+
+\newcommand{\NRBOrigin}{
+  \inferrule[NRB-Region]{
+    %% premises
+    \forall \oxvarctxentry{\oxplace}{\oxtref{\oxcprov}{\oxmuta}{\oxxitype}} \in
+    \oxexplode{\oxvarctx}. \; \not\exists \oxcprov^\prime. \;
+    \oxloanpkg{\oxmuta}{\oxderef{\! \oxplace}} \in \oxvarctx(\oxcprov^\prime)
+  }{
+    %% conclusion
+    \oxnotreborrowed{\oxvarctx}{\oxcprov}
+  }
+}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Closure Restrictions %%
+%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\newcommand{\CLSRegionNotIn}{
+  \inferrule[CLS-RegionNotIn]{
+    %% premises
+    \forall \oxtype \in \oxcodomain{\oxvarctx} \cup \oxkontctx. \;
+    \oxtycontains{\oxtfun{\_}{\oxsitype_1 \oxdotsc \oxsitype_n}{\oxsitype_r}{}}{\oxtype} \implies
+    \oxcprov \not\in
+    \underset{i=1}{\overset{n}{\bigcup}} \; \oxfprovs{\oxsitype_i} \cup \oxfprovs{\oxsitype_r} \\
+  }{
+    %% conclusion
+    \oxnotinclosure{\oxkontctx}{\oxvarctx}{\oxcprov}
+  }
+}
+
+\newcommand{\CLSRestriction}{
+  \inferrule[CLS-Restriction]{
+    %% premises
+    \forall \oxtype \in \oxcodomain{\oxvarctx} \cup \oxkontctx. \;
+    \oxtycontains{\oxtfun{\_}{\oxsitype_1 \oxdotsc \oxsitype_n}{\oxsitype_r}{}}{\oxtype} \implies \\
+    (\oxset{\overline{\oxcprov}} \subseteq
+    \underset{i=1}{\overset{n}{\bigcup}} \; \oxfprovs{\oxsitype_i} \cup \oxfprovs{\oxsitype_r} \vee
+    (\oxset{\overline{\oxcprov}} \cap
+    \underset{i=1}{\overset{n}{\bigcup}} \; \oxfprovs{\oxsitype_i} \cup \oxfprovs{\oxsitype_r}) =
+    \emptyset) \\
+  }{
+    %% conclusion
+    \oxclosrestriction{\oxkontctx}{\oxvarctx}{\overline{\oxcprov}}
+  }
+}

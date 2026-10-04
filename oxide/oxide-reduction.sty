@@ -1,0 +1,937 @@
+%%%%%%%%%%%%%%%%%%%%
+%% Reduction Form %%
+%%%%%%%%%%%%%%%%%%%%
+
+\newcommand{\oxconfiguration}[2]{
+  \ensuremath{(#1 \oxsemicolon  \fbox{$#2$})}
+}
+
+\newcommand{\oxconfigurationshape}{
+  \oxconfiguration{\oxstore}{\oxexpr}
+}
+
+\newcommand{\oxnorm}[5]{
+  \ensuremath{
+    #1 \vdash #2 \Downarrow #3 \mapsto #4 [#5]
+  }
+}
+
+\newcommand{\oxnorminner}[6]{
+  \ensuremath{
+    #1 \vdash #2 \times #3 \Downarrow (#4, #5, #6)
+  }
+}
+
+\newcommand{\oxnormctxinner}[5]{
+  \ensuremath{
+    #1 \vdash #2 \times #3 \Downarrow #4 \times #5
+  }
+}
+
+\newcommand{\oxnormctx}[3]{
+  \ensuremath{
+    #1 \vdash #2 \Downarrow #3
+  }
+}
+
+\newcommand{\oxnormOLD}[3]{
+  \ensuremath{
+    #1 \vdash #2 \Downarrow #3
+  }
+}
+
+\newcommand{\oxnormform}{
+  \framebox{
+    $\oxnorm{\oxstore}{\oxplaceexpr}{\oxreferent}{\oxvaluectx}{\oxvalue}$
+  }
+}
+
+\newcommand{\oxnorminnerform}{
+  \framebox{
+    $\oxnorminner{\oxstore}{\oxplaceexprctx}{\oxreferent}{\oxreferent^\prime}{\oxvaluectx}{\oxvalue}$
+  }
+}
+
+\newcommand{\oxnormctxform}{
+  \framebox{
+    $\oxnormctx{\oxstore}{\oxplaceexpr}{\oxvaluectx}$
+  }
+}
+
+\newcommand{\oxnormctxinnerform}{
+  \framebox{
+    $\oxnormctxinner{\oxstore}{\oxplaceexprctx}{\oxreferent}{\oxvaluectx}{\oxvalue}$
+  }
+}
+
+\newcommand{\oxevalreferent}[4]{
+  \ensuremath{#1 \vdash #2 \Downarrow #3 \times #4}
+}
+
+\newcommand{\oxevalreferentform}{
+  \framebox{
+    $\oxevalreferent{\oxstore}{\oxreferent}{\oxvaluectx}{\oxvalue}$
+  }
+}
+
+\newcommand{\oxreduce}[5]{
+  \ensuremath{
+    #1 \vdash \oxconfiguration{#2}{#3} \rightarrow \oxconfiguration{#4}{#5}
+  }
+  % \pbox{29em}{\centering
+  %   \mbox{$#1 \vdash$}
+  %   \mbox{$\oxconfiguration{#2}{#3} \rightarrow$}
+  %   \mbox{$\oxconfiguration{#4}{#5}$}
+  % }
+}
+
+\newcommand{\oxreducemany}[5]{
+  \pbox{29em}{\centering
+    \mbox{$#1 \vdash$}
+    \mbox{$\oxconfiguration{#2}{#3} \rightarrow^{*}$}
+    \mbox{$\oxconfiguration{#4}{#5}$}
+  }
+}
+
+\newcommand{\oxreduceform}{
+  \framebox{
+    $\oxreduce{\oxglobalctx}{\oxstore}{\oxexpr}{\oxstore^\prime}{\oxexpr^\prime}$
+  }
+}
+
+%%%%%%%%%%%%%%%%%%%%%%%
+%% Evaluate Referent %%
+%%%%%%%%%%%%%%%%%%%%%%%
+
+\newcommand{\ERId}{
+  \inferrule[ER-Id]{
+    %% premises
+    \oxlookup{\oxstore}{\oxid}{\oxvalue} \\
+  }{
+    %% conclusions
+    \oxevalreferent{\oxstore}{\oxid}{\oxhole}{\oxvalue}
+  }
+}
+
+\newcommand{\ERProj}{
+  \inferrule[ER-Projection]{
+    %% premises
+    \oxevalreferent{\oxstore}{\oxreferent}{\oxvaluectx}{
+      \oxprod{\oxvalue_0 \oxdotsc \oxvalue_i \oxdotsc \oxvalue_n}
+    }
+  }{
+    %% conclusions
+    \oxevalreferent{\oxstore}{\oxproj{\oxreferent}{i}}{
+      \oxvaluectx[\oxprod{\oxvalue_0 \oxdotsc \oxhole \oxdotsc \oxvalue_n}]
+    }{\oxvalue_i}
+  }
+}
+
+\newcommand{\ERIndexArray}{
+  \inferrule[ER-IndexArray]{
+    %% premises
+    \oxevalreferent{\oxstore}{\oxreferent}{
+      \oxvaluectx
+    }{\oxarr{\oxvalue_0 \oxdotsc \oxvalue_i \oxdotsc \oxvalue_n}} \\
+  }{
+    %% conclusions
+    \oxevalreferent{\oxstore}{
+      \oxindex{\oxreferent}{i}
+    }{
+      \oxvaluectx[\oxarr{\oxvalue_0 \oxdotsc \oxhole \oxdotsc \oxvalue_n}]
+    }{\oxvalue_i}
+  }
+}
+
+\newcommand{\ERIndexSlice}{
+  \inferrule[ER-IndexSlice]{
+    %% premises
+    \oxevalreferent{\oxstore}{\oxreferent}{
+      \oxvaluectx
+    }{\oxsliceval{\oxvalue_0 \oxdotsc \oxvalue_{k} \oxdotsc \oxvalue_n}} \\
+  }{
+    %% conclusions
+    \oxevalreferent{\oxstore}{
+      \oxindex{\oxreferent}{k}
+    }{
+      \oxvaluectx[\oxvalue_0] \oxdots [\oxhole] \oxdots [\oxvalue_n]
+    }{\oxvalue_{i+k}}
+  }
+}
+
+\newcommand{\ERSliceArray}{
+  \inferrule[ER-SliceArray]{
+    %% premises
+    \oxevalreferent{\oxstore}{\oxreferent}{
+      \oxvaluectx
+    }{\oxarr{\oxvalue_0 \oxdotsc \oxvalue_i \oxdotsc \oxvalue_j \oxdotsc \oxvalue_n}} \\
+  }{
+    %% conclusions
+    \oxevalreferent{\oxstore}{
+      \oxslice{\oxreferent}{i}{j}
+    }{
+      \oxvaluectx[\oxarr{\oxvalue_0 \oxdotsc \oxhole^{j-i+1} \oxdotsc \oxvalue_n}]
+    }{
+      \oxsliceval{\oxvalue_i \oxdotsc \oxvalue_j}
+    }
+  }
+}
+
+\newcommand{\ERSliceSlice}{
+  \inferrule[ER-SliceSlice]{
+    %% premises
+    \oxevalreferent{\oxstore}{\oxreferent}{
+      \oxvaluectx
+    }{\oxsliceval{\oxvalue_0 \oxdotsc \oxvalue_i \oxdotsc \oxvalue_j \oxdotsc \oxvalue_n}} \\
+  }{
+    %% conclusions
+    \oxevalreferent{\oxstore}{
+      \oxslice{\oxreferent}{i}{j}
+    }{
+      \oxvaluectx[\oxvalue_0] \oxdots [\oxhole] \oxdots [\oxhole] \oxdots [\oxvalue_n]
+    }{
+      \oxsliceval{\oxvalue_i \oxdotsc \oxvalue_j}
+    }
+  }
+}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Normalize to Context %%
+%%%%%%%%%%%%%%%%%%%%%%%%%% 
+
+\newcommand{\PCId}{
+  \inferrule[PC-Referent]{
+    %% premises
+    \oxevalreferent{\oxstore}{\oxreferent}{\oxvaluectx}{\oxvalue} \\
+  }{
+    %% conclusions
+    \oxnormctxinner{\oxstore}{\oxhole}{\oxreferent}{\oxvaluectx}{\oxvalue}
+  }
+}
+
+\newcommand{\PCProj}{
+  \inferrule[PC-Proj]{
+    %% premises
+    \oxnormctxinner{\oxstore}{\oxplaceexprctx}{\oxreferent}{\oxvaluectx}{
+      \oxprod{\oxvalue_0 \oxdotsc \oxvalue_i \oxdotsc \oxvalue_n}
+    }
+  }{
+    %% conclusions
+    \oxnormctxinner{\oxstore}{\oxplaceexprctx[\oxproj{\oxhole}{i}]}
+    {\oxvaluectx}{
+      \oxvaluectx[\oxprod{\oxvalue_0 \oxdotsc \oxhole \oxdotsc \oxvalue_n}]
+    }{\oxvalue_i}
+  }
+}
+
+\newcommand{\PCDerefPtr}{
+  \inferrule[PC-DerefPtr]{
+    %% premises
+    \oxnormctxinner{\oxstore}{\oxhole}{\oxreferent_1}{\_}{\oxptr{\oxplace}} \\\\
+    \oxnormctxinner{\oxstore}{\oxplaceexprctx}{\oxplace}{\oxvaluectx}{\oxvalue} \\
+  }{
+    %% conclusions
+    \oxnormctxinner{\oxstore}{\oxplaceexprctx[\oxderef{\oxhole}]}
+    {\oxreferent_1}{\oxvaluectx}{\oxvalue}
+  }
+}
+
+\newcommand{\PCDerefIndexPtrArray}{
+  \inferrule[PC-DerefIndexPtrArray]{
+    %% premises
+    \oxnormctxinner{\oxstore}{\oxhole}{\oxreferent_1}{\_}{
+      \oxindexptr{\oxreferent_2}{i}
+    } \\\\
+    \oxnormctxinner{\oxstore}{\oxplaceexprctx}{\oxreferent_2}{\oxvaluectx}{
+      \oxarr{\oxvalue_0 \oxdotsc \oxvalue_i \oxdotsc \oxvalue_n}
+    } \\
+  }{
+    %% conclusions
+    \oxnormctxinner{\oxstore}{\oxplaceexprctx[\oxderef{\oxhole}]}
+    {\oxreferent_1}{
+      \oxvaluectx[\oxarr{\oxvalue_0 \oxdotsc \oxhole \oxdotsc \oxvalue_n}]
+    }{\oxvalue_i}
+  }
+}
+
+\newcommand{\PCDerefIndexPtrSlice}{
+  \inferrule[PC-DerefIndexPtrSlice]{
+    %% premises
+    \oxnormctxinner{\oxstore}{\oxhole}{\oxreferent_1}{\_}{
+      \oxindexptr{\oxreferent_2}{i}
+    } \\\\
+    \oxnormctxinner{\oxstore}{\oxplaceexprctx}{\oxreferent_2}{\oxvaluectx}{
+      \oxsliceval{\oxvalue_0 \oxdotsc \oxvalue_i \oxdotsc \oxvalue_n} 
+    } \\
+  }{
+    %% conclusions
+    \oxnormctxinner{\oxstore}{\oxplaceexprctx[\oxderef{\oxhole}]}
+    {\oxreferent_1}{
+      \oxvaluectx[\oxvalue_0] \oxdots [\oxhole] \oxdots [\oxvalue_n]
+    }{\oxvalue_i}
+  }
+}
+
+\newcommand{\PCDerefSlicePtrArray}{
+  \inferrule[PC-DerefSlicePtrArray]{
+    %% premises
+    \oxnormctxinner{\oxstore}{\oxhole}{\oxreferent_1}{\_}{
+      \oxsliceptr{\oxreferent_2}{i}{j}
+    } \\
+    \oxnormctxinner{\oxstore}{\oxplaceexprctx}{\oxreferent_2}{\oxvaluectx}{
+      \oxarr{\oxvalue_0 \oxdotsc \oxvalue_i \oxdotsc \oxvalue_j \oxdotsc \oxvalue_n}
+    } \\
+  }{
+    %% conclusions
+    \oxnormctxinner{\oxstore}{
+      \oxplaceexprctx[(\oxderef{\oxhole})]
+    }
+    {\oxreferent_1}
+    {\oxvaluectx[\oxarr{
+      \oxvalue_0 \oxdotsc \oxhole^{j-i+1} \oxdotsc \oxvalue_n
+    }]}
+    {\oxsliceval{\oxvalue_i \oxdotsc \oxvalue_j}}
+  }
+}
+
+\newcommand{\PCDerefSlicePtrSlice}{
+  \inferrule[PC-DerefSlicePtrSlice]{
+    %% premises
+    \oxnormctxinner{\oxstore}{\oxhole}{\oxreferent_1}{\_}{
+      \oxsliceptr{\oxreferent_2}{i}{j}
+    } \\
+    \oxnormctxinner{\oxstore}{\oxplaceexprctx}{\oxreferent_2}{\oxvaluectx}{
+      \oxsliceval{\oxvalue_0 \oxdotsc \oxvalue_i \oxdotsc \oxvalue_j \oxdotsc \oxvalue_n}
+    } \\
+  }{
+    %% conclusions
+    \oxnormctxinner{\oxstore}{
+      \oxplaceexprctx[(\oxderef{\oxhole})]
+    }
+    {\oxreferent_1}{
+      \oxvaluectx[\oxvalue_0] \oxdots [\oxhole] \oxdots [\oxhole] \oxdots [\oxvalue_n]
+    }{\oxsliceval{\oxvalue_i \oxdotsc \oxvalue_j}}
+  }
+}
+ 
+%%%%%%%%%%%%%%%%%%%%%
+%% Reduction Rules %%
+%%%%%%%%%%%%%%%%%%%%%
+
+\newcommand{\PId}{
+  \inferrule[P-Referent]{
+    %% premises
+    \oxevalreferent{\oxstore}{\oxreferent}{\oxvaluectx}{\oxvalue} \\
+  }{
+    %% conclusions
+    \oxnorminner{\oxstore}{\oxhole}{\oxreferent}
+    {\oxreferent}{\oxvaluectx}{\oxvalue}
+  }
+}
+
+\newcommand{\PProj}{
+  \inferrule[P-Proj]{
+    %% premises
+    \oxnorminner{\oxstore}{\oxplaceexprctx}{\oxreferent_1}{\oxreferent_2}
+    {\oxvaluectx}{
+      \oxprod{\oxvalue_0 \oxdotsc \oxvalue_i \oxdotsc \oxvalue_n}
+    }
+  }{
+    %% conclusions
+    \oxnorminner{\oxstore}{\oxplaceexprctx[\oxproj{\oxhole}{i}]}{\oxreferent_1}
+    {\oxproj{\oxreferent_2}{i}}{\oxvaluectx[
+      \oxprod{\oxvalue_0 \oxdotsc \oxhole \oxdotsc \oxvalue_n}
+    ]}{\oxvalue_i}
+  }
+}
+
+\newcommand{\PDerefPtr}{
+  \inferrule[P-DerefPtr]{
+    %% premises
+    \oxnorminner{\oxstore}{\oxhole}{\oxreferent_1}{\_}{\oxptr{\oxplace}} \\\\
+    \oxnorminner{\oxstore}{\oxplaceexprctx}{\oxplace}
+    {\oxreferent_2}{\oxvaluectx}{\oxvalue} \\
+  }{
+    %% conclusions
+    \oxnorminner{\oxstore}{\oxplaceexprctx[\oxderef{\oxhole}]}
+    {\oxreferent_1}{\oxreferent_2}{\oxvaluectx}{\oxvalue}
+  }
+}
+
+\newcommand{\PDerefIndexPtrArray}{
+  \inferrule[P-DerefIndexPtrArray]{
+    %% premises
+    \oxnorminner{\oxstore}{\oxhole}{\oxreferent_1}{\_}{
+      \oxindexptr{\oxreferent_2}{i}
+    } \\\\
+    \oxnorminner{\oxstore}{\oxplaceexprctx}{\oxreferent_2}
+    {\oxreferent_3}{\oxvaluectx}{
+      \oxarr{\oxvalue_0 \oxdotsc \oxvalue_i \oxdotsc \oxvalue_n}
+    } \\
+  }{
+    %% conclusions
+    \oxnorminner{\oxstore}{\oxplaceexprctx[\oxderef{\oxhole}]}
+    {\oxreferent_1}{
+      \oxindex{\oxreferent_3}{i}
+    }{
+      \oxvaluectx[\oxarr{\oxvalue_0 \oxdotsc \oxhole \oxdotsc \oxvalue_n}]
+    }{\oxvalue_i}
+  }
+}
+
+\newcommand{\PDerefIndexPtrSlice}{
+  \inferrule[P-DerefIndexPtrSlice]{
+    %% premises
+    \oxnorminner{\oxstore}{\oxhole}{\oxreferent_1}{\_}{
+      \oxindexptr{\oxreferent_2}{i}
+    } \\\\
+    \oxnorminner{\oxstore}{\oxplaceexprctx}{\oxreferent_2}
+    {\oxreferent_3}{\oxvaluectx}{
+      \oxsliceval{\oxvalue_0 \oxdotsc \oxvalue_i \oxdotsc \oxvalue_n}
+    } \\
+  }{
+    %% conclusions
+    \oxnorminner{\oxstore}{\oxplaceexprctx[\oxderef{\oxhole}]}
+    {\oxreferent_1}{
+      \oxindex{\oxreferent_3}{i}
+    }{
+      \oxvaluectx[\oxvalue_0] \oxdots [\oxhole] \oxdots [\oxvalue_n]
+    }{\oxvalue_i}
+  }
+}
+
+\newcommand{\PDerefSlicePtrArray}{
+  \inferrule[P-DerefSlicePtrArray]{
+    %% premises
+    \oxnorminner{\oxstore}{\oxhole}{\oxreferent_1}{\_}{
+      \oxsliceptr{\oxreferent_2}{i}{j}
+    } \\\\
+    \oxnorminner{\oxstore}{\oxplaceexprctx}{\oxreferent_2}
+    {\oxreferent_3}{\oxvaluectx}{
+      \oxarr{\oxvalue_0 \oxdotsc \oxvalue_i \oxdotsc \oxvalue_j \oxdotsc \oxvalue_n}
+    } \\
+  }{
+    %% conclusions
+    \oxnorminner{\oxstore}{\oxplaceexprctx[\oxderef{\oxhole}]}{\oxreferent_1}
+    {\oxslice{\oxreferent_3}{i}{j}}{
+      \oxvaluectx[\oxarr{
+        \oxvalue_0 \oxdotsc \oxhole^{j-i+1} \oxdotsc \oxvalue_n
+      }]
+    }{\oxsliceval{\oxvalue_i \oxdotsc \oxvalue_j}}
+  }
+}
+
+\newcommand{\PDerefSlicePtrSlice}{
+  \inferrule[P-DerefSlicePtrSlice]{
+    %% premises
+    \oxnorminner{\oxstore}{\oxhole}{\oxreferent_1}{\_}{
+      \oxsliceptr{\oxreferent_2}{i}{j}
+    } \\\\
+    \oxnorminner{\oxstore}{\oxplaceexprctx}{\oxreferent_2}
+    {\oxreferent_3}{\oxvaluectx}{
+      \oxsliceval{\oxvalue_0 \oxdotsc \oxvalue_i \oxdotsc \oxvalue_j \oxdotsc \oxvalue_n}
+    } \\
+  }{
+    %% conclusions
+    \oxnorminner{\oxstore}{\oxplaceexprctx[\oxderef{\oxhole}]}{\oxreferent_1}
+    {\oxslice{\oxreferent_3}{i}{j}}{
+      \oxvaluectx[\oxvalue_0] \oxdots [\oxhole] \oxdots [\oxhole] \oxdots [\oxvalue_n]
+    }{\oxsliceval{\oxvalue_i \oxdotsc \oxvalue_j}}
+  }
+}
+
+\newcommand{\EMove}{
+  \inferrule[E-Move]{
+    %% premises
+    \oxnorm{\oxstore}{\oxplace}{\oxplace}{\_}{\oxvalue} \\
+  }{
+    %% conclusions
+    \oxreduce{\oxglobalctx}
+    {\oxstore}{\oxplace}
+    {\oxvupdate{\oxstore}{\oxplace}{\oxuninit}}{\oxvalue}
+  }
+}
+
+\newcommand{\ECopy}{
+  \inferrule[E-Copy]{
+    %% premises
+    \oxnorm{\oxstore}{\oxplaceexpr}{\_}{\_}{\oxvalue} \\
+  }{
+    %% conclusions
+    \oxreduce{\oxglobalctx}
+    {\oxstore}{\oxplaceexpr}
+    {\oxstore}{\oxvalue}
+  }
+}
+
+\newcommand{\EBorrow}{
+  \inferrule[E-Borrow]{
+    %% premises
+    \oxnorm{\oxstore}{\oxplaceexpr}{\oxreferent}{\_}{\_} \\
+  }{
+    %% conclusions
+    \oxreduce{\oxglobalctx}
+    {\oxstore}{\oxref{\oxcprov}{\oxmuta}{\oxplaceexpr}}
+    {\oxstore}{\oxptr{\oxreferent}}
+  }
+}
+
+\newcommand{\EBorrowIndex}{
+  \inferrule[E-BorrowIndex]{
+    %% premises
+    \oxnorm{\oxstore}{\oxplaceexpr}{\oxreferent}{\_}{\oxarr{\oxvalue_0 \oxdotsc \oxvalue_n}} \\
+    0 \leq \oxnum_i \leq \oxnum \\
+  }{
+    %% conclusions
+    \oxreduce{\oxglobalctx}
+    {\oxstore}{\oxref{\oxcprov}{\oxmuta}{\oxindex{\oxplaceexpr}{\oxnum_i}}}
+    {\oxstore}{\oxindexptr{\oxreferent}{\oxnum_i}}
+  }
+}
+
+\newcommand{\EBorrowIndexOOB}{
+  \inferrule[E-BorrowIndexOOB]{
+    %% premises
+    \oxnorm{\oxstore}{\oxplaceexpr}{\_}{\_}{\oxarr{\oxvalue_0 \oxdotsc \oxvalue_n}} \\
+    \oxnum_i < 0 \vee \oxnum_i > \oxnum \\
+  }{
+    %% conclusions
+    \oxreduce{\oxglobalctx}
+    {\oxstore}{\oxref{\oxcprov}{\oxmuta}{\oxindex{\oxderef{\oxplaceexpr}}{\oxnum_i}}}
+    {\oxstore}{\oxabort{\textrm{``attempted to index out of bounds''}}}
+  }
+}
+
+\newcommand{\EBorrowSlice}{
+  \inferrule[E-BorrowSlice]{
+    %% premises
+    \oxnorm{\oxstore}{\oxplaceexpr}{\oxreferent}{\_}{
+      \oxarr{\oxvalue_0 \oxdotsc \oxvalue_n}
+    } \\
+    0 \leq \oxnum_1 \leq \oxnum_2 \leq n \\
+  }{
+    %% conclusions
+    \oxreduce{\oxglobalctx}
+    {\oxstore}{\oxref{\oxcprov}{\oxmuta}{\oxslice{\oxplaceexpr}{\oxnum_1}{\oxnum_2}}}
+    {\oxstore}{\oxsliceptr{\oxreferent}{\oxnum_1}{\oxnum_2}}
+  }
+}
+
+\newcommand{\EBorrowSliceOOB}{
+  \inferrule[E-BorrowSliceOOB]{
+    %% premises
+    \oxnorm{\oxstore}{\oxplaceexpr}{\_}{\_}{\oxarr{\oxvalue_0 \oxdotsc \oxvalue_n}} \\
+    \oxnum_1 < 0 \vee \oxnum_1 > \oxnum \vee
+    \oxnum_2 < 0 \vee \oxnum_2 > \oxnum \vee
+    \oxnum_1 > \oxnum_2 \\
+  }{
+    %% conclusions
+    \oxreduce{\oxglobalctx}
+    {\oxstore}{\oxref{\oxcprov}{\oxmuta}{\oxslice{\oxplaceexpr}{\oxnum_1}{\oxnum_2}}}
+    {\oxstore}{\oxabort{\textrm{``attempted to slice out of bounds''}}}
+  }
+}
+
+\newcommand{\EIndexCopy}{
+  \inferrule[E-IndexCopy]{
+    %% premises
+    \oxnorm{\oxstore}{\oxplaceexpr}{\_}{\_}{\oxarr{
+      \oxvalue_0 \oxdotsc \oxvalue_{\oxnum_i} \oxdotsc \oxvalue_n}
+    } \\
+  }{
+    %% conclusions
+    \oxreduce{\oxglobalctx}
+    {\oxstore}{\oxindex{\oxplaceexpr}{\oxnum_i}}
+    {\oxstore}{\oxvalue_{\oxnum_i}}
+  }
+}
+
+\newcommand{\EIndexCopyOOB}{
+  \inferrule[E-IndexCopyOOB]{
+    %% premises
+    \oxnorm{\oxstore}{\oxplaceexpr}{\_}{\_}{\oxarr{
+      \oxvalue_0 \oxdotsc \oxvalue_n}
+    } \\
+    \oxnum_i < 0 \vee \oxnum_i > \oxnum \\
+  }{
+    %% conclusions
+    \oxreduce{\oxglobalctx}
+    {\oxstore}{\oxindex{\oxplaceexpr}{\oxnum_i}}
+    {\oxstore}{\oxabort{\textrm{``attempted to index out of bounds''}}}
+  }
+}
+
+\newcommand{\ELetProv}{
+  \inferrule[E-LetRegion]{
+    %% premises
+  }{
+    %% conclusions
+    \oxreduce{\oxglobalctx}{\oxstore}{\oxletrgn{\oxcprov}{\oxvalue}}
+    {\oxstore}{\oxvalue}
+  }
+}
+
+\newcommand{\ESeq}{
+  \inferrule[E-Seq]{
+    %% premises
+  }{
+    %% conclusions
+    \oxreduce{\oxglobalctx}{\oxstore}{\oxseq{\oxvalue}{\oxexpr}}
+    {\oxstore}{\oxexpr}
+  }
+}
+
+\newcommand{\EIfTrue}{
+  \inferrule[E-IfTrue]{
+    %% premises
+  }{
+    %% conclusions
+    \oxreduce{\oxglobalctx}{\oxstore}{\oxbranch{\oxtrue}{\oxexpr_1}{\oxexpr_2}}
+    {\oxstore}{\oxexpr_1}
+  }
+}
+
+\newcommand{\EIfFalse}{
+  \inferrule[E-IfFalse]{
+    %% premises
+  }{
+    %% conclusions
+    \oxreduce{\oxglobalctx}{\oxstore}{\oxbranch{\oxfalse}{\oxexpr_1}{\oxexpr_2}}
+    {\oxstore}{\oxexpr_2}
+  }
+}
+
+\newcommand{\EMatchLeft}{
+  \inferrule[E-MatchLeft]{
+    %% premises
+  }{
+    %% conclusions
+    \oxreduce{\oxglobalctx}{\oxstore}{
+      \oxmatch{\oxinl{\oxsitype_1}{\oxsitype_2}{\oxvalue}}
+      {\oxid_1}{\oxexpr_1}{\oxid_2}{\oxexpr_2}
+    }{
+      \oxextendctx{\oxstore}{
+        \oxstoreentry{\oxid_1}{\oxvalue}
+      }
+    }{\oxshift{\oxexpr_1}}
+  }
+}
+
+\newcommand{\EMatchRight}{
+  \inferrule[E-MatchRight]{
+    %% premises
+  }{
+    %% conclusions
+    \oxreduce{\oxglobalctx}{\oxstore}{
+      \oxmatch{\oxinr{\oxsitype_1}{\oxsitype_2}{\oxvalue}}
+      {\oxid_1}{\oxexpr_1}{\oxid_2}{\oxexpr_2}
+    }{
+      \oxextendctx{\oxstore}{
+        \oxstoreentry{\oxid_2}{\oxvalue}
+      }
+    }{\oxshift{\oxexpr_2}}
+  }
+}
+
+\newcommand{\ELet}{
+  \inferrule[E-Let]{
+    %% premises
+  }{
+    %% conclusions
+    \oxreduce{\oxglobalctx}{\oxstore}{
+      \oxlet{\oxid}{\oxsitype_a}{\oxvalue}{\oxexpr}
+    }{\oxextendctx{\oxstore}{\oxstoreentry{\oxid}{\oxvalue}}}{
+      \oxshift{\oxexpr}
+    }
+  }
+}
+
+\newcommand{\EAssign}{
+  \inferrule[E-Assign]{
+    %% premises
+    \oxnorm{\oxstore}{\oxplaceexpr}{\oxreferent}{\oxvaluectx}{\_} \\
+    \oxreferent = \oxreferentctx[\oxid] \\
+  }{
+    %% conclusions
+    \oxreduce{\oxglobalctx}
+    {\oxstore}{\oxassign{\oxplaceexpr}{\oxvalue}}
+    {\oxvupdate{\oxstore}{\oxid}{\oxvaluectx[\oxvalue]}}{\oxunit}
+  }
+}
+
+\newcommand{\EWhile}{
+  \inferrule[E-While]{
+    %% premises
+  }{
+    %% conclusions
+    \oxreduce{\oxglobalctx}{\oxstore}{
+      \oxwhile{\oxexpr_1}{\oxexpr_2}
+    }{\oxstore}{
+      \oxbranch{\oxexpr_1}{
+        \oxseq{\oxexpr_2}{
+          \oxwhile{\oxexpr_1}{\oxexpr_2}
+        }
+      }{
+        \oxunit
+      }
+    }
+  }
+}
+
+\newcommand{\EForArray}{
+  \inferrule[E-ForArray]{
+    %% premises
+  }{
+    %% conclusions
+    \oxreduce{\oxglobalctx}{\oxstore}{
+      \oxfor{\oxid}{\oxarr{\oxvalue_0 \oxdotsc \oxvalue_n}}{\oxexpr}
+    }{
+      \oxextendctx{\oxstore}{
+        \oxstoreentry{\oxid}{\oxvalue_0}
+      }
+    }{
+      \oxseq{\oxshift{\oxexpr}}{
+        \oxfor{\oxid}{\oxarr{\oxvalue_1 \oxdotsc \oxvalue_n}}{
+          \oxexpr
+        }
+      }
+    }
+  }
+}
+
+\newcommand{\EForEmptyArray}{
+  \inferrule[E-ForEmptyArray]{
+    %% premises
+  }{
+    %% conclusions
+    \oxreduce{\oxglobalctx}{\oxstore}{
+      \oxfor{\oxid}{\oxarr{}}{\oxexpr}
+    }{\oxstore}{\oxunit}
+  }
+}
+
+\newcommand{\EForSlice}{
+  \inferrule[E-ForSlice]{
+    %% premises
+    \oxnorm{\oxstore}{\oxreferent}{\_}{\_}{
+      \oxarr{\oxvalue_1 \oxdotsc \oxvalue_i \oxdotsc \oxvalue_j \oxdotsc \oxvalue_n}
+    } \\
+    i < j \\
+    i^\prime = i+1 \\
+  }{
+    %% conclusions
+    \oxreduce{\oxglobalctx}{\oxstore}{
+      \oxfor{\oxid}{
+        \oxsliceptr{\oxreferent}{i}{j}
+      }{\oxexpr}
+    }{
+      \oxextendctx{\oxstore}{
+        \oxstoreentry{\oxid}{
+          \oxindexptr{\oxreferent}{i}
+        }
+      }
+    }{
+      \oxseq{\oxshift{\oxexpr}}{
+        \oxfor{\oxid}{
+          \oxsliceptr{\oxreferent}{i^\prime}{j}
+        }{\oxexpr}
+      }
+    }
+  }
+}
+
+\newcommand{\EForEmptySlice}{
+  \inferrule[E-ForEmptySlice]{
+    %% premises
+  }{
+    %% conclusions
+    \oxreduce{\oxglobalctx}{\oxstore}{
+      \oxfor{\oxid}{
+        \oxsliceptr{\oxplace}{\oxnum}{\oxnum}
+      }{\oxexpr}
+    }{\oxstore}{\oxunit}
+  }
+}
+
+\newcommand{\EFunction}{
+  \inferrule[E-Function]{
+    %% premises
+    \oxlookup{\oxglobalctx}{\oxfnname}{
+      \oxfuncdef{\oxfnname}{
+        \overline{\oxenvvar} \oxcomma \overline{\oxabsprov} \oxcomma \overline{\oxtvar}
+      }{
+        \oxascribe{\oxid_1}{\oxsizedtype_1} \oxdotsc
+        \oxascribe{\oxid_n}{\oxsizedtype_n}
+      }{\oxsizedtype_r}{\overline{\oxabsprov : \oxabsprov^\prime}}{\oxexpr}
+    } \\
+  }{
+    %% conclusions
+    \oxreduce{\oxglobalctx}{\oxstore}{
+      \oxfnname
+    }{\oxstore}{
+      \oxfunctionval{\oxemptyctx}{
+        \overline{\oxenvvar} \oxcomma \overline{\oxabsprov} \oxcomma \overline{\oxtvar}
+      }{
+        \oxascribe{\oxid_1}{\oxsizedtype_1} \oxdotsc
+        \oxascribe{\oxid_n}{\oxsizedtype_n}
+      }{\oxsizedtype_r}{
+        \oxexpr
+      }
+    }
+  }
+}
+
+\newcommand{\EClosure}{
+  \inferrule[E-Closure]{
+    %% premises
+    \overline{\oxid_f} = \oxfvars{\oxexpr} \\
+    \overline{\oxid_{nc}} = \oxfncvars{\oxstore}{\oxexpr} \\
+    \oxstackframe_c = \oxrestrict{\oxstore}{\overline{\oxid_f}} \\
+  }{
+    %% conclusions
+    \oxglobalctx \vdash \oxconfiguration{\oxstore}{
+      \oxclosure{
+        \oxascribe{\oxid_1}{\oxsizedtype_1} \oxdotsc
+        \oxascribe{\oxid_n}{\oxsizedtype_n}
+      }{\oxsizedtype_r}{
+        \oxexpr
+      }
+    } \rightarrow 
+    \oxconfiguration{
+      \oxupdate{\oxstore}{
+        \overline{\oxstoreentry{\oxid_{nc}}{\oxuninit}}
+      }
+    }{
+      \oxclosureval{\oxstackframe_c}{
+        \oxascribe{\oxid_1}{\oxsizedtype_1} \oxdotsc
+        \oxascribe{\oxid_n}{\oxsizedtype_n}
+      }{\oxsizedtype_r}{
+        \oxexpr
+      }
+    }
+  }
+}
+
+\newcommand{\EApp}{
+  \inferrule[E-AppClosure]{
+    %% premises
+    \oxvalue_f = \oxclosureval{\oxstackframe_c}{
+      \oxascribe{\oxid_1}{\oxsizedtype_1} \oxdotsc
+      \oxascribe{\oxid_n}{\oxsizedtype_n}
+    }{\oxsizedtype_r}{\oxexpr} \\
+  }{
+    %% conclusions
+    \oxglobalctx \vdash \oxconfiguration{\oxstore}{
+      \oxapply{
+        \oxvalue_f
+      }{
+        \oxvalue_1 \oxdotsc \oxvalue_n
+      }
+    } \rightarrow 
+    \oxconfiguration{
+      \oxnewframe{\oxstore}{
+        \oxstackframe_c \oxcomma
+        \oxstoreentry{\oxid_1}{\oxvalue_1}
+        \oxdotsc
+        \oxstoreentry{\oxid_n}{\oxvalue_n}
+      }
+    }{
+      \oxframed{\oxexpr}
+    }
+  }
+}
+
+\newcommand{\EAppFun}{
+  \inferrule[E-AppFunction]{
+    %% premises
+    \oxlookup{\oxglobalctx}{\oxfnname}{
+      \oxfuncdef{\oxfnname}{
+        \overline{\oxenvvar} \oxcomma \overline{\oxabsprov} \oxcomma \overline{\oxtvar}
+      }{
+        \oxascribe{\oxid_1}{\oxsizedtype_1} \oxdotsc
+        \oxascribe{\oxid_n}{\oxsizedtype_n}
+      }{\oxsizedtype_r}{\overline{\oxabsprov : \oxabsprov^\prime}}{\oxexpr}
+    }
+  }{
+    %% conclusions
+    \oxglobalctx \vdash \oxconfiguration{\oxstore}{
+      \oxapp{
+        \oxfnname
+      }{
+        \overline{\oxenv} \oxcomma \overline{\oxcprov^\prime} \oxcomma \overline{\oxsizedtype}
+      }{
+        \oxvalue_1 \oxdotsc \oxvalue_n
+      }
+    } \rightarrow
+    \oxconfiguration{
+      \oxnewframe{\oxstore}{
+        \oxstoreentry{\oxid_1}{\oxvalue_1}
+        \oxdotsc
+        \oxstoreentry{\oxid_n}{\oxvalue_n}
+      }
+    }{
+      \oxframed{
+        \oxsubst{
+          \oxsubst{
+            \oxsubst{\oxexpr}{\overline{\oxenv}}{\overline{\oxenvvar}}
+          }{
+            \overline{\oxcprov^\prime}
+          }{
+            \overline{\oxabsprov}
+          }
+        }{
+          \overline{\oxsizedtype}
+        }{
+          \overline{\oxtvar}
+        }
+      }
+    }
+  }
+}
+
+\newcommand{\EFramed}{
+  \inferrule[E-Framed]{
+    %% premises
+  }{
+    %% conclusions
+    \oxreduce{\oxglobalctx}{
+      \oxnewframe{\oxstore}{\oxstackframe}
+    }{
+      \oxframed{\oxvalue}
+    }{\oxstore}{\oxvalue}
+  }
+}
+
+\newcommand{\EShift}{
+  \inferrule[E-Shift]{
+    %% premises
+  }{
+    %% conclusions
+    \oxreduce{\oxglobalctx}{
+      \oxextendctx{\oxstore}{
+        \oxstoreentry{\oxid}{\oxvalue^\prime}
+      }
+    }{\oxshift{\oxvalue}}
+    {\oxstore}{\oxvalue}
+  }
+}
+
+\newcommand{\EEvalCtx}{
+  \inferrule[E-EvalCtx]{
+    %% premises
+    \oxreduce{\oxglobalctx}{\oxstore}{\oxexpr}
+    {\oxstore^\prime}{\oxexpr^\prime} 
+  }{
+    \oxreduce{\oxglobalctx}{\oxstore}{\oxevalctx[\oxexpr]}
+    {\oxstore^\prime}{\oxevalctx[\oxexpr^\prime]}
+  }
+}
+
+\newcommand{\EEvalCtxAbort}{
+  \inferrule[E-EvalCtxAbort]{
+    %% premises
+  }{
+    \oxreduce{\oxglobalctx}{\oxstore}{\oxevalctx[\oxabort{\oxstring}]}
+    {\oxstore}{\oxabort{\oxstring}}
+  }
+}

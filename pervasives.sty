@@ -1,0 +1,106 @@
+%% pervasives.sty: packages, general macros (not pertaining to language definitions), etc
+
+%% ACM-recommended packages
+\RequirePackage{booktabs}   %% For formal tables:
+                        %% http://ctan.org/pkg/booktabs
+\RequirePackage{subcaption} %% For complex figures with subfigures/subcaptions
+                        %% http://ctan.org/pkg/subcaption
+
+%% Type-setting packages
+\RequirePackage{epigraph}
+\RequirePackage{microtype}
+\RequirePackage{mdframed}
+\RequirePackage{pbox}
+\RequirePackage{tabularx}
+\RequirePackage{xcolor}
+\RequirePackage{xspace}
+
+%% Highlight
+\newcommand{\highlight}[2][gray!20]{{\fboxsep=1.5pt \colorbox{#1}{$\displaystyle #2$}}}
+
+%% Typesetting code
+\RequirePackage{listings}
+\lstset{basicstyle=\ttfamily} %% make listings not disgusting looking
+\lstset{mathescape=true,language=Caml,morekeywords={error}} %% reasonable defaults for Oxide
+\RequirePackage[outputdir=latex.out,frozencache]{minted}
+
+%% Metatheory packages
+\RequirePackage{amsmath}
+\RequirePackage{graphicx}
+\RequirePackage{mathpartir}
+\RequirePackage{mathrsfs}
+\RequirePackage{mathtools}
+
+%% References
+\newcommand{\Sec}[1]{\S\ref{#1}}
+\newcommand{\Fig}[1]{Figure~\ref{#1}}
+\newcommand{\Lemma}[1]{Lemma~\ref{#1}}
+\newcommand{\Theorem}[1]{Theorem~\ref{#1}}
+
+%% Typesetting things
+\DeclareMathSymbol{\rres}{\mathbin}{AMSa}{"42}
+\newcommand{\rsub}{\mathbin{\ooalign{\ensuremath{\rres}\cr\hidewidth\hbox{$-$}\hidewidth\cr}}}
+\newcommand{\figuresize}{\footnotesize}
+\newmintinline[rusti]{rust}{}
+\newcommand{\TM}{%
+  $^{\texttrademark}$
+}
+\newcommand{\lambdarust}{$\lambda_{\textrm{Rust}}$\xspace}
+\newcommand{\defeq}{\stackrel{\mathrm{def}}{=}}
+
+\newcommand{\ifanonymous}[2]{
+  \hspace{-0.6em}
+  \makeatletter
+  \if@ACM@anonymous
+  #1
+  \else
+  #2
+  \fi
+  \makeatother
+  \hspace{-0.6em}
+}
+
+\newenvironment{rust}[0]{\VerbatimEnvironment
+  \begin{listing}[H] \begin{quote}
+  \begin{minted}[autogobble,linenos,mathescape,escapeinside=@@,fontsize=\small]{rust}}
+{\end{minted}\end{quote}\end{listing}}
+
+\newenvironment{rustbk}[0]{\VerbatimEnvironment
+  \begin{quote}
+  \begin{minted}[autogobble,linenos,mathescape,escapeinside=@@,fontsize=\small]{rust}}
+{\end{minted}\end{quote}}
+
+\newenvironment{rustbkl}[0]{\VerbatimEnvironment
+  \begin{quote}
+  \begin{minted}[autogobble,linenos,mathescape,escapeinside=@@,fontsize=\small]{rust}}
+{\end{minted}\end{quote}}
+
+\newcommand{\img}[2][\columnwidth]{%
+  \centering\includegraphics[width=#1]{#2}
+}
+
+\newcommand{\paranegspc}{\vspace{-0em}}
+
+%% BNF grammars
+\newcommand{\bnflabel}[1]{\mbox{\textrm{#1}}}
+\newcommand{\bnfdef}{\Coloneqq}
+\newcommand{\bnfalt}{\texttt{ } | \texttt{ }}
+\newenvironment{bnf}{
+  \begin{displaymath}
+  \begin{array}{lrcl}
+}{
+  \end{array}
+  \end{displaymath}
+}
+
+%% Note leaving
+\newcommand{\mknote}[3]{\noindent \textcolor{#1}{\textrm{#2 -- #3}}}
+\newcommand{\aaron}[1]{\mknote{red}{#1}{Aaron}}
+\newcommand{\amal}[1]{\mknote{blue}{#1}{Amal}}
+\newcommand{\olek}[1]{\mknote{olive}{#1}{Olek}}
+\newcommand{\nate}[1]{\mknote{violet}{#1}{Nate}}
+\newcommand{\elide}[1]{}
+
+% sorry but the rest of the pre-defined colors were ugly as all hell.
+\definecolor{nonuglygreen}{RGB}{60,128,49}
+\newcommand{\dbp}[1]{\mknote{nonuglygreen}{#1}{DBP}}

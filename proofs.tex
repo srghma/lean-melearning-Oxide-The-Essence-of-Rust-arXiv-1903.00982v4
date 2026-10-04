@@ -1,0 +1,4039 @@
+\section{Metatheory}
+\label{sec:metatheory-full}
+
+\subsection{Standard Lemmas}
+\label{sec:lemmas}
+
+\begin{oxlemma}{Canonical Forms}{lemma:canonical-forms}
+  If
+  \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxvarctx}{\oxvalue}{\oxtype}{\oxvarctx}
+  then
+
+  \begin{enumerate}
+  \item if $\oxtype = \oxtbool$, then $\oxvalue = \oxtrue$ or $\oxvalue =
+    \oxfalse$.
+  \item if $\oxtype = \oxtnum$, then $\oxvalue = \oxnum$.
+  \item if $\oxtype = \oxtunit$, then $\oxvalue = \oxunit$.
+  \item if $\oxtype = \oxtref{\oxprov}{\oxmuta}{\oxsitype}$, then $
+    \oxvalue$ is of the form $\oxptr{\oxreferent}$.
+  \item if $\oxtype = \oxtref{\oxprov}{\oxmuta}{\oxtslice{\oxsitype}}$, then $
+    \oxvalue$ is of the form $\oxsliceptr{\oxreferent}{i}{j}$.
+  \item if $\oxtype = \oxtfunext{
+      \overline{\oxenvvar} \oxcomma \overline{\oxabsprov} \oxcomma
+      \overline{\oxtvar}
+    }{\oxsitype_1 \oxdotsc \oxsitype_n}{\oxsitype_r}{}{
+      \overline{\oxabsprov_1 : \oxabsprov_2}
+    }$, then $\oxvalue$ is of the form $\oxfnname$.
+  \item if $\oxtype = \oxtclosure{
+        \oxsitype_1 \oxdotsc \oxsitype_n
+      }{\oxsitype_r}{\oxframe}$, then $\oxvalue$ is of the form
+      $\oxclosureval{\oxstore}{
+        \oxascribe{\oxid_1}{\oxsitype_1} \oxdotsc
+        \oxascribe{\oxid_n}{\oxsitype_n}
+      }{\oxsitype_r}{\oxexpr}$.
+  \item if $\oxtype = \oxtarr{\oxtype^\prime}{\oxnum}$, then $\oxvalue$ is of
+    the form $\oxarr{\oxvalue_1 \oxdotsc \oxvalue_n}$.
+  \item if $\oxtype = \oxtslice{\oxtype^\prime}$, then $\oxvalue$ is of
+    the form $\oxsliceval{\oxvalue_1 \oxdotsc \oxvalue_n}$.
+  \item if $\oxtype = \oxtprod{\oxtype_1 \oxdotsc \oxtype_n}$, then $\oxvalue$
+    is of the form $\oxprod{\oxvalue_1 \oxdotsc \oxvalue_n}$.
+  \item if $\oxtype = \oxtsum{\oxtype_1}{\oxtype_2}$, then $\oxvalue$ is of
+    either the form $\oxinl{\oxtype_1}{\oxtype_2}{\oxvalue^\prime}$ or
+    $\oxinr{\oxtype_1}{\oxtype_2}{\oxvalue^\prime}$.
+  \end{enumerate}
+\end{oxlemma}
+
+\begin{proof}
+  By inspection of the grammar of values and typing rules.
+\end{proof}
+
+\begin{oxlemma}{Preservation of Types under Substitution}{lemma:substitution}
+  \hfill
+  \begin{enumerate}
+  \item If $\oxtypjudge{\oxglobalctx}{ \oxextendctx{\oxtvarctx}{
+        \oxtvarctxentry{\oxtvar}{\oxktype} }
+    }{\oxkontctx}{\oxvarctx}{\oxexpr}{\oxtype}{\oxvarctx^\prime}$ and
+    $\oxtypevalidity{\oxglobalctx}{\oxtvarctx}{\oxvarctx}{\oxtype^\prime}$, then
+    $\oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxvarctx}{
+      \oxsubst{\oxexpr}{\oxtype^\prime}{\oxtvar}
+    }{\oxsubst{\oxtype}{\oxtype^\prime}{\oxtvar}}
+    {\oxsubst{\oxvarctx^\prime}{\oxtype^\prime}{\oxtvar}}$
+  \item If $\oxtypjudge{\oxglobalctx}{ \oxextendctx{\oxtvarctx}{
+        \oxtvarctxentry{\oxabsprov}{\oxkprov} }
+    }{\oxkontctx}{\oxvarctx}{\oxexpr}{\oxtype}{\oxvarctx^\prime}$ and
+    $\oxrgnvalidity{\oxtvarctx}{\oxvarctx}{\oxprov}$, then
+    $\oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx} {\oxvarctx}{
+      \oxsubst{\oxexpr}{\oxprov}{\oxabsprov}
+    }{\oxsubst{\oxtype}{\oxprov}{\oxabsprov}}
+    {\oxsubst{\oxvarctx^\prime}{\oxprov}{\oxabsprov}}$
+  \item If $\oxtypjudge{\oxglobalctx}{ \oxextendctx{\oxtvarctx}{
+        \oxtvarctxentry{\oxenvvar}{\oxkenv} }
+    }{\oxkontctx}{\oxvarctx}{\oxexpr}{\oxtype}{\oxvarctx^\prime}$ and
+    $\oxenvwellformed{\oxglobalctx}{\oxtvarctx}{\oxvarctx}{\oxenv}$, then
+    $\oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx} {\oxvarctx}{
+      \oxsubst{\oxexpr}{\oxenv}{\oxenvvar}
+    }{\oxsubst{\oxtype}{\oxenv}{\oxenvvar}}
+    {\oxsubst{\oxvarctx^\prime}{\oxenv}{\oxenvvar}}$
+  \end{enumerate}
+\end{oxlemma}
+
+\begin{proof}
+  By induction on the typing derivation.
+\end{proof}
+
+\subsection{Referent Lemmas}
+\label{sec:ref-lemmas}
+
+\begin{oxlemma}{Well-Formed References Evaluate to Well-Typed Values}
+  {lemma:wf-refs-evalref}
+  If $\oxreferentvalidity{\oxglobalctx}{\oxvarctx}{\oxreferent}{\oxxitype}$ and
+  $\oxstorevalidity{\oxglobalctx}{\oxvarctx}{\oxstore}$, then
+  $\oxevalreferent{\oxstore}{\oxreferent}{\oxvaluectx}{\oxvalue}$.
+\end{oxlemma}
+
+\begin{proof}
+  We proceed by induction on $\oxreferentvalidity{\oxglobalctx}{\oxvarctx}
+  {\oxreferent}{\oxxitype}$. There are six cases: \oxname{WF-RefId},
+  \oxname{WF-RefProj}, \oxname{WF-RefIndexArray}, \oxname{WF-RefIndexSlice},
+  \oxname{WF-RefSliceArray}, and \oxname{WF-RefSliceSlice}. Each of these cases
+  has a corresponding evaluation rule:
+
+  \vspace{1em}
+  \noindent \framebox[\textwidth]{
+    \figuresize
+    \begin{mathpar}
+      \WFRefId \and \ERId
+    \end{mathpar}
+  }
+  \vspace{1em}
+
+  For the base case, we consider the frame of $\oxvarctx$ which contains
+  $\oxid$. By inversion of \oxname{WF-StackFrame} for the portion of the
+  derivation $\oxstorevalidity{\oxglobalctx}{\oxvarctx}{\oxstore}$ pertaining to
+  that frame, we have $\forall \oxid \in \oxdomain{\oxstackframe}. \;
+  \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxemptyctx}{\oxnewframe{\oxvarctx}{\oxframe}}
+  {(\oxnewframe{\oxstore}{\oxstackframe})(\oxid)}{
+    (\oxnewframe{\oxvarctx}{\oxframe})(\oxid)
+  }{\oxnewframe{\oxvarctx}{\oxframe}}$. Focusing on our particular $\oxid$, we
+  have both that $\oxlookup{\oxstore}{\oxid}{\oxvalue}$ and that
+  $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxemptyctx}{\oxnewframe{\oxvarctx}{\oxframe}}
+  {\oxvalue}{(\oxnewframe{\oxvarctx}{\oxframe})(\oxid)}{
+    \oxnewframe{\oxvarctx}{\oxframe}
+  }$, finishing the case. The remaining cases follow:
+
+  \vspace{1em}
+
+  \noindent \framebox[\textwidth]{
+    \figuresize
+    \begin{mathpar}
+      \WFRefProj \and \ERProj
+    \end{mathpar}
+  }
+
+  \vspace{1em}
+
+  \noindent \framebox[\textwidth]{
+    \figuresize
+    \begin{mathpar}
+      \WFRefIndexArray \and \ERIndexArray
+    \end{mathpar}
+  }
+
+  \vspace{1em}
+
+  \noindent \framebox[\textwidth]{
+    \figuresize
+    \begin{mathpar}
+      \WFRefIndexSlice \and \ERIndexSlice
+    \end{mathpar}
+  }
+
+  \vspace{1em}
+
+  \noindent \framebox[\textwidth]{
+    \figuresize
+    \begin{mathpar}
+      \WFRefSliceArray \and \ERSliceArray
+    \end{mathpar}
+  }
+
+  \vspace{1em}
+
+  \noindent \framebox[\textwidth]{
+    \figuresize
+    \begin{mathpar}
+      \WFRefSliceSlice \and \ERSliceSlice
+    \end{mathpar}
+  }
+
+  The proof for each case is identical: apply the induction hypothesis and then
+  \Lemma{lemma:canonical-forms} and then the evaluation rule on the right. For
+  the well-typed portion, apply inversion on the typing rule for the appropriate
+  value.
+\end{proof}
+
+\begin{oxlemma}{Place Expressions Reduce}{lemma:place-exprs-reduce}
+  If $\oxcomputetynoprov{\oxtvarctx}{\oxvarctx}{\oxmuta}{\oxplaceexpr}{\oxxitype}$
+  and $\oxstorevalidity{\oxglobalctx}{\oxvarctx}{\oxstore}$,
+  then $\oxnorm{\oxstore}{\oxplaceexpr}{\oxreferent}{\oxvaluectx}{\oxvalue}$ and
+  $\oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxvarctx}{\oxvalue}{\oxxitype}{\oxvarctx}$.
+\end{oxlemma}
+
+\begin{proof} 
+  We proceed by induction on
+  $\oxcomputetynoprov{\oxtvarctx}{\oxvarctx}{\oxmuta}{\oxplaceexpr}{\oxxitype}$.
+  There are three cases: \oxname{TC-Var}, \oxname{TC-Proj}, and \oxname{TC-Deref}.
+
+  \vspace{1em}
+  \noindent \framebox[\textwidth]{
+    \figuresize
+    \begin{mathpar}
+      \TCVar \and \PId
+    \end{mathpar}
+  }
+  \vspace{1em}
+  
+  For \oxname{TC-Var}, we consider the piece of the derivation for
+  $\oxstorevalidity{\oxglobalctx}{\oxvarctx}{\oxstore}$ (from our premise)
+  for the frame containing $\oxid$. By inversion on \oxname{WF-StackFrame},
+  we have $\forall \oxid \in \oxdomain{\oxstackframe}. \;
+  \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxemptyctx}{\oxnewframe{\oxvarctx}{\oxframe}}
+  {(\oxnewframe{\oxstore}{\oxstackframe})(\oxid)}{
+    (\oxnewframe{\oxvarctx}{\oxframe})(\oxid)
+  }{\oxnewframe{\oxvarctx}{\oxframe}}$. This immediately gives us that
+  $\oxlookup{\oxstore}{\oxid}{\oxvalue}$ and that
+  $\oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxvarctx}{\oxvalue}
+  {\oxxitype}{\oxvarctx}$. To construct our premise for \oxname{P-Referent},
+  we apply \oxname{ER-Id} to $\oxlookup{\oxstore}{\oxid}{\oxvalue}$.
+
+  \vspace{1em}
+  \noindent \framebox[\textwidth]{
+    \figuresize
+    \begin{mathpar}
+      \TCProj \and \PProj
+    \end{mathpar}
+  }
+  \vspace{1em}
+  
+  For \oxname{TC-Proj}, we apply our induction hypothesis to
+  $\oxcomputety{\oxtvarctx}{\oxvarctx}{\oxmuta}{
+    \oxplaceexpr
+  }{
+    \oxtprod{\oxsitype_1 \oxdotsc \oxsitype_i \oxdotsc \oxsitype_n}
+  }{\oxset{\overline{\oxprov_p}}}$ from the premise of \oxname{TC-Proj} and get
+  $\oxnorm{\oxstore}{\oxplaceexpr}{\oxreferent}{\oxvaluectx}{\oxvalue}$ and
+  $\oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxvarctx}{\oxvalue}
+  {\oxtprod{\oxsitype_1 \oxdotsc \oxsitype_i \oxdotsc \oxsitype_n}}{\oxvarctx}$.
+  Then, by \Lemma{lemma:canonical-forms}, we know that $\oxvalue$ must be of the
+  form $\oxprod{\oxvalue_1 \oxdotsc \oxvalue_i \oxdotsc \oxvalue_n}$. We can use
+  this and the definition of $\oxnorm{\oxstore}{\oxplaceexpr}{\oxreferent}
+  {\oxvaluectx}{\oxvalue}$ to get
+  $\oxnorminner{\oxstore}{\oxplaceexprctx}{\oxid}{\oxreferent}{\oxvaluectx}{
+    \oxprod{\oxvalue_1 \oxdotsc \oxvalue_i \oxdotsc \oxvalue_n}
+  }$ (where $\oxplaceexprctx[\oxid] = \oxplaceexpr$). This is precisely the
+  premise of \oxname{P-Proj} and thus we can use that. We also have by inversion
+  of \oxname{T-Tuple} for
+  $\oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxvarctx}{\oxvalue}
+  {\oxtprod{\oxsitype_1 \oxdotsc \oxsitype_i \oxdotsc \oxsitype_n}}{\oxvarctx}$
+  that $\oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxvarctx}{\oxvalue_i}
+  {\oxsitype_i}{\oxvarctx}$.
+
+  \vspace{1em}
+  \noindent \framebox[\textwidth]{
+    \figuresize
+    \begin{mathpar}
+      \TCDeref
+    \end{mathpar}
+  }
+  \vspace{1em}
+
+  For \oxname{TC-Deref}, we apply our induction hypothesis to 
+  $\oxcomputety{\oxtvarctx}{\oxvarctx}{\oxmuta}{
+    \oxplaceexpr
+  }{
+    \oxtref{\oxprov}{\oxmuta^\prime}{\oxxitype}
+  }{\oxset{\overline{\oxprov_p}}}$ to get
+  $\oxnorm{\oxstore}{\oxplaceexpr}{\oxreferent}{\oxvaluectx}{\oxvalue}$ and
+  $\oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxvarctx}{\oxvalue}
+  {\oxtref{\oxprov}{\oxmuta^\prime}{\oxxitype}}{\oxvarctx}$. Then, by
+  \Lemma{lemma:canonical-forms}, we know that $\oxvalue$ must of the form
+  $\oxptr{\oxreferent}$. We now have five subcases to consider depending on
+  whether $\oxreferent$ is of $\oxplace$, $\oxindex{\oxreferent_3}{i}$, or
+  $\oxslice{\oxreferent}{i}{j}$, and for the latter two, whether $\oxxitype$ is
+  $\oxtarr{\oxsitype}{\oxnum}$ or $\oxtslice{\oxsitype}$.
+
+  \vspace{1em}
+  \noindent \framebox[\textwidth]{
+    \figuresize
+    \begin{mathpar}
+      \PDerefPtr \and \PDerefIndexPtrArray \and \PDerefIndexPtrSlice \and
+      \PDerefSlicePtrArray \and \PDerefSlicePtrSlice
+    \end{mathpar}
+  }
+  \vspace{1em}
+
+  In all these cases, we know structurally that $\oxplaceexprctx = \oxhole$
+  since \oxname{TC-Deref} has no context outside of the dereference. So, for
+  each of them, we need to be able to show $\oxnorm{\oxhole}{\oxreferent}{
+    \oxreferent^\prime
+  }{\oxvaluectx}{\oxvalue^\prime}$. Inversion on \oxname{T-Pointer} gives us
+  $\oxreferentvalidity{\oxglobalctx}{\oxvarctx}{\oxreferent}{\oxxitype}$. We can
+  then apply \Lemma{lemma:wf-refs-evalref} to get
+  $\oxevalreferent{\oxglobalctx}{\oxvarctx}{\oxvaluectx}{\oxvalue}$. Then, we
+  can apply \oxname{P-Referent} to this to produce the derivation we need to
+  apply the appropriate rule. For \oxname{P-DerefIndexPtrArray} and
+  \oxname{P-DerefSlicePtrArray}, we apply \Lemma{lemma:canonical-forms}
+  to get that the value is an array. For \oxname{P-DerefIndexPtrSlice} and
+  \oxname{P-DerefSlicePtrSlice}, we apply \Lemma{lemma:canonical-forms} to get
+  that the value is a slice value.
+\end{proof}
+
+\begin{oxlemma}{Reduced Place Expressions Produce Valid Referents}
+  {lemma:norm-for-valid-referents}
+  If $\oxstorevalidity{\oxglobalctx}{\oxvarctx}{\oxstore}$
+  and $\oxnorm{\oxstore}{\oxplaceexpr}{\oxreferentctx[\oxplace]}
+  {\oxvaluectx}{\oxvalue}$,
+  then
+  $\oxreferentvalidity{\oxglobalctx}{\oxvarctx}{\oxreferentctx[\oxplace]}{\oxxitype}$.
+\end{oxlemma}
+
+\begin{proof}
+  We start by rewriting 
+  $\oxnorm{\oxstore}{\oxplaceexpr}{\oxreferentctx[\oxplace]}
+  {\oxvaluectx}{\oxvalue}$ with its definition to get
+  $\oxnorminner{\oxstore}{\oxplaceexprctx}{\oxid}{
+    \oxreferentctx[\oxplace]
+  }{\oxvaluectx}{\oxvalue}$ where $\oxplaceexpr = \oxplaceexprctx[\oxid]$. We
+  then proceed by induction by cases (note this means our induction hypothesis
+  is really about the rewritten form).
+
+  \vspace{1em}
+  \noindent \framebox[\textwidth]{
+    \figuresize
+    \begin{mathpar}
+      \PId \and \WFRefId
+    \end{mathpar}
+  }
+  \vspace{1em}
+
+  \oxname{P-Referent} only applies if the context is $\oxhole$ which is only the
+  case if our original place expression was $\oxid$. We can rewrite with this
+  knowledge to see that we really have
+  $\oxevalreferent{\oxstore}{\oxid}{\_}{\oxvalue}$ in our premise. Inversion on
+  \oxname{ER-Id} gives us $\oxlookup{\oxstore}{\oxvalue}$ Then, we consider the
+  frame of $\oxvarctx$ which contains $\oxid$. By inversion of
+  \oxname{WF-StackFrame} for the portion of the derivation
+  $\oxstorevalidity{\oxglobalctx}{\oxvarctx}{\oxstore}$ pertaining to that
+  frame, we have $\forall \oxid \in \oxdomain{\oxstackframe}. \;
+  \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxemptyctx}{\oxnewframe{\oxvarctx}{\oxframe}}
+  {(\oxnewframe{\oxstore}{\oxstackframe})(\oxid)}{
+    (\oxnewframe{\oxvarctx}{\oxframe})(\oxid)
+  }{\oxnewframe{\oxvarctx}{\oxframe}}$. Focusing on our particular $\oxid$, we
+  have both that $\oxlookup{\oxvarctx}{\oxid}{\oxvalue}$. We can then apply
+  \oxname{WF-RefId}.
+
+  \vspace{1em}
+  \noindent \framebox[\textwidth]{
+    \figuresize
+    \begin{mathpar}
+      \PProj \and \WFRefProj
+    \end{mathpar}
+  }
+  \vspace{1em}
+
+  Applying the induction hypothesis to
+  $\oxnorminner{\oxstore}{\oxplaceexprctx}{\oxreferent_1}{\oxreferent_2}{\_}{
+    \oxprod{\oxvalue_0 \oxdotsc \oxvalue_i \oxdotsc \oxvalue_n}
+  }$ gives us $\oxreferentvalidity{\oxglobalctx}{\oxvarctx}{\oxreferent_2}{
+    \oxtprod{\oxsitype_0 \oxdotsc \oxsitype_i \oxdotsc \oxsitype_n}
+  }$. We can then apply \oxname{WF-RefProjection}.
+  
+  \vspace{1em}
+  \noindent \framebox[\textwidth]{
+    \figuresize
+    \begin{mathpar}
+      \PDerefPtr
+    \end{mathpar}
+  }
+  \vspace{1em}
+
+  Applying the induction hypothesis to 
+  $\oxnorminner{\oxstore}{\oxplaceexprctx}{\oxplace}{\oxreferent_2}{\_}{\oxvalue}$
+  gives us $\oxreferentvalidity{\oxglobalctx}{\oxvarctx}{\oxreferent_2}{
+    \oxxitype
+  }$.
+
+  \vspace{1em}
+  \noindent \framebox[\textwidth]{
+    \figuresize
+    \begin{mathpar}
+      \PDerefIndexPtrArray \and \WFRefIndexArray
+    \end{mathpar}
+  }
+  \vspace{1em}
+
+  Applying the induction hypothesis to
+  $\oxnorminner{\oxstore}{\oxplaceexprctx}{\oxreferent_2}{\oxreferent_3}{\_}{
+    \oxarr{\oxvalue_0 \oxdotsc \oxvalue_i \oxdotsc \oxvalue_n}
+  }$ gives us $\oxreferentvalidity{\oxglobalctx}{\oxvarctx}{\oxreferent_3}{
+    \oxtarr{\oxsitype}{\oxnum}
+  }$. Then, we can apply \oxname{WF-RefIndexArray} to get
+  $\oxreferentvalidity{\oxglobalctx}{\oxvarctx}{\oxindex{\oxreferent_3}{i}}{
+    \oxsitype
+  }$.
+
+  \vspace{1em}
+  \noindent \framebox[\textwidth]{
+    \figuresize
+    \begin{mathpar}
+      \PDerefIndexPtrSlice \and \WFRefIndexSlice
+    \end{mathpar}
+  }
+  \vspace{1em}
+
+  Applying the induction hypothesis to
+  $\oxnorminner{\oxstore}{\oxplaceexprctx}{\oxreferent_2}{\oxreferent_3}{\_}{
+    \oxsliceval{\oxvalue_0 \oxdotsc \oxvalue_i \oxdotsc \oxvalue_n}
+  }$ gives us $\oxreferentvalidity{\oxglobalctx}{\oxvarctx}{\oxreferent_3}{
+    \oxtslice{\oxsitype}
+  }$. Then, we can apply \oxname{WF-RefIndexSlice} to get
+  $\oxreferentvalidity{\oxglobalctx}{\oxvarctx}{\oxindex{\oxreferent_3}{i}}{
+    \oxsitype
+  }$.
+
+  \vspace{1em}
+  \noindent \framebox[\textwidth]{
+    \figuresize
+    \begin{mathpar}
+      \PDerefSlicePtrArray \and \WFRefSliceArray
+    \end{mathpar}
+  }
+  \vspace{1em}
+
+  Applying the induction hypothesis to
+  $\oxnorminner{\oxstore}{\oxplaceexprctx}{\oxreferent_2}{\oxreferent_3}{\_}{
+    \oxarr{
+      \oxvalue_0 \oxdotsc \oxvalue_i \oxdotsc \oxvalue_j \oxdotsc \oxvalue_n
+    }
+  }$ gives us $\oxreferentvalidity{\oxglobalctx}{\oxvarctx}{\oxreferent_3}{
+    \oxtarr{\oxsitype}{\oxnum}
+  }$. Then, we can apply \oxname{WF-RefSliceArray} to get
+  $\oxreferentvalidity{\oxglobalctx}{\oxvarctx}{\oxslice{\oxreferent_3}{i}{j}}{
+    \oxsitype
+  }$.
+
+  \vspace{1em}
+  \noindent \framebox[\textwidth]{
+    \figuresize
+    \begin{mathpar}
+      \PDerefSlicePtrSlice \and \WFRefSliceSlice
+    \end{mathpar}
+  }
+  \vspace{1em}
+
+  Applying the induction hypothesis to
+  $\oxnorminner{\oxstore}{\oxplaceexprctx}{\oxreferent_2}{\oxreferent_3}{\_}{
+    \oxsliceval{
+      \oxvalue_0 \oxdotsc \oxvalue_i \oxdotsc \oxvalue_j \oxdotsc \oxvalue_n
+    }
+  }$ gives us $\oxreferentvalidity{\oxglobalctx}{\oxvarctx}{\oxreferent_3}{
+    \oxtslice{\oxsitype}
+  }$. Then, we can apply \oxname{WF-RefSliceSlice} to get
+  $\oxreferentvalidity{\oxglobalctx}{\oxvarctx}{\oxslice{\oxreferent_3}{i}{j}}{
+    \oxsitype
+  }$.
+\end{proof}
+
+\begin{oxlemma}{Reduced Place Expressions Have Roots in Loan Sets}
+  {lemma:norm-place-prefix-in-loans}
+  If $\oxstorevalidity{\oxglobalctx}{\oxvarctx}{\oxstore}$,
+  $\oxnorm{\oxstore}{\oxplaceexpr}{\oxreferentctx[\oxplace]}
+  {\oxvaluectx}{\oxvalue}$, and
+  $\oxmusafety{\oxemptyctx}{\oxkontctx}{\oxvarctx}{\oxmuta}{\oxplaceexpr}{
+    \oxset{\overline{\oxloan}}
+  }$, then $\oxreferent = \oxreferentctx[\oxplace]$ and
+  $\oxloanpkg{\oxmuta}{\oxplace} \in \oxset{\overline{\oxloan}}$.
+\end{oxlemma}
+
+\begin{proof}
+  We proceed by induction on $\oxmusafety{\oxemptyctx}{\oxkontctx}{\oxvarctx}{\oxmuta}{
+    \oxplaceexpr
+  }{
+    \oxset{\overline{\oxloan}}
+  }$. There are ordinarily three cases: \oxname{O-SafePlace}, \oxname{O-Deref},
+  and \oxname{O-DerefAbs}. However, \oxname{O-DerefAbs} requires the type
+  variable context to contain entries, and thus can be immediately discharged by
+  contradiction. This leaves us with only \oxname{O-SafePlace} and
+  \oxname{O-Deref}.
+
+  \vspace{1em}
+  \noindent \framebox[\textwidth]{
+    \figuresize
+    \begin{mathpar}
+      \OSafePlace
+    \end{mathpar}
+  }
+  \vspace{1em}
+
+  \oxname{O-SafePlace} tells us that our $\oxplaceexpr$ is in fact a place
+  $\oxplace$ meaning that it does not contain any dereferences. As such, we know
+  that $\oxnorm{\oxstore}{\oxplaceexpr}{\oxreferentctx[\oxplace]}
+  {\oxvaluectx}{\oxvalue}$ must have been derived using a combination of
+  \oxname{P-Referent} and \oxname{P-Proj} corresponding to the structure of
+  $\oxplace$. The resulting referent in such a case is precisely $\oxplace$
+  (meaning $\oxreferentctx = \oxhole$), which we know is in the output
+  immediately from the definition of \oxname{O-SafePlace}.
+  
+  \vspace{1em}
+  \noindent \framebox[\textwidth]{
+    \figuresize
+    \begin{mathpar}
+      \ODeref
+    \end{mathpar}
+  }
+  \vspace{1em}
+
+  In the premise of \oxname{O-Deref}, we have a number of ownership safety
+  derivations corresponding to each of the loans for the pointer being
+  dereferenced. Since we know we have a dereference, we know that we must have
+  derived $\oxnorm{\oxstore}{\oxplaceexpr}{\oxreferentctx[\oxplace]}
+  {\oxvaluectx}{\oxvalue}$
+  using one of the five dereference rules at the appropriate point
+  (\oxname{P-DerefPtr}, \oxname{P-DerefIndexPtrArray},
+  \oxname{P-DerefIndexPtrSlice}, \oxname{P-DerefSlicePtrArray}, and
+  \oxname{P-DerefSlicePtrSlice}). Each of which share a common premise (at least
+  when sufficiently generalized):
+  $\oxnorminner{\oxstore}{\oxplaceexprctx}{\oxreferent_2}
+  {\oxreferent_3}{\oxvaluectx}{\oxvalue}$. Here, $\oxreferent_2$ corresponds to
+  the referent of the pointer we are dereferencing. As such, we know that one of
+  the derivations of ownership safety corresponds to that particular referent.
+  So, we can apply our induction hypothesis and get that
+  $\oxloanpkg{\oxmuta}{\oxplace} \in \oxset{
+    \overline{\oxloanpkg{\oxmuta}{\oxplaceexpr^\prime_i}} }$ for the appropriate
+  ownership safety derivation numbered i. The final output is the union of all
+  of these sets, and thus we can generalize to $\oxloanpkg{\oxmuta}{\oxplace}
+  \in \oxset{ \overline{\oxloanpkg{\oxmuta}{\oxplaceexpr^\prime_1}} \oxdotsc
+    \overline{\oxloanpkg{\oxmuta}{\oxplaceexpr^\prime_n}} \oxdotsc
+    \oxloanpkg{\oxmuta}{\oxplaceexprctx[\oxderef{\oxplace}]}}$.
+\end{proof}
+
+\subsection{Preservation under Region Rewriting Lemmas}
+\label{sec:rewriting-lemmas}
+
+\begin{oxlemma}{Ownership Safety is Preserved under Region Rewriting}
+  {lemma:subtyping-ownership-safety} If $\oxmusafetyinner{\oxemptyctx}{\oxkontctx}{\oxvarctx}
+  {\oxmuta}{\overline{\oxplace_e}}{\oxplaceexpr}{\oxset{\overline{\oxloan^\prime}}}$ and
+  $\oxtunify{\oxemptyctx}{\oxkontctx}{\oxvarctx}{\oxtype_1}{\oxtype_2}{\oxvarctx^\prime}$ and
+  $\oxset{\overline{\oxplace_e}} \subseteq \oxset{\overline{\oxplace_e^\prime}}$ then
+  $\oxmusafetyinner{\oxemptyctx}{\oxkontctx}{\oxvarctx^\prime}
+  {\oxmuta}{\overline{\oxplace_e}}{\oxplaceexpr}{\oxset{\overline{\oxloan^{\prime\prime}}}}$.
+\end{oxlemma}
+\begin{proof}
+  We proceed by induction on the region rewriting judgement. We note that if
+  $\oxrewritemode$ is $=$, then by inspection of the outlives judgement, $\oxvarctx
+  = \oxvarctx^\prime$, so the proof follows immediately from the premise. So
+  consider when $\oxrewritemode$ is $+$. The only case that doesn't follow
+  immediately by induction and application of premises is \oxname{RR-Reference},
+  and in this case the only interesting part of the proof is the outlives
+  constraint.
+
+  Proceeding by induction on the outlives constraint, the only interesting case
+  is \\ \oxname{OL-CombineConcrete}.
+
+  \vspace{1em}
+  \noindent \framebox[\textwidth]{ \figuresize
+    \begin{mathpar}
+      \UCombineLocalProvs
+    \end{mathpar}
+  } \vspace{1em}
+
+  We want to show that $\oxmusafetyinner{\oxtvarctx}{\oxkontctx}
+  {\oxvarctx[\oxcprov_2 \mapsto \oxset{\overline{\oxloan}}]}
+  {\oxmuta}{\overline{\oxplace_e}}{\oxplaceexpr}{\oxset{\overline{\oxloan^{\prime\prime}}}}$.
+  Proceed by induction on the ownership safety judgement in the premise.
+
+  \vspace{1em}
+  \noindent \framebox[\textwidth]{ \figuresize
+    \begin{mathpar}
+      \OSafePlace
+    \end{mathpar}
+  } \vspace{1em}
+
+  Let $\oxcprov^\prime$ be an arbitrary region. There are two cases to prove,
+  depending which part of the disjunction is true for the premise
+  $\oxmusafetyinner{\oxtvarctx}{\oxkontctx}{\oxvarctx}{\oxmuta}{\overline{\oxplace_e}}{\oxplace}
+  {\oxset{\overline{\oxloan^\prime}}}$.
+
+  If the first part was true, then we need to show that $\forall
+  \oxloanpkg{\oxmuta^\prime}{\oxplaceexprctx[\oxplace^\prime]} \in
+  \oxvarctx[\oxcprov_2 \mapsto
+    \oxset{\overline{\oxloan^{\prime\prime}}}](\oxcprov^\prime).\ (\oxmuta =
+  \oxmut \vee \oxmuta^\prime = \oxmut) \implies
+  \oxrelevant{\oxplace^\prime}{\oxplace}$. This is only interesting when
+  $\oxcprov^\prime = \oxcprov_2$. Using the fact that $\oxvarctx[\oxcprov_2
+    \mapsto \oxset{\oxloans}](\oxcprov_2) = \oxvarctx(\oxcprov_1) \cup
+  \oxvarctx(\oxcprov_2)$, we need to show $\forall
+  \oxloanpkg{\oxmuta^\prime}{\oxplaceexprctx[\oxplace^\prime]} \in
+  \oxvarctx(\oxcprov_1) \cup \oxvarctx(\oxcprov_2).\ (\oxmuta = \oxmut \vee
+  \oxmuta^\prime = \oxmut) \implies \oxrelevant{\oxplace^\prime}{\oxplace}$.
+  This is immediate if we can show that $\oxcprov_1$ and $\oxcprov_2$ are not
+  excluded. This is immediate from the region not reborrowed judgement. For
+  $\oxcprov_1$ or $\oxcprov_2$ to be excluded, for each reference
+  $\oxplace^{\prime\prime}$ that has $\oxcprov_1$ or $\oxcprov_2$, there would
+  have to be a loan of the form $\oxplaceexprctx[\oxderef
+    \oxplace^{\prime\prime}]$, but such loans are precisely what the region not
+  reborrowed judgement excludes.
+
+  If the second part was true, then we can prove the second part immediately
+  from the hypothesis, because the types of references are unchanged,
+  $\oxkontctx$ is unchanged, and the exclusion list can only grow.
+
+  \vspace{1em}
+  \noindent \framebox[\textwidth]{ \figuresize
+    \begin{mathpar}
+      \ODeref
+    \end{mathpar}
+  } \vspace{1em}
+
+  Firstly, note that the exclusion list will be equal if $\oxcprov \neq
+  \oxcprov_2$, and will be potentially larger if $\oxcprov = \oxcprov_2$.
+  Therefore we can immediately apply our induction hypothesis to get ownership
+  safety for $\oxplaceexprctx[\oxplaceexpr_i]$ under
+  $\oxvarctx[\oxcprov_2 \mapsto \oxloans]$.
+
+  For the rest of the case, apply identical reasoning to that in the
+  \oxname{O-SafePlace} case.
+
+  \vspace{1em}
+  \noindent \framebox[\textwidth]{ \figuresize
+    \begin{mathpar}
+      \ODerefAbs
+    \end{mathpar}
+  } \vspace{1em}
+
+  Since $\oxtvarctx = \oxemptyctx$, there are no valid reference types that have
+  an abstract region, meaning the first hypothesis is a contradiction.
+
+\end{proof}
+
+\begin{oxlemma}{Type Computation is Preserved under Region Rewriting}
+  {lemma:subtyping-type-computation} If
+  $\oxcomputetynoprov{\oxemptyctx}{\oxnewframe{\oxvarctx}{\oxframe}}{\oxmuta}{\oxplaceexpr}{\oxsitype}$
+  and
+  $\oxtunify{\oxemptyctx}{\oxkontctx}{\oxvarctx}{\oxtype_1}{\oxtype_2}{\oxvarctx^\prime}$
+  then
+  $\oxcomputetynoprov{\oxemptyctx}{\oxnewframe{\oxvarctx^\prime}{\oxframe}}{\oxmuta}{\oxplaceexpr}{\oxsitype}$.
+\end{oxlemma}
+
+\begin{proof}
+  The proof is immediate by inspection of the type computation judgement,
+  because the only things considered in the judgement are the types of places in
+  $\oxvarctx$, which cannot change through the region rewriting judgement (in
+  other words, $\oxdomain{\oxvarctx} = \oxdomain{\oxvarctx^\prime}$).
+\end{proof}
+
+\begin{oxlemma}{Outlives is Preserved under Region Rewriting}
+  {lemma:subtyping-outlives} If $\oxrunify{\oxemptyctx}{\oxkontctx}{\oxnewframe{\oxvarctx}{\oxframe}}{\oxcprov_1}{\oxcprov_2}{\oxnewframe{\oxvarctx_o}{\oxframe_o}}$ and
+  $\oxtunify{\oxemptyctx}{\oxkontctx}{\oxvarctx}{\oxtype_1}{\oxtype_2}{\oxvarctx^\prime}$ then
+  $\oxrunify{\oxemptyctx}{\oxkontctx}{\oxnewframe{\oxvarctx^\prime}{\oxframe}}{\oxcprov_1}{\oxcprov_2}{\oxnewframe{\oxvarctx_o^\prime}{\oxframe_o^\prime}}$.
+\end{oxlemma}
+\begin{proof}
+  We proceed by induction on the outlives judgement. The only interesting cases
+  are \oxname{OL-CombineConcrete} and \oxname{OL-CheckConcrete}. In both cases,
+  the only non immediate premise is the region not reborrowed judgement. Proceed
+  by induction over the region rewriting hypothesis, and in the interesting case
+  \oxname{RR-Reference}, proceed by induction over the outlives judgement. In
+  this case, the only interesting case is when the loan sets in $\oxvarctx$
+  potentially change, \oxname{OL-CombineConcrete}. But note that no new loans
+  are generated, only loans are copied into other sets. For this reason, the
+  region not reborrowed judgements we already have are sufficient, because these
+  loans that are now potentially in two loan sets were already found to not
+  contain any problematic reborrows.
+\end{proof}
+
+\begin{oxlemma}{Region Rewriting is Preserved under Region Rewriting}
+  {lemma:subtyping-subtyping} If
+  $\oxtunify{\oxemptyctx}{\oxkontctx}{\oxnewframe{\oxvarctx}{\oxframe}}{\oxtype_1}{\oxtype_2}{\oxnewframe{\oxvarctx_o}{\oxframe_o}}$ and
+  $\oxtunify{\oxemptyctx}{\oxkontctx}{\oxvarctx}{\oxtype_1^\prime}{\oxtype_2^\prime}{\oxvarctx^\prime}$ then
+  $\oxtunify{\oxemptyctx}{\oxkontctx}{\oxnewframe{\oxvarctx^\prime}{\oxframe}}{\oxtype_1}{\oxtype_2}{\oxnewframe{\oxvarctx_o^\prime}{\oxframe_o^\prime}}$.
+\end{oxlemma}
+\begin{proof}
+  Proceed by induction over the the region rewriting judgement. The only
+  interesting case is \oxname{RR-Reference}, for which we just apply
+  \Lemma{lemma:subtyping-outlives}.
+\end{proof}
+
+\begin{oxlemma}{Region Rewriting is Preserved by Garbage Collecting Loans}
+  {lemma:subtyping-gc} If
+  $\oxtunify{\oxemptyctx}{\oxkontctx}{\oxvarctx}{\oxtype_1^\prime}{\oxtype_2^\prime}{\oxvarctx^\prime}$
+  then
+  $\oxtunify{\oxemptyctx}{\oxkontctx}{\oxgcloans{\oxkontctx}{\oxvarctx}}{\oxtype_1^\prime}{\oxtype_2^\prime}{\oxvarctx^{\prime\prime}}$.
+\end{oxlemma}
+\begin{proof}
+  We proceed by induction over the region rewriting judgement, in which the only
+  interesting case is \oxname{RR-Reference}. We then proceed by induction over
+  the outlives relation, in which the only interesting cases are
+  \oxname{OL-CombineConcrete} and \oxname{OL-CheckConcrete}. The only
+  interesting part of the judgement is the region not reborrowed, and this is
+  immediate because garbage collection will only potentially remove some loans.
+\end{proof}
+
+\begin{oxlemma}{Closure Body Typing is Preserved under Region Rewriting}
+  {lemma:subtyping-closure-typing} If
+  $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{\oxnewframe{\oxvarctx}{\oxframe}}
+  {\oxexpr}{\oxtype}{\oxnewframe{\oxvarctx_o}{\oxframe_o}}$ and
+  $\oxtunify{\oxemptyctx}{\oxkontctx}{\oxvarctx}{\oxtype_1}{\oxtype_2}{\oxvarctx^\prime}$
+  then
+  $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{\oxnewframe{\oxvarctx^\prime}{\oxframe}}
+  {\oxexpr}{\oxtype}{\oxnewframe{\oxvarctx_o^\prime}{\oxframe_o^\prime}}$ and
+  $\oxtunify{\oxemptyctx}{\oxkontctx}{\oxvarctx_o^\prime}{\oxtype_1}{\oxtype_2}{\oxvarctx_o^{\prime\prime}}$.
+\end{oxlemma}
+\begin{proof}
+  Proceed by induction over the typing derivation for $\oxexpr$.
+
+  The \oxname{T-Abort}, \oxname{T-Function}, \oxname{T-Unit}, \oxname{T-u32},
+  \oxname{T-True}, and \oxname{T-False} cases follow immediately.
+
+  The \oxname{T-LetRegion}, \oxname{T-While}, \oxname{T-Closure},
+  \oxname{T-Tuple}, \oxname{T-Array}, \oxname{T-Slice}, \oxname{T-Drop},
+  \oxname{T-Left}, and \oxname{T-Right} cases all follow immediately from the
+  induction hypothesis.
+
+  The \oxname{T-Seq} case follows from the induction hypothesis and
+  \Lemma{lemma:subtyping-gc}.
+
+  The \oxname{T-Branch}, \oxname{T-Let}, and \oxname{T-Match} cases follow from
+  the induction hypothesis, \Lemma{lemma:subtyping-subtyping}, and
+  \Lemma{lemma:subtyping-gc}. Note the reborrow restriction follows immediately
+  from the fact that rewriting can at most union together loan sets, which means
+  the overall loans considered for the region not reborrowed judgement are the
+  same in the context after rewriting.
+
+  The \oxname{T-Move}, \oxname{T-Copy}, \oxname{T-Borrow},
+  \oxname{T-BorrowIndex}, \oxname{T-BorrowSlice}, \oxname{T-IndexCopy},
+  \oxname{T-ForArray}, and \oxname{T-ForSlice} cases follow from the induction
+  hypothesis, \Lemma{lemma:subtyping-ownership-safety}, and
+  \Lemma{lemma:subtyping-type-computation}.
+
+  The \oxname{T-AppFunction} and \oxname{T-AppClosure} cases follow from the
+  induction hypothesis, \Lemma{lemma:subtyping-outlives}, and the fact that
+  context, region, and type well formedness aren't affected by changes in the
+  loan sets.
+\end{proof}
+
+\begin{oxlemma}{Value Typing is Preserved under Region Rewriting}
+  {lemma:subtyping-value-typing} If
+  $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{\oxvarctx}
+  {\oxvalue}{\oxtype}{\oxvarctx}$ and
+  $\oxtunify{\oxemptyctx}{\oxkontctx}{\oxvarctx}{\oxtype_1}{\oxtype_2}{\oxvarctx^\prime}$
+  then $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{\oxvarctx^\prime}
+  {\oxvalue}{\oxtype}{\oxvarctx^\prime}$.
+\end{oxlemma}
+
+\begin{proof}
+  We proceed by induction on the value typing.
+
+  \vspace{1em}
+  \noindent \framebox[\textwidth]{ \figuresize
+    \begin{mathpar}
+      \inferrule[T-Pointer]{
+        %% premises
+        \oxreferentvalidity{\oxglobalctx}{\oxvarctx}{\oxreferentctx[\oxplace]}{\oxxitype} \\
+        \oxloanpkg{\oxmuta}{\oxplace} \in \oxvarctx(\oxcprov) \\
+      }{
+        %% conclusions
+        \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{\oxvarctx}{
+          \oxptr{\oxreferentctx[\oxplace]} }{
+          \oxtref{\oxcprov}{\oxmuta}{\oxxitype} }{\oxvarctx} }
+    \end{mathpar}
+  } \vspace{1em}
+
+  The \oxname{T-Pointer} case is immediate, because by inspection of the
+  referent well formedness, there is no reliance on loan sets, and the loan is
+  preserved since by inspection of the rewriting judgement, the loan sets either
+  stay the same or potentially grow.
+  
+  \vspace{1em}
+  \noindent \framebox[\textwidth]{ \figuresize
+    \begin{mathpar}
+      \TClosureVal
+    \end{mathpar}
+  } \vspace{1em}
+
+  First, we invert the stack frame typing hypothesis to get that $\forall \oxid
+  \in \oxdomain{\oxstackframe}.\;
+  \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{\oxnewframe{\oxvarctx}{\oxframe_c}}{\oxstackframe(\oxid)}{\oxframe_c(\oxid)}{\oxnewframe{\oxvarctx}{\oxframe_c}}$.
+  We can apply the induction hypothesis to each of these statements, and apply
+  \oxname{WF-Frame} to get
+  $\oxsubstorevalidity{\oxglobalctx}{\oxvarctx^\prime}{\oxstackframe_c}{\oxframe_c}$.
+
+  For the typing of the body, we can apply \Lemma{lemma:subtyping-closure-typing}.
+\end{proof}
+
+\begin{oxlemma}{Stack Well-Formedness is Preserved under Region Rewriting}
+  {lemma:stack-validity-region-rewriting} If
+  $\oxstorevalidity{\oxglobalctx}{\oxvarctx}{\oxstore}$ and
+  $\oxtunify{\oxemptyctx}{\oxkontctx}{\oxvarctx}{\oxtype_1}{\oxtype_2}{\oxvarctx^\prime}$
+  then $\oxstorevalidity{\oxglobalctx}{\oxvarctx^\prime}{\oxstore}$.
+\end{oxlemma}
+
+\begin{proof}
+  We proceed by induction on the stack typing derivation.
+  
+  \vspace{1em}
+  \noindent \framebox[\textwidth]{ \figuresize
+    \begin{mathpar}
+      \VStack \and \VStackEmpty
+    \end{mathpar}
+  } \vspace{1em}
+
+  The \oxname{WF-StackEmpty} case is immediate. In the \oxname{WF-StackFrame}
+  case, we get the well formedness in the premise from our induction hypothesis.
+  What's left to show is that for all of the values $\oxvalue$ in the stack
+  frame, they remain well typed in $\oxvarctx^\prime$. This follows from
+  applying \Lemma{lemma:subtyping-value-typing}.
+\end{proof}
+
+\subsection{Preservation under Drops and Garbage Collection Lemmas}
+\label{sec:environment-relation-lemmas}
+
+\begin{oxlemma}{Values Change Environments in Limited Ways}{lemma:values-dont-change}
+  If \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxvarctx}{\oxvalue}
+  {\oxtype}{\oxvarctx^\prime}, then
+  $\oxsubtypectx{\oxglobalctx}{\oxtvarctx}{\oxvarctx}{\oxvarctx^\prime}$.
+\end{oxlemma}
+
+\begin{proof}
+  We proceed by induction on the structure of the typing derivation. Since we
+  assume that the expression being typed is a value, we need only consider the
+  cases that can be used to type a value.
+
+  For many cases, the output environments are precisely the input environments,
+  and thus this holds immediately. These cases are \oxname{T-Unit},
+  \oxname{T-u32}, \oxname{T-True}, \oxname{T-False}, \oxname{T-Pointer},
+  \oxname{T-Function}, \oxname{T-ClosureValue}, and \oxname{T-Dead}.
+
+  For \oxname{T-Tuple}, \oxname{T-Array}, \oxname{T-Left}, and \oxname{T-Right},
+  knowing that we have a value means that all of the subterms are themselves
+  values, and thus we can apply our induction hypothesis to them in sequence
+  (relying on the transitivity of $\oxsubtype$ for stack typings).
+
+  This leaves us with one remaining case: \oxname{T-Drop}.
+
+  \vspace{1em}
+  \noindent \framebox[\textwidth]{ \figuresize
+    \begin{mathpar}
+      \TDrop
+    \end{mathpar}
+  } \vspace{1em}
+
+  For \oxname{T-Drop}, we apply our induction hypothesis to
+  $\oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{
+    \oxtupdate{\oxvarctx}{\oxplace}{\oxsidtype_\oxplace}
+  }{\oxexpr}{\oxsxtype}{\oxvarctx_f}$ which tells us that
+  $\oxsubtypectx{\oxglobalctx}{\oxtvarctx}{
+    \oxtupdate{\oxvarctx}{\oxplace}{\oxsidtype_\oxplace} }{\oxvarctx_f}$. Then,
+  by \oxname{R-Env}, we have that
+  $\oxsubtypectx{\oxglobalctx}{\oxtvarctx}{\oxvarctx}
+  {\oxtupdate{\oxvarctx}{\oxplace}{\oxsidtype_\oxplace}}$. Then, by
+  transitivity, we have
+  $\oxsubtypectx{\oxglobalctx}{\oxtvarctx}{\oxvarctx}{\oxvarctx_f}$.
+\end{proof}
+
+
+\begin{oxlemma}{Type Computation is Preserved in Related Environments}
+  {lemma:tc-related-contexts} If $\oxsubtypectx{\oxglobalctx}{\oxtvarctx}
+  {\oxvarctx}{\oxvarctx^\prime}$ and
+  $\oxcomputety{\oxtvarctx}{\oxvarctx}{\oxmuta}{\oxplaceexprctx[\oxplace]}{\oxtype}{\oxset{\overline{\oxprov}}}$
+  and $\oxvarctx(\oxplace) = \oxvarctx^\prime(\oxplace)$, then
+  $\oxcomputety{\oxtvarctx}{\oxvarctx^\prime}{\oxmuta}{\oxplaceexprctx[\oxplace]}{\oxtype}{\oxset{\overline{\oxprov}}}$.
+\end{oxlemma}
+\begin{proof}
+  We proceed by induction on the type computation derivation. \oxname{TC-Var}
+  follows immediately by the same type hypothesis, and \oxname{TC-Proj} follows
+  from applying the induction hypothesis. All that is left is \oxname{TC-Deref}.
+
+  \vspace{1em}
+  \noindent \framebox[\textwidth]{ \figuresize
+    \begin{mathpar}
+      \TCDeref
+    \end{mathpar}
+  } \vspace{1em}
+
+  First, we can apply the induction hypothesis to get the type computation for
+  $\oxplaceexpr$. Then, all that's left is to show the outlives constraint, but
+  this is immediate because $\oxtvarctx$ is unchanged and both $\oxvarctx$ and
+  $\oxvarctx^\prime$ have the exact same domains.
+
+\end{proof}
+
+\begin{oxlemma}{Ownership Safety Preserved in Related Environments}
+  {lemma:ownership-safety-related-envs} If
+  $\oxmusafetyinner{\oxtvarctx}{\oxkontctx}{\oxvarctx}{\oxmuta}{\overline{\oxplace_e}}{\oxplaceexpr}
+  {\oxset{\overline{\oxloan}}}$ and
+  $\oxsubtypectx{\oxglobalctx}{\oxtvarctx}{\oxvarctx}{\oxvarctx^\prime}$ and
+  $\oxcomputetynoprov{\oxtvarctx}{\oxvarctx^\prime}{\oxmuta}{\oxplaceexpr}{\oxxitype}$
+  and $\oxplaceexpr = \oxplaceexprctx[\oxplace_\oxplaceexpr]$ and
+  $\oxvarctx(\oxplace_\oxplaceexpr) = \oxvarctx^\prime(\oxplace_\oxplaceexpr)$,
+  then
+  $\oxmusafetyinner{\oxtvarctx}{\oxkontctx}{\oxvarctx^\prime}{\oxmuta}{\overline{\oxplace_e}}{\oxplaceexpr}
+  {\oxset{\overline{\oxloan}}}$.
+\end{oxlemma}
+
+\begin{proof}
+  We proceed by induction on the $\omega$-safety derivation, for which there are
+  three cases to consider.
+
+  \vspace{1em}
+  \noindent \framebox[\textwidth]{ \figuresize
+    \begin{mathpar}
+      \OSafePlace
+    \end{mathpar}
+  } \vspace{1em}
+
+  We'd like to show that \oxname{O-SafePlace} can be applied with context
+  $\oxvarctx^\prime$. First, note that for any $\oxcprov^\prime$, if the right
+  side of the or is true for $\oxvarctx$ with $\overline{\oxplace}$ then it will
+  be true for $\oxvarctx^\prime$ with $\overline{\oxplace}$. That is, if all of
+  the pointers with region $\oxcprov^\prime$ in $\oxvarctx$ are in the exclusion
+  list $\overline{\oxplace}$, then all of the pointers with region
+  $\oxcprov^\prime$ in $\oxvarctx^\prime$ are also in the exclusion list
+  $\overline{\oxplace}$. Note that $\oxkontctx$ is unchanged between the two.
+  Therefore, the only cases we need to consider are where $\oxcprov^\prime$
+  occurs in pointers in $\oxvarctx$ and $\oxvarctx^\prime$ that do not occur in
+  $\overline{\oxplace}$.
+
+  Since the only allowed change to loan sets is emptying, and an emptied loan
+  set has the left side of the disjunction as vacuously true, and if the loan
+  set is the same we have the condition from the ownership safety in the
+  premise, we are done.
+
+  \vspace{1em}
+  \noindent \framebox[\textwidth]{ \figuresize
+    \begin{mathpar}
+      \ODeref
+    \end{mathpar}
+  } \vspace{1em}
+
+  Firstly, we have that $\oxvarctx(\oxplace_i) = \oxvarctx^\prime(\oxplace_i)$,
+  because $\oxvarctx^\prime(\oxplace_i)$ must be an initialized type by the type
+  computation premise, and the only changes in types between $\oxvarctx$ and
+  $\oxvarctx^\prime$ allowed by the environment relation is dropping some types
+  to uninitialized.
+
+  Second, note that $\oxvarctx^\prime(\oxcprov) = \oxvarctx(\oxcprov)$ since
+  $\oxvarctx^\prime(\oxplace)$ being a reference with region $\oxcprov$ means we
+  can't empty the loan set. So we proceed by applying the induction hypothesis
+  for all $n$ loans, noting that the type computation requirement follows from
+  the well formedness of $\oxvarctx^\prime$.
+
+  Finally, we have to show the statement about no conflicting loans, but here
+  the argument is identical to that in the \oxname{O-SafePlace} case. If the
+  loan set is empty then we're done, otherwise we just use the ownership safety
+  premise.
+
+  \vspace{1em}
+  \noindent \framebox[\textwidth]{ \figuresize
+    \begin{mathpar}
+      \ODerefAbs
+    \end{mathpar}
+  } \vspace{1em}
+
+  This case proceeds similarly to the \oxname{O-Deref} case, but with an added
+  application of \Lemma{lemma:tc-related-contexts} to get the type computation,
+  and no application of any induction hypothesis.
+\end{proof}
+
+\begin{oxlemma}{Types Are Well Formed in Related Environments}
+  {lemma:types-well-formed} If $\oxsubtypectx{\oxglobalctx}{\oxtvarctx}
+  {\oxvarctx}{\oxvarctx^\prime}$ and $\oxtypevalidity{\oxglobalctx}{\oxtvarctx}
+  {\oxvarctx}{\oxxitype}$ and $\forall \oxcprov$ that occur in $\oxxitype$,
+  $\oxvarctx(\oxcprov) = \oxvarctx^\prime(\oxcprov)$, then
+  $\oxtypevalidity{\oxglobalctx}{\oxtvarctx} {\oxvarctx^\prime}{\oxxitype}$.
+\end{oxlemma}
+
+\begin{proof}
+  We proceed by induction on the type well formedness derivation. The only case
+  that doesn't follow directly from induction and the fact that $\oxtvarctx$ and
+  $\oxkontctx$ are unchanged between the two related environments is
+  \oxname{WF-Ref}.
+
+  \vspace{1em}
+  \noindent \framebox[\textwidth]{ \figuresize
+    \begin{mathpar}
+      \VRef
+    \end{mathpar}
+  } \vspace{1em}
+
+  Firstly we apply our induction hypothesis to get that
+  $\oxtypevalidity{\oxglobalctx}{\oxtvarctx}
+  {\oxvarctx^\prime}{\oxxitype_\oxplaceexpr}$. What's left to show is the loan
+  set condition on $\oxcprov$. If $\oxvarctx^\prime(\oxcprov) = \emptyset$, then
+  we're done. Otherwise, we just need that the type computation still holds,
+  which we get from \Lemma{lemma:tc-related-contexts}. We know the places in
+  these place expressions all have the same type in $\oxvarctx$ and
+  $\oxvarctx^\prime$ because between these two contexts the only changes allowed
+  that could cause problems here are dropping one of these places, but then
+  $\oxvarctx^\prime$ would not be well formed since there would be an invalid
+  loan.
+
+\end{proof}
+
+\begin{oxlemma}{Related Environments Remain Well-Formed}
+  {lemma:related-contexts-well-formed} If
+  $\oxsubtypectx{\oxglobalctx}{\oxtvarctx} {\oxvarctx}{\oxvarctx^\prime}$ and
+  $\oxctxswellformed{\oxglobalctx}{\oxtvarctx}
+  {\oxnewframe{\oxvarctx}{\oxframe_{c}}}{\oxkontctx}$ then
+  $\oxctxswellformed{\oxglobalctx}{\oxtvarctx}
+  {\oxnewframe{\oxvarctx^\prime}{\oxframe_{c}}}{\oxkontctx}$.
+\end{oxlemma}
+
+\begin{proof}
+  From the well formedness of $\oxnewframe{\oxvarctx}{\oxframe_c}$, we know that
+  the places and disjointness conditions both hold. We also know that the occurs
+  in restriction holds, because we at most have the same alive types. By
+  \Lemma{lemma:types-well-formed}, noting that
+  $\oxsubtypectx{\oxglobalctx}{\oxtvarctx}{\oxnewframe{\oxvarctx}{\oxframe_c}}{\oxnewframe{\oxvarctx^\prime}{\oxframe_c}}$
+  is immediate, we know that the types remain well formed in the environment. We
+  also have the well formedness of $\oxvarctx^\prime$ as a premise of the
+  related environments judgement. All that's left to show is the loan set
+  condition. But for this all we have to show is that each place computes to
+  some type, which follows from \Lemma{lemma:tc-related-contexts}. We know the
+  types of the places in each place expression remain the same because the only
+  allowed changes between $\oxvarctx$ and $\oxvarctx^\prime$ are that places can
+  be dropped and loan sets emptied, but if one such place was dropped, then
+  $\oxvarctx^\prime$ would have not been well formed.
+\end{proof}
+
+\begin{oxlemma}{Related Input Environments Produce Similar Output Environments}
+  {lemma:related-input-output-differences} If:
+  \begin{itemize}
+  \item
+    $\oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxvarctx_1}{\oxexpr_1}{\oxtype_1}{\oxvarctx_2}$
+  \item
+    $\oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxvarctx_1}{\oxexpr_2}{\oxtype_2}{\oxvarctx_3}$
+  \item
+    $\oxsubtypectx{\oxglobalctx}{\oxtvarctx}{\oxvarctx_1}{\oxvarctx_1^\prime}$
+  \item
+    $\oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxvarctx_1^\prime}{\oxexpr_1}{\oxtype_1}{\oxvarctx_2^\prime}$
+  \item
+    $\oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxvarctx_1^\prime}{\oxexpr_2}{\oxtype_2}{\oxvarctx_3^\prime}$
+  \item
+    $\oxsubtypectx{\oxglobalctx}{\oxtvarctx}{\oxvarctx_2}{\oxvarctx_2^\prime}$
+  \item
+    $\oxsubtypectx{\oxglobalctx}{\oxtvarctx}{\oxvarctx_3}{\oxvarctx_3^\prime}$
+  \item $\forall \oxid \in \oxdomain{\oxvarctx_2}$, $\oxvarctx_2(\oxid) =
+    \oxvarctx_3(\oxid)$ and $\oxvarctx_2^\prime(\oxid) =
+    \oxvarctx_3^\prime(\oxid)$
+  \item $\forall \oxcprov$ that occur in $\oxexpr_1$ or $\oxexpr_2$ or
+    $\oxtype_1$ or $\oxtype_2$, $\oxvarctx_1(\oxcprov) =
+    \oxvarctx_1^\prime(\oxcprov)$
+  \end{itemize}
+
+  then $\forall \oxcprov \in \oxdomain{\oxvarctx_1}$, if
+  $\oxvarctx_2^\prime(\oxcprov) = \emptyset$ and $\oxvarctx_3^\prime(\oxcprov)
+  \neq \emptyset$, then $\oxvarctx_2(\oxcprov) = \emptyset$, and if
+  $\oxvarctx_3^\prime(\oxcprov) = \emptyset$ and $\oxvarctx_2^\prime(\oxcprov)
+  \neq \emptyset$, then $\oxvarctx_3(\oxcprov) = \emptyset$.
+\end{oxlemma}
+\begin{proof}
+  The proofs for both statements in the conclusion follow identically, so
+  without loss of generality it suffices to show that if
+  $\oxvarctx_2^\prime(\oxcprov) = \emptyset$ and $\oxvarctx_3^\prime(\oxcprov)
+  \neq \emptyset$, then $\oxvarctx_2(\oxcprov) = \emptyset$. Note there are two
+  cases to consider: that the loan set was empty all along, or that the loan set
+  was at some point non empty, but then got garbage collected.
+
+  First, at some point between $\oxvarctx_1^\prime$ and $\oxvarctx_2^\prime$,
+  $\oxcprov$ mapped to a non empty set of loans but then was garbage collected.
+  In this case, $\oxvarctx_2^\prime$ must not contain any references that
+  contain $\oxcprov$, since otherwise it would have been invalid to garbage
+  collect $\oxcprov$. But then since $\oxvarctx_2^\prime$ and
+  $\oxvarctx_3^\prime$ agree on types, it must be the case that it was also
+  garbage collected in $\oxvarctx_3^\prime$, which is a contradiction with the
+  fact that $\oxvarctx_3^\prime(\oxcprov)$ is non empty, so this case is
+  impossible.
+
+  Second, at each step of the derivation between $\oxvarctx_1^\prime$ and
+  $\oxvarctx_2^\prime$, $\oxcprov$ mapped to empty. If $\oxvarctx_1(\oxcprov)$
+  also was empty, then this means $\oxvarctx_2(\oxcprov)$ is also empty, and
+  we're done. Otherwise, $\oxcprov$ was garbage collected between $\oxvarctx_1$
+  and $\oxvarctx_1^\prime$. But then $\oxcprov$ must be free in $\oxexpr_2$ for
+  loans to have been added between $\oxvarctx_1^\prime$ and
+  $\oxvarctx_3^\prime$, which means the loan set could not have been emptied
+  between $\oxvarctx_1$ and $\oxvarctx_1^\prime$, which is a contradiction.
+\end{proof}
+
+\begin{oxlemma}{Outlives Preserves Related Environments}
+  {lemma:outlives-related} If
+  $\oxrunify{\oxtvarctx}{\oxkontctx}{\oxvarctx}{\oxprov_1}{\oxprov_2}{\oxvarctx_o}$, and
+  $\oxsubtypectx{\oxglobalctx}{\oxtvarctx}{\oxvarctx}{\oxvarctx^\prime}$ and
+  $\oxctxswellformed{\oxglobalctx}{\oxtvarctx}{\oxvarctx_o}{\oxkontctx}$ and
+  $\oxvarctx(\oxprov_1) = \oxvarctx^\prime(\oxprov_1)$ and $\oxvarctx(\oxprov_2)
+  = \oxvarctx^\prime(\oxprov_2)$, then
+  $\oxrunify{\oxtvarctx}{\oxkontctx}{\oxvarctx^\prime}{\oxprov_1}{\oxprov_2}{\oxvarctx_o^\prime}$,
+  and
+  $\oxsubtypectx{\oxglobalctx}{\oxtvarctx}{\oxvarctx_o}{\oxvarctx_o^\prime}$.
+  and $\oxvarctx_o(\oxprov_1) = \oxvarctx_o^\prime(\oxprov_1)$ and
+  $\oxvarctx_o(\oxprov_2) = \oxvarctx_o^\prime(\oxprov_2)$
+\end{oxlemma}
+
+\begin{proof}
+  Proceed by induction on the outlives derivation. \oxname{OL-Refl},
+  \oxname{OL-Trans}, \oxname{OL-AbstractConcrete}, and \oxname{OL-BothAbstract}
+  are immediate.
+
+  \oxname{OL-ConcreteAbstract} follows from additionally applying
+  \Lemma{lemma:tc-related-contexts}. The condition on the place having the same
+  type follows from the fact that $\oxplaceexpr$ is a loan and
+  $\oxvarctx^\prime(\oxcprov)$ is not emptied, so we could not have dropped the
+  place.
+
+  \oxname{OL-CheckConcrete} is immediate, because the occurs before condition is
+  unaffected since the domains are equal, and the region not reborrowed
+  judgement is unaffected by adding loans that are already in other loan sets.
+
+  This leaves two cases which proceed similarly: \oxname{OL-CombineConcrete} and
+  \oxname{OL-CombineConcreteUnrestricted}.
+  
+  \vspace{1em}
+  \noindent \framebox[\textwidth]{ \figuresize
+    \begin{mathpar}
+      \UCombineLocalProvs
+    \end{mathpar}
+  } \vspace{1em}
+
+  Since $\oxvarctx^\prime(\oxcprov_1) = \oxvarctx(\oxcprov_1)$ and
+  $\oxvarctx^\prime(\oxcprov_2) = \oxvarctx(\oxcprov_2)$,
+  $\oxvarctx^\prime(\oxcprov_1) \cup \oxvarctx^\prime(\oxcprov_2) =
+  \oxvarctx(\oxcprov_1) \cup \oxvarctx^\prime(\oxcprov_2)$. The region not
+  reborrowed judgement is unaffected by adding loans that are already in other
+  loan sets, so those conditions are also still true. The rest of the conditions
+  are immediate: the equality on $\oxcprov_1$ and $\oxcprov_2$'s loan sets, the
+  closure restriction since types are at most the same, and well formedness.
+\end{proof}
+
+\begin{oxlemma}{Related Environments Preserved by Region Rewriting}
+  {lemma:unified-types-well-formed} If
+  $\oxtunify{\oxtvarctx}{\oxkontctx}{\oxvarctx}{\oxsitype_1}{\oxsitype_2}{\oxvarctx_o}$, and
+  $\oxsubtypectx{\oxglobalctx}{\oxtvarctx}{\oxvarctx}{\oxvarctx^\prime}$ and
+  $\oxctxswellformed{\oxglobalctx}{\oxtvarctx}{\oxvarctx_o}{\oxkontctx}$ and $\forall
+  \oxcprov$ that occur in $\oxsitype_1$ or $\oxsitype_2$, $\oxvarctx(\oxcprov) =
+  \oxvarctx^\prime(\oxcprov)$, then
+  $\oxtunify{\oxtvarctx}{\oxkontctx}{\oxvarctx^\prime}{\oxsitype_1}{\oxsitype_2}{\oxvarctx_o^\prime}$,
+  and
+  $\oxsubtypectx{\oxglobalctx}{\oxtvarctx}{\oxvarctx_o}{\oxvarctx_o^\prime}$,
+  and $\forall \oxcprov$ that occur in $\oxsitype_1$ or $\oxsitype_2$,
+  $\oxvarctx_o(\oxcprov) = \oxvarctx_o^\prime(\oxcprov)$.
+\end{oxlemma}
+
+\begin{proof}
+  Proceed by induction on the region rewriting derivation. The only interesting
+  case is \oxname{RR-Reference}, which proceeds by
+  \Lemma{lemma:outlives-related} in addition to applying the induction
+  hypothesis.
+\end{proof}
+
+\begin{oxlemma}{Expression Typing Preserved in Related Environments}
+  {lemma:expression-typing-related-envs} Let $\oxexpr$ be a surface expression
+  as defined on page 1. If
+  $\oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxnewframe{\oxvarctx}{\oxframe}}
+  {\oxexpr}{\oxtype}{\oxnewframe{\oxvarctx_o}{\oxframe_o}}$ and
+  $\oxsubtypectx{\oxglobalctx}{\oxtvarctx}{\oxnewframe{\oxvarctx}{\oxframe}}
+  {\oxnewframe{\oxvarctx^\prime}{\oxframe}}$ and $\oxfvars{\oxexpr} =
+  \overline{\oxid_f} \subseteq \oxdomain{\oxframe}|_\oxid$ and $\forall \oxcprov
+  \in \oxfprovs{\oxexpr}.$ $\oxcprov \in \oxdomain{\oxframe}$, and $\forall
+  \oxcprov$ that occur a type in $\overline{\oxframe(\oxid_f)}$,
+  $\oxvarctx(\oxcprov) = \oxvarctx^\prime(\oxcprov)$ then
+  $\oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxnewframe{\oxvarctx^\prime}{\oxframe}}
+  {\oxexpr}{\oxtype}{\oxnewframe{\oxvarctx_o^\prime}{\oxframe_o}}$ and
+  $\oxsubtypectx{\oxglobalctx}{\oxtvarctx}{\oxnewframe{\oxvarctx_o}{\oxframe_o}}
+  {\oxnewframe{\oxvarctx_o^\prime}{\oxframe_o}}$ and $\forall \oxcprov$ that
+  occur a type in $\overline{\oxframe(\oxid_f)}$, $\oxvarctx_o(\oxcprov) =
+  \oxvarctx_o^\prime(\oxcprov)$.
+\end{oxlemma}
+\begin{proof}
+  Proceed by induction on the typing derivation for $e$. In the cases of
+  \oxname{T-Abort}, \oxname{T-Function}, \oxname{T-Unit}, \oxname{T-u32},
+  \oxname{T-True}, and \oxname{T-False}, the results are immediate.
+
+  In the cases of \oxname{T-LetRegion}, \oxname{T-While}, \oxname{T-ForArray},
+  \oxname{T-ForSlice}, \oxname{T-Closure}, \oxname{T-Left}, and
+  \oxname{T-Right}, they all follow immediately from induction hypotheses.
+
+  For each of the following cases, the convention is that the statement in the
+  box is our assumption, and we want to prove the same statement with
+  $\oxvarctx^\prime$ replaced for each $\oxvarctx$.
+
+  \vspace{1em}
+  \noindent \framebox[\textwidth]{ \inferrule[T-Tuple]{
+      %% premises
+      \forall i \in \oxset{1 \oxdots n}. \;
+      \oxtypjudge{\oxglobalctx}{\oxtvarctx}{
+        \oxextendctx{\oxkontctx}{
+          \oxkontctxentry{\oxsitype_1} \oxdotsc \oxkontctxentry{\oxsitype_{i-1}}
+        }
+      }{
+        \oxnewframe{\oxvarctx_{i-1}}{\oxframe_{i-1}}
+      }{ \oxexpr_i
+      }{\oxsitype_i}{\oxnewframe{\oxvarctx_i}{\oxframe_i}} 
+    }{
+      %% conclusions
+      \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxnewframe{\oxvarctx_0}{\oxframe_0}}{
+        \oxprod{\oxexpr_1 \oxdotsc \oxexpr_n} }{\oxtprod{\oxsitype_1 \oxdotsc
+          \oxsitype_n}}{ \oxnewframe{\oxvarctx_n}{\oxframe_n} } } }
+
+  We have $n$ induction hypotheses, each giving us the properties for input
+  context $\oxnewframe{\oxvarctx^\prime_{i-1}}{\oxframe^\prime_{i-1}}$ and output context
+  $\oxnewframe{\oxvarctx^\prime_i}{\oxframe^\prime_i}$.
+
+  Given these resulting $n$ typing judgements, we get from applying
+  \oxname{T-Tuple} that
+  $\oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxnewframe{\oxvarctx^\prime_0}{\oxframe_0}}{
+    \oxprod{\oxexpr_1 \oxdotsc \oxexpr_n} }{\oxtprod{\oxsitype_1 \oxdotsc
+      \oxsitype_n}}{ \oxnewframe{\oxvarctx^\prime_o}{\oxframe^\prime_o} }$, as
+  well as the related environments judgement
+  $\oxsubtypectx{\oxglobalctx}{\oxtvarctx}{\oxnewframe{\oxvarctx_n}{\oxframe_n}}{\oxnewframe{\oxvarctx_n^\prime}{\oxframe_n^\prime}}$.
+
+  The cases for \oxname{T-Array} and \oxname{T-Slice} proceed identically. This
+  reasoning is also used in the \oxname{T-App} case.
+
+
+  \vspace{1em}
+  \noindent \framebox[\textwidth]{ \figuresize
+    \begin{mathpar}
+      \inferrule[T-Branch]{
+        %% premises
+        \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxnewframe{\oxvarctx}{\oxframe}}{
+          \oxexpr_1
+        }{\oxtbool}{\oxnewframe{\oxvarctx_1}{\oxframe_1}} \\
+        \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxnewframe{\oxvarctx_1}{\oxframe_1}}{
+          \oxexpr_2
+        }{\oxsitype_2}{\oxnewframe{\oxvarctx_2}{\oxframe_2}} \\\\
+        \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxnewframe{\oxvarctx_1}{\oxframe_1}}{
+          \oxexpr_3
+        }{\oxsitype_3}{\oxnewframe{\oxvarctx_3}{\oxframe_3}} \\
+        \oxsitype = \oxsitype_2 \vee \oxsitype = \oxsitype_3 \\\\
+        \oxtunify{\oxtvarctx}{\oxkontctx}{\oxnewframe{\oxvarctx_2}{\oxframe_2}}
+        {\oxsitype_2}{\oxsitype}{\oxnewframe{\oxvarctx_{2s}}{\oxframe_{2s}}} \\
+        \oxtunify{\oxtvarctx}{\oxkontctx}{\oxnewframe{\oxvarctx_3}{\oxframe_3}}
+        {\oxsitype_3}{\oxsitype}{\oxnewframe{\oxvarctx_{3s}}{\oxframe_{3s}}} \\
+        \oxnewframe{\oxvarctx_{2s}}{\oxframe_{2s}} \oxintersect \oxnewframe{\oxvarctx_{3s}}{\oxframe_{3s}} = \oxnewframe{\oxvarctx_o}{\oxframe_o} \\
+      }{
+        %% conclusions
+        \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxnewframe{\oxvarctx}{\oxframe}}{
+          \oxbranch{\oxexpr_1}{\oxexpr_2}{\oxexpr_3}
+        }{\oxsitype}{\oxnewframe{\oxvarctx_o}{\oxframe_o}} }
+    \end{mathpar}
+  } \vspace{1em}
+
+  By our induction hypothesis we get that
+  $\oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxnewframe{\oxvarctx^\prime}{\oxframe}}{\oxexpr_1}{\oxtbool}{\oxnewframe{\oxvarctx_1^\prime}{\oxframe_1}}$,
+  and
+  $\oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxnewframe{\oxvarctx_1^\prime}{\oxframe_1}}{\oxexpr_2}{\oxtbool}{\oxnewframe{\oxvarctx_2^\prime}{\oxframe_2}}$,
+  and
+  $\oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxnewframe{\oxvarctx_1^\prime}{\oxframe_1}}{\oxexpr_3}{\oxtbool}{\oxnewframe{\oxvarctx_3^\prime}{\oxframe_3}}$
+  with
+  $\oxsubtypectx{\oxglobalctx}{\oxtvarctx}{\oxnewframe{\oxvarctx_2}{\oxframe_2}}{\oxnewframe{\oxvarctx_2^\prime}{\oxframe_2}}$
+  and
+  $\oxsubtypectx{\oxglobalctx}{\oxtvarctx}{\oxnewframe{\oxvarctx_3}{\oxframe_3}}{\oxnewframe{\oxvarctx_3^\prime}{\oxframe_3}}$.
+
+  Next we want to show that
+  $\oxtunify{\oxtvarctx}{\oxkontctx}{\oxnewframe{\oxvarctx_2^\prime}{\oxframe_2}}{\oxsitype_2}{\oxsitype}{\oxnewframe{\oxvarctx_{2s}^\prime}{\oxframe_{2s}}}$,
+  $\oxsubtypectx{\oxglobalctx}{\oxtvarctx}{\oxnewframe{\oxvarctx_{2s}}{\oxframe_{2s}}}{\oxnewframe{\oxvarctx_{2s}^\prime}{\oxframe_{2s}}}$,
+  $\oxtunify{\oxtvarctx}{\oxkontctx}{\oxnewframe{\oxvarctx_3^\prime}{\oxframe_3}}{\oxsitype_3}{\oxsitype}{\oxnewframe{\oxvarctx_{3s}^\prime}{\oxframe_{3s}}}$,
+  and
+  $\oxsubtypectx{\oxglobalctx}{\oxtvarctx}{\oxnewframe{\oxvarctx_{3s}}{\oxframe_{3s}}}{\oxnewframe{\oxvarctx_{3s}^\prime}{\oxframe_{3s}}}$,
+  which all follow from applying \Lemma{lemma:unified-types-well-formed}. To do
+  this lemma application, we just need to show that for all $\oxcprov$ in
+  $\oxsitype_1$, $\oxsitype_2$ and $\oxsitype$, $\oxvarctx(\oxcprov) =
+  \oxvarctx^\prime(\oxcprov)$ which follows from the premise.
+
+  Finally, we need to show that
+  $\oxsubtypectx{\oxglobalctx}{\oxtvarctx}{\oxnewframe{\oxvarctx_o}{\oxframe_o}}{\oxnewframe{\oxvarctx_o^\prime}{\oxframe_o}}$.
+  The well formedness condition on $\oxvarctx_o^\prime$ follows immediately
+  since all types are the same as in $\oxvarctx_2^\prime$ and
+  $\oxvarctx_3^\prime$ and the loan sets are just unioned, meaning reference
+  types remain valid and we can compute types for all loans.
+
+  The equal or empty condition follows from the fact that $\oxvarctx_2^\prime$
+  and $\oxvarctx_3^\prime$ both agree on types by
+  \Lemma{lemma:related-input-output-differences}, which means they drop exactly
+  the same entries. For any regions emptied, either the same regions are
+  emptied, or the region was emptied in the corresponding smaller context
+  $\oxvarctx_2$ or $\oxvarctx_3$. Otherwise the loan sets are untouched.
+
+  Finally, both of these are preserved when adding on the same frame, so we're
+  done.
+
+  \vspace{1em}
+  \noindent \framebox[\textwidth]{ \figuresize
+    \begin{mathpar}
+      \inferrule[T-Match]{
+        %% premises
+        \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxnewframe{\oxvarctx}{\oxframe}}{
+          \oxexpr
+        }{\oxtsum{\oxsitype_l}{\oxsitype_r}}{\oxnewframe{\oxvarctx_1}{\oxframe_1}} \\
+        \forall \oxcprov \in \oxfprovs{\oxtsum{\oxsitype_l}{\oxsitype_r}}. \;
+        \oxnotreborrowed{\oxnewframe{\oxvarctx_1}{\oxframe_1}}{\oxcprov} \\\\
+        \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}
+        {\oxextendctx{\oxnewframe{\oxvarctx_1}{\oxframe_1}}{
+            \oxvarctxentry{\oxid_1}{\oxsitype_l} }}{ \oxexpr_1
+        }{\oxsitype_2}{\oxextendctx{\oxnewframe{\oxvarctx_2}{\oxframe_2}}{
+            \oxvarctxentry{\oxid_1}{\oxsdtype_l}
+          }} \\\\
+        \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxextendctx{\oxnewframe{\oxvarctx_1}{\oxframe_1}}{
+            \oxvarctxentry{\oxid_2}{\oxsitype_r} }}{ \oxexpr_2
+        }{\oxsitype_3}{\oxextendctx{\oxnewframe{\oxvarctx_3}{\oxframe_3}}{
+            \oxvarctxentry{\oxid_2}{\oxsdtype_r}
+          }} \\
+        \oxsitype = \oxsitype_2 \vee \oxsitype = \oxsitype_3 \\\\
+        \oxtunify{\oxtvarctx}{\oxkontctx}{\oxnewframe{\oxvarctx_2}{\oxframe_2}}
+        {\oxsitype_2}{\oxsitype}{\oxnewframe{\oxvarctx_{2s}}{\oxframe_{2s}}} \\
+        \oxtunify{\oxtvarctx}{\oxkontctx}{\oxnewframe{\oxvarctx_3}{\oxframe_3}}
+        {\oxsitype_3}{\oxsitype}{\oxnewframe{\oxvarctx_{3s}}{\oxframe_{3s}}} \\
+        \oxnewframe{\oxvarctx_{2s}}{\oxframe_{2s}} \oxintersect \oxnewframe{\oxvarctx_{3s}}{\oxframe_{3s}} = \oxnewframe{\oxvarctx_o}{\oxframe_o} \\
+      }{
+        %% conclusions
+        \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxnewframe{\oxvarctx}{\oxframe}}{
+          \oxmatch{\oxexpr}{\oxid_1}{\oxexpr_1}{\oxid_2}{\oxexpr_2}
+        }{\oxsitype}{\oxnewframe{\oxvarctx_o}{\oxframe_o}} }
+    \end{mathpar}
+  } \vspace{1em}
+
+  This case follows almost identically to the \oxname{T-Branch} case above. The
+  only structural difference is that the expression typing judgements for
+  $\oxexpr_1$ and $\oxexpr_2$ have $\oxid_1$ and $\oxid_2$ respectively in their
+  environments, but we know we can remove $\oxid_1$ and $\oxid_2$ from each side
+  and keep the contexts well formed, since nothing that comes before $\oxid_1$
+  or $\oxid_2$ can refer to it, and we know that $\oxsitype_1$ and $\oxsitype_2$
+  cannot in any way refer to $\oxid_1$ or $\oxid_2$ because we have from the
+  region rewriting judgements in the premises that the types are well formed in
+  $\oxnewframe{\oxvarctx_2}{\oxframe_2}$ and
+  $\oxnewframe{\oxvarctx_3}{\oxframe_3}$ respectively. We also need to show that the region not reborrowed judgement still holds, but this is immediate because at most $\oxvarctx_1^\prime$ has the same types as $\oxvarctx_1$. 
+  
+  \vspace{1em}
+  \noindent \framebox[\textwidth]{ \figuresize
+    \begin{mathpar}
+      \inferrule[T-Let]{
+        %% premises
+        \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxnewframe{\oxvarctx}{\oxframe}}{
+          \oxexpr_1
+        }{\oxsitype_1}{\oxnewframe{\oxvarctx_1}{\oxframe_1}} \\
+        \oxtunify{\oxtvarctx}{\oxkontctx}{\oxnewframe{\oxvarctx_1}{\oxframe_1}}
+                 {\oxsitype_1}{\oxsitype_a}{\oxnewframe{\oxvarctx_{1s}}{\oxframe_{1s}}} \\\\
+        \forall \oxcprov \in \oxfprovs{\oxsitype_a}. \;
+        \oxnotreborrowed{\oxnewframe{\oxvarctx_{1s}}{\oxframe_{1s}}}{\oxcprov} \\\\
+        \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{
+          \oxgcloans{\oxkontctx}{\oxextendctx{\oxnewframe{\oxvarctx_{1s}}{\oxframe_{1s}}}{\oxvarctxentry{\oxid}{\oxsitype_a}}}
+        }{ \oxexpr_2 }{\oxsitype_2}{
+          \oxextendctx{\oxnewframe{\oxvarctx_2}{\oxframe_2}}{
+            \oxvarctxentry{\oxid}{\oxsdtype} }
+        } \\
+      }{
+        %% conclusions
+        \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxnewframe{\oxvarctx}{\oxframe}}{
+          \oxlet{\oxid}{\oxsitype_a}{\oxexpr_1}{\oxexpr_2} }{\oxsitype_2}{
+          \oxnewframe{\oxvarctx_2}{\oxframe_2} } }
+    \end{mathpar}
+  } \vspace{1em}
+
+  Firstly, we apply our induction hypothesis to get that $\oxexpr_1$ is well
+  typed with input environment $\oxnewframe{\oxvarctx^\prime}{\oxframe}$ and
+  output environment $\oxnewframe{\oxvarctx_1^\prime}{\oxframe_1}$ with
+  $\oxsubtypectx{\oxglobalctx}{\oxtvarctx}{\oxnewframe{\oxvarctx_1}{\oxframe_1}}{\oxnewframe{\oxvarctx_1^\prime}{\oxframe_1}}$.
+  Then, we apply \Lemma{lemma:unified-types-well-formed} to get
+  $\oxsubtypectx{\oxglobalctx}{\oxtvarctx}{\oxnewframe{\oxvarctx_{1s}}{\oxframe_{1s}}}{\oxnewframe{\oxvarctx_{1s}^\prime}{\oxframe_{1s}}}$.
+  In order to apply this lemma we need to know that for any $\oxcprov$ that
+  occur in $\oxsitype_1$ or $\oxsitype_a$,
+  $\oxnewframe{\oxvarctx_1}{\oxframe_1}(\oxcprov) =
+  \oxnewframe{\oxvarctx_1^\prime}{\oxframe_1}(\oxcprov)$, which we have as a
+  conclusion from the previous application of the induction hypothesis.
+
+  The region not reborrowed judgement holds immediately, because at most
+  $\oxvarctx_1^\prime$ has the same types as $\oxvarctx_1$.
+
+  To apply our induction hypothesis on $\oxexpr_2$ and continue the case, we need that \\
+  $\oxsubtypectx{\oxglobalctx}{\oxtvarctx}{\oxgcloans{\oxkontctx}{\oxnewframe{\oxvarctx_{1s}}{\oxframe_{1s}},
+      \oxid :
+      \oxsitype_a}}{\oxgcloans{\oxkontctx}{\oxnewframe{\oxvarctx_{1s}^\prime}{\oxframe_{1s}},
+      \oxid : \oxsitype_a}}$. But this is immediate by definition since gcloans
+  can only empty loan sets for regions for which there are no types that contain
+  them, which is allowed by \oxname{R-Env}.
+
+  Our final obligation to apply the induction hypothesis is that for any
+  $\oxcprov$ that occurs in a type in $\oxframe_{1s}$ but is not in
+  $\oxframe_{1s}$, we need that
+  $\oxgcloans{\oxkontctx}{\oxnewframe{\oxvarctx_{1s}}{\oxframe_{1s}}}(\oxcprov)
+  =
+  \oxgcloans{\oxkontctx}{\oxnewframe{\oxvarctx_{1s}^\prime}{\oxframe_{1s}}}(\oxcprov)$.
+  We already have that $\oxnewframe{\oxvarctx_{1s}}{\oxframe_{1s}}(\oxcprov) =
+  \oxnewframe{\oxvarctx_{1s}^\prime}{\oxframe_{1s}}(\oxcprov)$, so we just need
+  to know that $\exists \oxplace : \oxtype \in \oxvarctx_{1s}$, where $\oxcprov$
+  occurs in $\oxtype$, and $\oxnewframe{\oxvarctx_{1s}}{\oxframe_{1s}}(\oxplace)
+  = \oxnewframe{\oxvarctx_{1s}}{\oxframe_{1s}}^\prime(\oxplace)$. But we said
+  that $\oxcprov$ is contained in a type in $\oxframe_{1s}$, so the place for
+  that type is one such place, so we cannot empty the loan set.
+
+  \vspace{1em}
+  \noindent \framebox[\textwidth]{ \figuresize
+    \begin{mathpar}
+      \inferrule[T-Seq]{
+        %% premises
+        \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxnewframe{\oxvarctx}{\oxframe}}{
+          \oxexpr_1
+        }{\oxsitype_1}{\oxnewframe{\oxvarctx}{\oxframe}_1} \\\\
+        \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxgcloans{\oxkontctx}{\oxnewframe{\oxvarctx_1}{\oxframe_1}}}{
+          \oxexpr_2
+        }{\oxsitype_2}{\oxnewframe{\oxvarctx_2}{\oxframe_2}} \\
+      }{
+        %% conclusions
+        \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxnewframe{\oxvarctx}{\oxframe}}{
+          \oxseq{\oxexpr_1}{\oxexpr_2}
+        }{\oxsitype_2}{\oxnewframe{\oxvarctx_2}{\oxframe_2}} }
+    \end{mathpar}
+  } \vspace{1em}
+
+  Firstly, we apply our induction hypothesis to get that $\oxexpr_1$ is well
+  typed with input environment $\oxnewframe{\oxvarctx^\prime}{\oxframe}$ and
+  output environment $\oxnewframe{\oxvarctx_1^\prime}{\oxframe_1}$, with
+  $\oxsubtypectx{\oxglobalctx}{\oxtvarctx}{\oxnewframe{\oxvarctx_1}{\oxframe_1}}{\oxnewframe{\oxvarctx_1^\prime}{\oxframe_1}}$.
+  We need to know that
+  $\oxsubtypectx{\oxglobalctx}{\oxtvarctx}{\oxgcloans{\oxkontctx}{\oxnewframe{\oxvarctx_1}{\oxframe_1}}}{\oxgcloans{\oxkontctx}{\oxnewframe{\oxvarctx_1^\prime}{\oxframe_1}}}$
+  before we can apply our induction hypothesis to finish the proof. But this
+  fact is trivial by the definitions, since \textrm{gc-loans} can only empty
+  regions that are not in initialized types in the context, which is allowed in
+  \oxname{R-Env}.
+
+  Our final obligation to apply the induction hypothesis is that for any
+  $\oxcprov$ that occurs in a type in $\oxframe_{1}$ but is not in
+  $\oxframe_{1}$, we need that
+  $\oxgcloans{\oxkontctx}{\oxnewframe{\oxvarctx_{1}}{\oxframe_{1}}}(\oxcprov) =
+  \oxgcloans{\oxkontctx}{\oxnewframe{\oxvarctx_{1}^\prime}{\oxframe_{1}}}(\oxcprov)$.
+  We already have that $\oxnewframe{\oxvarctx_{1}}{\oxframe_{1}}(\oxcprov) =
+  \oxnewframe{\oxvarctx_{1}^\prime}{\oxframe_{1}}(\oxcprov)$, so we just need to
+  know that $\exists \oxplace : \oxtype \in \oxvarctx_{1}$, where $\oxcprov$
+  occurs in $\oxtype$, and $\oxnewframe{\oxvarctx_{1}}{\oxframe_1}(\oxplace) =
+  \oxnewframe{\oxvarctx_{1}^\prime}{\oxframe_1}(\oxplace)$. But since $\oxcprov$
+  occurs in a type in $\oxframe_1$, the place that maps to that type is such a
+  place.
+  
+  \vspace{1em}
+  \noindent \framebox[\textwidth]{ \figuresize
+    \begin{mathpar}
+      \inferrule[T-Drop]{
+        %% premises
+        \oxlookup{\oxvarctx}{\oxplace}{\oxsitype_\oxplace} \\
+        \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{
+          (\oxnewframe{\oxvarctx}{\oxframe})[\oxplace \mapsto
+          \oxsidtype_\oxplace]
+        }{\oxexpr}{\oxsxtype}{\oxnewframe{\oxvarctx_o}{\oxframe_o}} \\
+      }{
+        %% conclusions
+        \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxnewframe{\oxvarctx}{\oxframe}}{
+          \oxexpr }{\oxsxtype}{\oxnewframe{\oxvarctx_o}{\oxframe_o}} }
+    \end{mathpar}
+  } \vspace{1em}
+
+  In order to apply our induction hypothesis and finish the case, we only need
+  to show that
+  $\oxsubtypectx{\oxglobalctx}{\oxtvarctx}{(\oxnewframe{\oxvarctx}{\oxframe})[\oxplace
+    \mapsto
+    \oxsidtype_\oxplace]}{(\oxnewframe{\oxvarctx^\prime}{\oxframe})[\oxplace
+    \mapsto \oxsidtype_\oxplace]}$, which is immediate by the definition of
+  related contexts. Note that
+  $(\oxnewframe{\oxvarctx^\prime}{\oxframe})[\oxplace \mapsto
+  \oxsidtype_\oxplace]$ is well formed because
+  $(\oxnewframe{\oxvarctx}{\oxframe})[\oxplace \mapsto \oxsidtype_\oxplace]$ is
+  well formed. There cannot be any loans to $\oxplace$ because in the
+  $(\oxnewframe{\oxvarctx^\prime}{\oxframe})[\oxplace \mapsto
+  \oxsidtype_\oxplace]$ because those loans would be there in
+  $(\oxnewframe{\oxvarctx}{\oxframe})[\oxplace \mapsto \oxsidtype_\oxplace]$.
+
+  \vspace{1em}
+  \noindent \framebox[\textwidth]{ \figuresize
+    \begin{mathpar}
+      \inferrule[T-App]{
+        %% premises
+        \overline{\oxenvwellformed{\oxglobalctx}{\oxtvarctx}{\oxnewframe{\oxvarctx}{\oxframe}}{\oxenv}} \\
+        \overline{\oxrgnvalidity{\oxtvarctx}{\oxnewframe{\oxvarctx}{\oxframe}}{\oxprov}} \\
+        \overline{\oxtypevalidity{\oxglobalctx}{\oxtvarctx}{\oxnewframe{\oxvarctx}{\oxframe}}{\oxsitype}} \\
+        \delta = \oxsubstmany{
+          \oxsubstmany{
+            \oxsubstmany{\cdot}{\oxenv}{\oxenvvar}
+          }{\oxprov}{\oxabsprov}
+        }{\oxsitype}{\oxtvar} \\\\
+        \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxnewframe{\oxvarctx}{\oxframe}}{
+          \oxnoseqexpr_f }{ \oxtfunext{ \overline{\oxenvvar} \oxcomma
+            \overline{\oxabsprov} \oxcomma \overline{\oxtvar} }{ \oxsitype_1
+            \oxdotsc \oxsitype_n
+          }{\oxsitype_f}{\oxenv_c}{\overline{\oxabsprov_1: \oxabsprov_2}}
+        }{\oxnewframe{\oxvarctx_0}{\oxframe_0}} \\\\
+        \forall i \in \oxset{1 \oxdots n}. \;
+        \oxtypjudge{\oxglobalctx}{\oxtvarctx}{
+          \oxextendctx{\oxkontctx}{
+            \delta(\oxsitype_1) \oxdots \delta(\oxsitype_{i-1})
+          }
+        }{\oxnewframe{\oxvarctx_{i-1}}{\oxframe_{i-1}}}{
+          \oxnoseqexpr_i }{\delta(\oxsitype_i)}{\oxnewframe{\oxvarctx_i}{\oxframe_i}} \\
+        \forall i \in \oxset{ 1 \oxdots n }. \;
+    \forall \oxcprov \in \oxfprovs{\oxsitype_i}. \;
+    \oxnotreborrowed{\oxnewframe{\oxvarctx_n}{\oxframe_n}}{\oxcprov} \\
+        \oxrunifymany{\oxtvarctx}{\oxkontctx}{\oxnewframe{\oxvarctx_n}{\oxframe_n}}{
+          \oxsubstmany{\oxabsprov_2}{\oxprov}{\oxabsprov} }{
+          \oxsubstmany{\oxabsprov_1}{\oxprov}{\oxabsprov}
+        }{\oxnewframe{\oxvarctx_b}{\oxframe_b}} \\
+      }{
+        %% conclusions
+        \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxnewframe{\oxvarctx}{\oxframe}}{
+          \oxapp{\oxnoseqexpr_f}{ \overline{\oxenv} \oxcomma \overline{\oxprov}
+            \oxcomma \overline{\oxsitype} }{ \oxnoseqexpr_1 \oxdotsc
+            \oxnoseqexpr_n } }{ \oxsubstmany{ \oxsubstmany{
+              \oxsubstmany{\oxsitype_f}{\oxenv}{\oxenvvar}
+            }{\oxprov}{\oxabsprov} }{\oxsitype}{\oxtvar}
+        }{\oxnewframe{\oxvarctx_b}{\oxframe_b}} }
+    \end{mathpar}
+  } \vspace{1em}
+
+  In the case of \oxname{T-App}, we firstly must prove the well formedness
+  properties:
+  \begin{itemize}
+  \item
+    $\oxenvwellformed{\oxglobalctx}{\oxtvarctx}{\oxnewframe{\oxvarctx^\prime}{\oxframe}}{\oxenv}$.
+    Since $\oxtvarctx$ is unchanged, \oxname{WF-Env} is the only interesting
+    case.
+    
+    \vspace{1em}
+    \noindent \hspace{-2.5em} \framebox[\textwidth]{ \figuresize
+      \begin{mathpar}
+        \inferrule[WF-Env]{
+          %% premises
+          \oxvarctxwellformed{\oxglobalctx}{\oxtvarctx}{
+            \oxnewframe{\oxnewframe{\oxvarctx}{\oxframe}}{\oxframe_c} } }{
+          %% conclusions
+          \oxenvwellformed{\oxglobalctx}{\oxtvarctx}{\oxnewframe{\oxvarctx}{\oxframe}}{
+            \oxframe_c } }
+      \end{mathpar}
+    } \vspace{1em}
+
+    Let $\oxenv = \oxframe_e$. We want to show that
+    $\oxctxswellformed{\oxglobalctx}{\oxtvarctx}{\oxnewframe{\oxnewframe{\oxvarctx^\prime}{\oxframe}}{\oxframe_c}}{\oxkontctx}$
+    given
+    $\oxctxswellformed{\oxglobalctx}{\oxtvarctx}{\oxnewframe{\oxnewframe{\oxvarctx}{\oxframe}}{\oxframe_c}}{\oxkontctx}$,
+    which is immediate from \Lemma{lemma:related-contexts-well-formed}.
+  \item $\oxrgnvalidity{\oxtvarctx}
+    {\oxnewframe{\oxvarctx^\prime}{\oxframe}}{\oxprov}$, which is immediate from
+    the premises since related loan environments have the same domains and
+    $\oxtvarctx$ is the same.
+  \item $\oxtypevalidity{\oxglobalctx}{\oxtvarctx}
+    {\oxnewframe{\oxvarctx^\prime}{\oxframe}}{\oxsitype}$, which is immediate
+    from \Lemma{lemma:types-well-formed}. We just need that for the regions that
+    occur in the type, their loan sets are unchanged, but we get that from the
+    premise, because the function argument is either: locally defined, in which
+    case it can only use and produce types accessible in the context; an
+    argument, in which case its arguments are also part of the argument type; or
+    a global function, in which case these types do not contain any non abstract
+    regions which are replaced with concrete regions all in $\oxframe$.
+  \end{itemize}
+
+  For the rest of the application case, we can apply our induction hypothesis on
+  the function and the arguments, additionally applying the substitution lemma,
+  \Lemma{lemma:substitution}, where needed. The region not reborrowed condition
+  is true by the fact that at most the types between $\oxvarctx_n$ and
+  $\oxvarctx_n^\prime$ are the same. The last part about outlives follows from
+  \Lemma{lemma:outlives-related}, where we have the condition on the loan sets
+  from the conclusion of the application of the induction hypothesis.
+
+  \vspace{1em}
+  \noindent \framebox[\textwidth]{ \figuresize
+    \begin{mathpar}
+      \inferrule[T-AppClosure]{
+        %% premises
+        \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxnewframe{\oxvarctx}{\oxframe}}{
+          \oxexpr_f
+        }{
+          \oxtfun{}{
+            \oxsitype_1 \oxdotsc \oxsitype_n
+          }{\oxsitype_f}{\oxenv_c}
+        }{\oxnewframe{\oxvarctx_{0s}}{\oxframe_{0s}}} \\\\
+        \forall i \in \oxset{1 \oxdots n}. \;
+        \oxtypjudge{\oxglobalctx}{\oxtvarctx}{
+          \oxextendctx{\oxkontctx}{
+            \oxsitype_1 \oxdots \oxsitype_{i-1}
+          }
+        }{\oxnewframe{\oxvarctx_{i-1s}}{\oxframe_{i-1s}}}{
+          \oxexpr_i
+        }{
+          \oxsitype_{i^\prime}
+        }{\oxnewframe{\oxvarctx_i}{\oxframe_i}} \\
+        \oxtunify[\oxcombineunrest]{\oxtvarctx}{\oxkontctx}{\oxnewframe{\oxvarctx_i}{\oxframe_i}}
+                 {\oxsitype_{i^\prime}}{\oxsitype_i}{\oxnewframe{\oxvarctx_{is}}{\oxframe_{is}}} \\\\
+                 \forall i \in \oxset{ 1 \oxdots n }. \;
+                 \forall \oxcprov \in \oxfprovs{\oxsitype_i}. \;
+                 \oxnotreborrowed{\oxnewframe{\oxvarctx_{ns}}{\oxframe_{ns}}}{\oxcprov} \\
+      }{
+        %% conclusions
+        \oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxnewframe{\oxvarctx}{\oxframe}}{
+          \oxapply{\oxexpr_f}{
+            \oxexpr_1 \oxdotsc \oxexpr_n
+          }
+        }{
+          \oxsitype_f
+        }{\oxnewframe{\oxvarctx_{ns}}{\oxframe_{ns}}}
+      }
+
+    \end{mathpar}
+  }
+
+  In the case of \oxname{T-AppClosure}, we follow a very similar procedure to
+  \oxname{T-AppFunction}, but with an empty substituion, and the addition that
+  we need to apply \Lemma{lemma:unified-types-well-formed} to handle the
+  rewriting.
+
+  In the cases of \oxname{T-Move}, \oxname{T-Copy}, \oxname{T-Borrow},
+  \oxname{T-BorrowIndex}, \oxname{T-BorrowSlice}, \oxname{IndexCopy}, they all
+  follow from the induction hypothesis and additionally applying
+  \Lemma{lemma:ownership-safety-related-envs} and
+  \Lemma{lemma:tc-related-contexts}. Note we get the place having the right type
+  requirement for \oxname{T-Move} from the fact that the place must be in
+  $\oxframe$ since it is a free variable.
+
+  The remaining cases of \oxname{T-Assign} and \oxname{T-AssignDeref} proceed
+  similarly. Firstly, we apply the induction hypothesis on the expression, then
+  \Lemma{lemma:ownership-safety-related-envs} and
+  \Lemma{lemma:tc-related-contexts}, and finally we get well formedness and
+  relatedness on the output environment by applying
+  \Lemma{lemma:unified-types-well-formed}. Note we get the place having the same
+  type requirement for type computation from the fact that the place must be in
+  $\oxframe$ since it is a free variable.
+
+\end{proof}
+
+\begin{oxlemma}{Referent Well Formedness Preserved in Related Environments}
+  {lemma:referent-related-envs} If
+  $\oxsubtypectx{\oxglobalctx}{\oxtvarctx}{\oxvarctx}{\oxvarctx^\prime}$ and
+  $\oxreferentvalidity{\oxglobalctx}{\oxvarctx}{\oxreferentctx[\oxplace]}{\oxxitype}$
+  and $\oxvarctx(\oxplace) = \oxvarctx^\prime(\oxplace)$, then
+  $\oxreferentvalidity{\oxglobalctx}{\oxvarctx^\prime}{\oxreferentctx[\oxplace]}{\oxxitype}$.
+\end{oxlemma}
+\begin{proof}
+  Proceed by induction on the referent validity derivation. The only case that
+  doesn't follow immediately from premises and the induction hypothesis in
+  \oxname{WF-RefId}, which follows from the equal types premise.
+\end{proof}
+
+\begin{oxlemma}{Value Typing Preserved in Related Environments}
+  {lemma:value-typing-related-envs} If
+  $\oxsubtypectx{\oxglobalctx}{\oxemptyctx}{\oxvarctx} {\oxvarctx^\prime}$,
+  and $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxemptyctx}{\oxvarctx}{\oxvalue}
+  {\oxvarctx(x)}{\oxvarctx}$, then
+  $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxemptyctx}{\oxvarctx^\prime}
+  {\oxvalue}{\oxvarctx^\prime(x)}{\oxvarctx^\prime}$.
+\end{oxlemma}
+
+\begin{proof}
+  Proceed by simultaneous induction on the typing derivation and the stack frame
+  well formedness.
+  Since we know the expression is already a value, we restrict ourselves
+  only to those cases that type values: \oxname{T-Unit}, \oxname{T-u32},
+  \oxname{T-True}, \oxname{T-False}, \oxname{T-Tuple}, \oxname{T-Array},
+  \oxname{T-Left}, \oxname{T-Right}, \oxname{T-Dead}, \oxname{T-Pointer}, and
+  \oxname{T-ClosureValue}.
+
+  For \oxname{T-Unit}, \oxname{T-u32}, \oxname{T-Dead}, \oxname{T-True}, and
+  \oxname{T-False}, this holds trivially. For \oxname{T-Tuple},
+  \oxname{T-Array}, \oxname{T-Left}, and \oxname{T-Right}, this holds directly
+  by repeated application of our induction hypothesis. This leaves us with
+  four cases.
+
+  \vspace{1em}
+  \noindent \framebox[\textwidth]{ \figuresize
+    \begin{mathpar}
+      \TClosureVal
+    \end{mathpar}
+  } \vspace{1em}
+
+  For the \oxname{T-ClosureValue} case, firstly we want to show
+  $\oxsubstorevalidity{\oxglobalctx}{\oxvarctx^\prime}{\oxstackframe}{\oxframe_c}$.
+  This follows immediatedly from applying the induction hypothesis for each value.
+
+  Then to finish the closure case, it suffices to show\\
+  $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxemptyctx}{\oxnewframe{\oxvarctx^\prime}{\oxframe_c}}
+  {\oxexpr}{\oxsitype_r}{\oxnewframe{\oxvarctx_o^\prime}{\oxframe}}$, which
+  follows immediately from \Lemma{lemma:expression-typing-related-envs}.
+  
+
+  \vspace{1em}
+  \noindent \framebox[\textwidth]{ \figuresize
+    \begin{mathpar}
+      \TPointer
+    \end{mathpar}
+  } \vspace{1em}
+  
+  If $x$ was dropped, then $\oxvarctx^\prime(x) = \oxvarctx(x)^\dagger$. Then
+  the proof follows immediately from \oxname{T-Dead}.
+  
+  If $x$ was not dropped, then $\oxvarctx(x) = \oxvarctx^\prime(x)$. All that
+  is left to show is that that the referent remains well formed, and the loan
+  $\oxloanpkg{\oxmuta}{\oxplace}$ is in $\oxvarctx^\prime(\oxcprov)$. The
+  first condition follows from \Lemma{lemma:referent-related-envs}. The second
+  condition is immediate because the only potential changes allowed in the
+  related environment to loan sets is emptying the loan sets of regions if
+  there's no references with the region in their type, and this particular
+  reference is a reference with the region, so emptying the loan set is ruled
+  out.
+\end{proof}
+  
+\begin{oxlemma}{Value Typing Fixed on Output Environments}
+  {lemma:value-typing-output} If
+  $\oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxvarctx}{\oxvalue}
+  {\oxtype}{\oxvarctx^\prime}$, then
+  $\oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxvarctx^\prime}
+  {\oxvalue}{\oxtype}{\oxvarctx^\prime}$.
+\end{oxlemma}
+
+\begin{proof}
+  Immediate by induction on the typing derivation. The only non immediate case
+  is \oxname{T-Pointer}, where we also need to apply
+  \Lemma{lemma:referent-related-envs}.
+\end{proof}
+
+\begin{oxlemma}{Stack Validity is Preserved in Related Environments}
+  {lemma:stack-validity-related-envs} If
+  $\oxstorevalidity{\oxglobalctx}{\oxvarctx}{\oxstore}$ and
+  $\oxsubtypectx{\oxglobalctx}{\oxemptyctx}{\oxvarctx}{\oxvarctx^\prime}$, then
+  $\oxstorevalidity{\oxglobalctx}{\oxvarctx^\prime}{\oxstore}$.
+\end{oxlemma}
+
+\begin{proof}
+  We proceed by induction over the well typedness of the store.
+
+  \vspace{1em}
+  \noindent \framebox[\textwidth]{ \figuresize
+    \begin{mathpar}
+      \VStack\and \VStackEmpty
+    \end{mathpar}
+  } \vspace{1em}
+
+  The interesting case is when the stack is non empty. Then we have that
+  $\oxstorevalidity{\oxglobalctx}{\oxvarctx^\prime}{\oxstore}$ and want to show
+  that
+  $\oxstorevalidity{\oxglobalctx}{\oxnewframe{\oxvarctx^\prime}{\oxframe}}{\oxnewframe{\oxstore}{\oxstackframe}}$.
+  The requirement on the domain is immediate since related environments have the
+  same domains. What's left to show is that the values in the store remain well
+  typed under the new environment. This follows from repeated applications of
+  \Lemma{lemma:value-typing-related-envs}
+\end{proof}
+
+\subsection{Preservation When Popping a Stack Frame Lemmas}
+\label{sec:pop-lemmas}
+
+\begin{oxlemma}{Stack Validity is Preserved When Popping A Stack Frame}
+  {lemma:stack-envminus} If
+  $\oxstorevalidity{\oxglobalctx}{\oxnewframe{\oxvarctx}{\oxframe}}{\oxnewframe{\oxstore}{\oxstackframe}}$,
+  then $\oxstorevalidity{\oxglobalctx} {\oxvarctx}{\oxstore}$.
+\end{oxlemma}
+
+\begin{proof}
+  Immediate by inversion on \oxname{WF-StackFrame} which gives us
+  $\oxstorevalidity{\oxglobalctx}{\oxvarctx}{\oxstore}$.
+\end{proof}
+
+\subsection{Preservation under Well Typed Extension Lemmas}
+\label{sec:extension-lemmas}
+
+\begin{oxlemma}{Ownership Safety is Preserved under Well-Typed Extensions}
+  {lemma:ownership-well-typed-extension} If
+  \begin{enumerate}
+  \item
+    $\oxtypevalidity{\oxglobalctx}{\oxemptyctx}{\oxnewframe{\oxvarctx}{\oxframe}}{\oxsitype_\oxid}$
+  \item
+    $\oxmusafetyinner{\oxemptyctx}{\oxkontctx}{\oxnewframe{\oxvarctx}{\oxframe}}{\oxmuta}{\overline{\oxplace}}{\oxplaceexpr}{\oxset{\oxloans}}$
+  \item $\oxrootof{\oxplaceexpr} \in \oxdomain{\oxframe}$
+  \item $\forall \oxcprov \in \oxfprovs{\oxsitype_\oxid}. \;
+    \oxnotreborrowed{\oxvarctx}{\oxcprov}$
+  \item $\forall \oxcprov \in \oxfprovs{\oxsitype_\oxid}. \; \forall \oxplace_i
+    \in \oxset{\overline{\oxplace}}. \; \oxvarctx(\oxplace_i) =
+    \oxtref{\oxcprov^{\prime\prime}}{\oxmuta}{\oxxitype} \implies
+    \oxcprov^{\prime\prime} \neq \oxcprov$
+  \end{enumerate}
+  then
+  $\oxmusafetyinner{\oxemptyctx}{\oxkontctx}{\oxnewframe{\oxextendctx{\oxvarctx}{\oxvarctxentry{\oxid}{\oxsitype_\oxid}}}{\oxframe}}{\oxmuta}{\overline{\oxplace}}{\oxplaceexpr}{\oxset{\oxloans}}$.
+\end{oxlemma}
+
+\begin{proof}
+  We proceed by induction on the ownership safety derivation.
+
+  \vspace{1em}
+  \noindent \framebox[\textwidth]{ \figuresize
+    \begin{mathpar}
+      \OSafePlace
+    \end{mathpar}
+  } \vspace{1em}
+
+  We'd like to apply \oxname{O-SafePlace} to show
+  $\oxmusafetyinner{\oxemptyctx}{\oxkontctx}{ \oxnewframe{
+      \oxextendctx{\oxvarctx}{\oxvarctxentry{\oxid}{\oxsitype_\oxid}}
+    }{\oxframe} }{\oxmuta}{ \overline{\oxplace_e} }{ \oxplace }{
+    \oxset{\oxloanpkg{\oxmuta}{\oxplace}} }$. Let
+  $\oxloanctxentry{\oxcprov^\prime}{\oxset{\oxloans}} \in \oxvarctx$. Note that
+  necessarily $\oxloanctxentry{\oxcprov^\prime}{\oxset{\oxloans}} \in
+  \oxextendctx{\oxvarctx}{\oxvarctxentry{\oxid}{\oxsitype_\oxid}}$.
+
+  If $\forall \oxloanpkg{\oxmuta^\prime}{\oxplaceexprctx[\oxplace^\prime]} \in
+  \oxset{\overline{\oxloan}}. (\oxmuta = \oxmut \vee \oxmuta^\prime = \oxmut)
+  \implies \oxrelevant{\oxplace^\prime}{\oxplace}$ held in our original
+  $\oxvarctx$, then it still holds in the extended typing $\oxnewframe{
+    \oxextendctx{\oxvarctx}{\oxvarctxentry{\oxid}{\oxsitype_\oxid}} }{\oxframe}$
+  since the loan sets are unchanged between the two stack typings.
+
+  Otherwise, we must have used the second clause $\exists
+  \oxvarctxentry{\oxplace^\prime}{\oxtref{\oxcprov^\prime}{\oxmuta^\prime}{\oxtype^\prime}}
+  \in \oxexplode{\oxvarctx} \; \wedge \; \not \exists
+  \oxtref{\oxcprov^\prime}{\oxmuta^\prime}{\oxtype^\prime} \in \oxkontctx \;
+  \wedge (\forall
+  \oxvarctxentry{\oxplace^\prime}{\oxtref{\oxcprov^\prime}{\oxmuta^\prime}{\oxtype^\prime}}
+  \in \oxexplode{\oxvarctx}. \; \oxplace^\prime \in \oxset{
+    \overline{\oxplace_e} })$ in the first place. To show that this is still
+  true, we need to show that nothing in our newly-bound $\oxid$ shares a type
+  with a reborrowed reference which would end up in our exclusion list. The
+  reason for this is that the failure condition for this is that with such a
+  reference now bound at (or reachable within) $\oxid$, we could violate the
+  universally-quantified portion of this clause. Fortunately, we have from our
+  premise that all the regions that appear in the type $\oxsitype_\oxid$ are
+  distinct from the ones in the exclusion list ($\forall \oxcprov \in
+  \oxfprovs{\oxsitype_\oxid}. \; \forall \oxplace_i \in
+  \oxset{\overline{\oxplace}}. \; \oxvarctx(\oxplace_i) =
+  \oxtref{\oxcprov^{\prime\prime}}{\oxmuta}{\oxxitype} \implies
+  \oxcprov^{\prime\prime} \neq \oxcprov$). Thus, we know this cannot be the
+  case.
+
+  \vspace{1em}
+  \noindent \framebox[\textwidth]{ \figuresize
+    \begin{mathpar}
+      \ODeref
+    \end{mathpar}
+  } \vspace{1em}
+
+  We'd like to apply \oxname{O-Deref} to show $\oxmusafetyinner{\oxemptyctx}{\oxkontctx}{
+    \oxnewframe{ \oxextendctx{\oxvarctx}{\oxvarctxentry{\oxid}{\oxsitype_\oxid}}
+    }{\oxframe} }{\oxmuta}{ \overline{\oxplace_e} }{ \oxplace }{
+    \oxset{\oxloanpkg{\oxmuta}{\oxplace}} }$. This requires us to show
+  $\oxlookup{ (\oxnewframe{
+      \oxextendctx{\oxvarctx}{\oxvarctxentry{\oxid}{\oxsitype_\oxid}}
+    }{\oxframe}) }{\oxplace}{
+    \oxtref{\oxcprov}{\oxmuta_\oxplace}{\oxtype_\oxplace} }$ and $\oxlookup{
+    (\oxnewframe{
+      \oxextendctx{\oxvarctx}{\oxvarctxentry{\oxid}{\oxsitype_\oxid}}
+    }{\oxframe}) }{\oxcprov}{
+    \oxset{\overline{\oxloanpkg{\oxmuta^\prime}{\oxplaceexpr}}^n} }$. The former
+  follows from the disjointedness assumption for $\oxid$, i.e. that $\oxid$ is
+  disjoint from all existing identifiers in $\oxvarctx$. The latter follows from
+  the fact that no loan sets are changed between the two stack typings. Since
+  the loan set is unchanged, we also have that the new extension for the
+  exclusion list $\oxkey{excl}$ is the same. This leaves us with two pieces to
+  show. First, that the recursive uses of ownership safety still succeed (for
+  which we will use the induction hypothesis) and that our last obligation holds
+  (which follows much as it did for \oxname{O-SafePlace}).
+
+  For the inductive cases, we can very nearly just apply the induction
+  hypothesis, but we first must show that our exclusion list invariant applies
+  for the extensions to the exclusion list. That is, we have that $\forall
+  \oxcprov \in \oxfprovs{\oxsitype_\oxid}. \; \forall \oxplace_i \in
+  \oxset{\overline{\oxplace_e}}. \; \oxvarctx(\oxplace_i) =
+  \oxtref{\oxcprov^{\prime\prime}}{\oxmuta}{\oxxitype} \implies
+  \oxcprov^{\prime\prime} \neq \oxcprov$, and we need to show $\forall \oxcprov
+  \in \oxfprovs{\oxsitype_\oxid}. \; \forall \oxplace_i \in \oxset{\textrm{excl}
+    \oxcomma \oxplace}. \; \oxvarctx(\oxplace_i) =
+  \oxtref{\oxcprov^{\prime\prime}}{\oxmuta}{\oxxitype} \implies
+  \oxcprov^{\prime\prime} \neq \oxcprov$. The exclusion extension $\oxkey{excl}$
+  is constructed by looking specifically at the reborrow loans associated with
+  the region $\oxcprov$. Since we know that $\forall \oxcprov \in
+  \oxfprovs{\oxsitype_\oxid}. \; \forall
+  \oxvarctxentry{\oxplace}{\oxtref{\oxcprov}{\oxmuta}{\oxxitype}} \in
+  \oxexplode{\oxvarctx}. \; \not\exists \oxcprov^\prime. \;
+  \oxloanpkg{\oxmuta}{\oxderef{\! \oxplace}} \in \oxvarctx(\oxcprov^\prime)$
+  (from inversion of \oxname{NRB-Region}), it
+  follows directly that none of the places in $\oxkey{excl}$ can have a
+  reference type with an region in $\oxsitype_\oxid$. If they did, that would
+  mean syntactically that $\oxvarctx(\oxcprov)$ contains a loan for
+  $\oxderef{\oxplace}$ which would give us a contradiction.
+
+  For the last obligation, let
+  $\oxloanctxentry{\oxcprov^\prime}{\oxset{\oxloans}} \in \oxvarctx$. Note that
+  necessarily $\oxloanctxentry{\oxcprov^\prime}{\oxset{\oxloans}} \in
+  \oxextendctx{\oxvarctx}{\oxvarctxentry{\oxid}{\oxsitype_\oxid}}$.
+
+  If $\forall \oxloanpkg{\oxmuta^\prime}{\oxplaceexpr^{\prime\prime}} \in
+  \oxset{\overline{\oxloan}}. (\oxmuta = \oxmut \vee \oxmuta^\prime = \oxmut)
+  \implies \oxrelevant{\oxplaceexpr^{\prime\prime}}{
+    \oxplaceexprctx[\oxderef{\oxplace}] }$ held in our original $\oxvarctx$,
+  then it still holds in the extended typing $\oxnewframe{
+    \oxextendctx{\oxvarctx}{\oxvarctxentry{\oxid}{\oxsitype_\oxid}} }{\oxframe}$
+  since the loan sets are unchanged between the two stack typings.
+
+  Otherwise, we must have used the second clause $\exists
+  \oxvarctxentry{\oxplace^\prime}{\oxtref{\oxcprov^\prime}{\oxmuta^\prime}{\oxtype^\prime}}
+  \in \oxexplode{\oxvarctx} \; \wedge \; \not \exists
+  \oxtref{\oxcprov^\prime}{\oxmuta^\prime}{\oxtype^\prime} \in \oxkontctx \;
+  \wedge (\forall
+  \oxvarctxentry{\oxplace^\prime}{\oxtref{\oxcprov^\prime}{\oxmuta^\prime}{\oxtype^\prime}}
+  \in \oxexplode{\oxvarctx}. \; \oxplace^\prime \in \oxset{
+    \overline{\oxplace_e} \oxcomma \textrm{excl} \oxcomma \oxplace })$ in the
+  first place. To show that this is still true, we need to show that nothing in
+  our newly-bound $\oxid$ shares a type with a reborrowed reference which would
+  end up in our exclusion list. The reason for this is that the failure
+  condition for this is that with such a reference now bound at (or reachable
+  within) $\oxid$, we could violate the universally-quantified portion of this
+  clause. Fortunately, we have from our premise that all the regions that
+  appear in the type $\oxsitype_\oxid$ are distinct from the ones in the
+  exclusion list ($\forall \oxcprov \in \oxfprovs{\oxsitype_\oxid}. \; \forall
+  \oxplace_i \in \oxset{\overline{\oxplace}}. \; \oxvarctx(\oxplace_i) =
+  \oxtref{\oxcprov^{\prime\prime}}{\oxmuta}{\oxxitype} \implies
+  \oxcprov^{\prime\prime} \neq \oxcprov$). Thus, we know this cannot be the
+  case.
+
+  \vspace{1em}
+  \noindent \framebox[\textwidth]{ \figuresize
+    \begin{mathpar}
+      \ODerefAbs
+    \end{mathpar}
+  } \vspace{1em}
+
+  Since $\oxtvarctx = \oxemptyctx$, there are no valid reference types that have
+  an abstract region, meaning the first hypothesis is a contradiction.
+\end{proof}
+
+\begin{oxlemma}{Type Computation is Preserved under Well-Typed Extensions}
+  {lemma:computety-well-typed-extension} If
+  $\oxtypevalidity{\oxglobalctx}{\oxemptyctx}{\oxvarctx}{\oxsitype_\oxid}$ and
+  $\oxcomputety{\oxemptyctx}{\oxvarctx}{\oxmuta}{\oxplaceexpr}{\oxtype}
+  {\oxset{\overline{\oxprov}}}$ then $\oxcomputety{\oxemptyctx}{
+    \oxextendctx{\oxvarctx}{\oxsitype_\oxid}
+  }{\oxmuta}{\oxplaceexpr}{\oxtype}{\oxset{\overline{\oxprov}}}$.
+\end{oxlemma}
+
+\begin{proof}
+  We proceed by induction on the type computation. This gives us three cases,
+  \oxname{TC-Var}, \oxname{TC-Proj} and \oxname{TC-Deref}. In \oxname{TC-Var},
+  the lookup yields the same type based on the assumption that our new binding
+  is disjoint from our existing ones. \oxname{TC-Proj} and \oxname{TC-Deref}
+  proceed directly from the induction hypothesis.
+\end{proof}
+
+\begin{oxlemma}{Outlives is Preserved under Well-Typed Extensions}
+  {lemma:outlives-well-typed-extension} If
+  $\oxtypevalidity{\oxglobalctx}{\oxemptyctx}{\oxvarctx}{\oxsitype_\oxid}$ and
+  $\forall \oxcprov \in \oxfprovs{\oxsitype_\oxid}. \;
+  \oxnotreborrowed{\oxvarctx}{\oxcprov}$ and
+  $\oxrunify{\oxemptyctx}{\oxkontctx}{\oxvarctx}{\oxprov_1}{\oxprov_2}{\oxvarctx^\prime}$
+  then $\oxrunify{\oxemptyctx}{\oxkontctx}{ \oxextendctx{\oxvarctx}{
+      \oxvarctxentry{\oxid}{\oxsitype_\oxid} } }{\oxprov_1}{\oxprov_2}{
+    \oxextendctx{\oxvarctx^\prime}{ \oxvarctxentry{\oxid}{\oxsitype_\oxid} } }$
+\end{oxlemma}
+
+\begin{proof}
+  We proceed by induction on the outlives judgment. This gives us six cases,
+  \oxname{OL-Refl}, \oxname{OL-Trans}, \oxname{OL-BothAbstract},
+  \oxname{OL-CombineConcrete}, \oxname{OL-ConcreteAbstract} and
+  \oxname{OL-AbstractConcrete}.
+
+  \oxname{OL-Refl}, \oxname{OL-BothAbstract} and \oxname{OL-AbstractConcrete}
+  are immediate.
+
+  \oxname{OL-Trans} follows from the induction hypothesis.
+
+  \oxname{OL-ConcreteAbstract} follows from the induction hypothesis and
+  \Lemma{lemma:computety-well-typed-extension}.
+
+  This leaves \oxname{OL-CombineConcrete} as the most interesting case. Here we
+  use $\forall \oxcprov \in \oxfprovs{\oxsitype_\oxid}. \;
+  \oxnotreborrowed{\oxvarctx}{\oxcprov}$ from our premise and note that since
+  this holds for arbitrary regions $\oxcprov$, we know that it holds for both
+  $\oxcprov_1$ and $\oxcprov_2$ in the premise of \oxname{OL-CombineConcrete} and
+  thus we are done.
+\end{proof}
+
+\begin{oxlemma}{Region Rewriting is Preserved under Well-Typed Extensions}
+  {lemma:subtyping-well-typed-extension} If
+  $\oxtypevalidity{\oxglobalctx}{\oxemptyctx}{\oxvarctx}{\oxsitype_\oxid}$ and
+  $\forall \oxcprov \in \oxfprovs{\oxsitype_\oxid}. \;
+  \oxnotreborrowed{\oxvarctx}{\oxcprov}$ and
+  $\oxtunify{\oxemptyctx}{\oxkontctx}{\oxvarctx}{\oxtype_1}{\oxtype_2}{\oxvarctx^\prime}$
+  then $\oxtunify{\oxemptyctx}{\oxkontctx}{ \oxextendctx{\oxvarctx}{
+      \oxvarctxentry{\oxid}{\oxsitype_\oxid} } }{\oxtype_1}{\oxtype_2}{
+    \oxextendctx{\oxvarctx^\prime}{ \oxvarctxentry{\oxid}{\oxsitype_\oxid} } }$.
+\end{oxlemma}
+
+\begin{proof}
+  We proceed by induction on the region rewriting judgment. This gives us seven
+  cases, \oxname{RR-Refl}, \oxname{RR-Trans}, \oxname{RR-Array},
+  \oxname{RR-Slice}, \oxname{RR-Reference}, \oxname{RR-Tuple}, and
+  \oxname{RR-Dead}.
+
+  \oxname{RR-Refl} is immediate.
+
+  \oxname{RR-Trans}, \oxname{RR-Array}, \oxname{RR-Slice}, \oxname{RR-Tuple} and
+  \oxname{RR-Dead} all follow directly from the induction hypothesis.
+
+  This leaves \oxname{RR-Reference} which follows from
+  \Lemma{lemma:outlives-well-typed-extension} and the induction hypothesis.
+\end{proof}
+
+\begin{oxlemma}{Closure Bodies are Well-Typed under Well-Typed Extensions}
+  {lemma:exprs-well-typed-extension} If
+  $\oxtypevalidity{\oxglobalctx}{\oxemptyctx}{\oxvarctx}{\oxsitype_\oxid}$ and
+  $\forall \oxcprov \in \oxfprovs{\oxsitype_\oxid}. \;
+  \oxnotreborrowed{\oxvarctx}{\oxcprov}$ and
+  $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{
+    \oxnewframe{\oxvarctx}{\oxframe} }{\oxexpr}{\oxsitype}{
+    \oxnewframe{\oxvarctx^\prime}{\oxframe^\prime} }$, then
+  $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{ \oxnewframe{
+      \oxextendctx{\oxvarctx}{ \oxvarctxentry{\oxid}{\oxsitype_\oxid} }
+    }{\oxframe} }{\oxexpr}{\oxsitype}{ \oxnewframe{
+      \oxextendctx{\oxvarctx^\prime}{ \oxvarctxentry{\oxid}{\oxsitype_\oxid} }
+    }{\oxframe^\prime} }$ and $\forall \oxcprov \in \oxfprovs{\oxsitype_\oxid}.
+  \; \forall \oxvarctxentry{\oxplace}{\oxtref{\oxcprov}{\oxmuta}{\oxxitype}} \in
+  \oxexplode{\oxvarctx^\prime}. \; \not\exists \oxcprov^\prime. \;
+  \oxloanpkg{\oxmuta}{\oxderef{\! \oxplace}} \in
+  \oxvarctx^\prime(\oxcprov^\prime)$.
+\end{oxlemma}
+
+\begin{proof}
+  We proceed by induction on the typing derivation.
+
+  \oxname{T-Function}, \oxname{T-Abort}, \oxname{T-Unit}, \oxname{T-u32},
+  \oxname{T-True}, \oxname{T-False}, and \oxname{T-Dead} are all immediate.
+
+  \oxname{T-LetRegion}, \oxname{T-While}, \oxname{T-ForArray},
+  \oxname{T-ForSlice}, \oxname{T-Closure}, \oxname{T-Tuple}, \oxname{T-Slice},
+  \oxname{T-Drop}, \oxname{T-Left}, \oxname{T-Right}, and \oxname{T-Shift},
+  \oxname{T-Framed}, and \oxname{T-ClosureValue} all follow directly from the
+  induction hypothesis.
+
+  For \oxname{T-Move}, \oxname{T-Copy}, \oxname{T-Borrow},
+  \oxname{T-BorrowIndex}, \oxname{T-BorrowSlice}, and \oxname{T-IndexCopy}, we
+  rely on \Lemma{lemma:ownership-well-typed-extension} and the induction
+  hypothesis for almost all of our obligations. For all of them except
+  \oxname{T-Move}, we also have to show that the type computation for
+  $\oxplaceexpr$ still works in the extended stack typing. This follows from
+  \Lemma{lemma:computety-well-typed-extension}.
+
+  For \oxname{T-Branch} and \oxname{T-Match}, we use the induction hypothesis in
+  conjunction with \Lemma{lemma:subtyping-well-typed-extension} to get most of
+  the premises. In the end, we also need to deal with the union between the
+  output environments from the two region rewriting derivations. Fortunately, we
+  know that by definition this operation unions corresponding loan sets for the
+  same region and as such creates no new loans leaving our not-reborrowed
+  property intact.
+
+  \oxname{T-Seq} proceeds almost directly based on just the induction
+  hypothesis, but with the required note that garbage collecting loans can only
+  remove loans and thus leaves our not-reborrowed property intact.
+  \oxname{T-Let} follows similarly to \oxname{T-Seq} but also requires the use
+  of \Lemma{lemma:subtyping-well-typed-extension}.
+
+  \oxname{T-Assign} and \oxname{T-AssignDeref} follow from the induction
+  hypothesis combined with \Lemma{lemma:subtyping-well-typed-extension} and
+  \Lemma{lemma:ownership-well-typed-extension}.
+
+  \oxname{T-App} follows from the induction hypothesis and
+  \Lemma{lemma:outlives-well-typed-extension}.
+
+  \oxname{T-Pointer} follows from \Lemma{lemma:computety-well-typed-extension}.
+\end{proof}
+
+\begin{oxlemma}{Values are Well-Typed under Well-Typed Extensions}
+  {lemma:values-well-typed-extension} If
+  $\oxtypevalidity{\oxglobalctx}{\oxemptyctx}{\oxvarctx}{\oxsitype_\oxid}$ and
+  $\forall \oxcprov \in \oxfprovs{\oxsitype_\oxid}. \;
+  \oxnotreborrowed{\oxvarctx}{\oxcprov}$ and
+  $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{\oxvarctx}
+  {\oxvalue}{\oxsitype}{\oxvarctx}$, then
+  $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{ \oxextendctx{\oxvarctx}{
+      \oxvarctxentry{\oxid}{\oxsitype_\oxid} } }{\oxvalue}{\oxsitype}{
+    \oxextendctx{\oxvarctx}{ \oxvarctxentry{\oxid}{\oxsitype_\oxid} } }$.
+\end{oxlemma}
+
+\begin{proof}
+  We proceed by induction on the typing derivation. The only non-immediate case
+  is \oxname{T-ClosureValue}.
+
+  \vspace{1em}
+  \noindent \framebox[\textwidth]{ \figuresize
+    \begin{mathpar}
+      \TClosureVal
+    \end{mathpar}
+  } \vspace{1em}
+
+  First, we invert the stack frame typing hypothesis to get that $\forall \oxid
+  \in \oxdomain{\oxstackframe}.\;
+  \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{\oxnewframe{\oxvarctx}{\oxframe_c}}{\oxstackframe(\oxid)}{\oxframe_c(\oxid)}{\oxnewframe{\oxvarctx}{\oxframe_c}}$.
+  We can apply the induction hypothesis to each of these statements, and apply
+  \oxname{WF-Frame} to get
+  $\oxsubstorevalidity{\oxglobalctx}{\oxextendctx{\oxvarctx}{\oxvarctxentry{\oxid}{\oxsitype_x}}}{\oxstackframe_c}{\oxframe_c}$.
+
+  Next, we need to show that
+  $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{ \oxnewframe{
+      \oxextendctx{\oxvarctx}{ \oxvarctxentry{\oxid}{\oxsitype_\oxid} } }{
+      \oxframe_c \oxcomma \oxvarctxentry{\oxid_1}{\oxsitype_1} \oxdotsc
+      \oxvarctxentry{\oxid_n}{\oxsitype_n} }
+  }{\oxexpr}{\oxsitype_\oxcprov}{\oxnewframe{\oxvarctx^{\prime\prime}}{\oxframe^\prime}}$
+  for some $\oxvarctx^{\prime\prime}$ and $\oxframe^\prime$. We get this by
+  applying \Lemma{lemma:exprs-well-typed-extension} to
+  $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{ \oxnewframe{\oxvarctx}{
+      \oxframe_c \oxcomma \oxvarctxentry{\oxid_1}{\oxsitype_1} \oxdotsc
+      \oxvarctxentry{\oxid_n}{\oxsitype_n} }
+  }{\oxexpr}{\oxsitype_\oxcprov}{\oxnewframe{\oxvarctx^\prime}{\oxframe^\prime}}$
+  (from the premise of \oxname{T-ClosureValue}).
+\end{proof}
+
+\begin{oxlemma}{Stack Validity is Preserved under Well-Typed Extensions}
+  {lemma:store-validity-extension} If
+  $\oxstorevalidity{\oxglobalctx}{\oxvarctx}{\oxstore}$ and
+  $\forall \oxcprov \in \oxfprovs{\oxsitype_\oxid}. \;
+  \oxnotreborrowed{\oxvarctx}{\oxcprov}$ and
+  $\oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxvarctx}{\oxvalue}
+  {\oxsitype}{\oxvarctx}$, then $\oxstorevalidity{\oxglobalctx}{
+    \oxextendctx{\oxvarctx}{ \oxvarctxentry{\oxid}{\oxsitype} } }{
+    \oxextendctx{\oxstore}{ \oxstoreentry{\oxid}{\oxvalue} } }$.
+\end{oxlemma}
+
+\begin{proof}
+  This proof follows directly from the definition of \oxname{WF-StackFrame}.
+  
+  \vspace{1em}
+  \noindent \framebox[\textwidth]{ \figuresize
+    \begin{mathpar}
+      \VStack
+    \end{mathpar}
+  } \vspace{1em}
+
+  In particular, inversion of \oxname{WF-StackFrame} on
+  $\oxstorevalidity{\oxglobalctx}{\oxvarctx}{\oxstore}$ gives us well-formedness
+  for the remainder of the stack, $\oxdomain{\oxstackframe} =
+  \oxdomain{\oxframe}|_\oxid$ and $\forall \oxid \in \oxdomain{\oxstackframe}.
+  \;
+  \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxemptyctx}{\oxnewframe{\oxvarctx}{\oxframe}}
+  {(\oxnewframe{\oxstore}{\oxstackframe})(\oxid)}{(\oxnewframe{\oxvarctx}{\oxframe})(\oxid)}{\oxnewframe{\oxvarctx}{\oxframe}}$.
+  We can then apply \Lemma{lemma:values-well-typed-extension} to each of these
+  derivations to get $\forall \oxid \in \oxdomain{ \oxextendctx{\oxstackframe}{
+      \oxstoreentry{\oxid}{\oxvalue} } }. \;
+  \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxemptyctx}{
+    \oxextendctx{\oxnewframe{\oxvarctx}{\oxframe}}{
+      \oxvarctxentry{\oxid}{\oxsitype} } }{ (\oxextendctx{\oxstackframe}{
+      \oxstoreentry{\oxid}{\oxvalue} })(\oxid) }{
+    (\oxextendctx{\oxnewframe{\oxvarctx}{\oxframe}}{
+      \oxvarctxentry{\oxid}{\oxsitype} })(\oxid) }{
+    \oxextendctx{\oxnewframe{\oxvarctx}{\oxframe}}{
+      \oxvarctxentry{\oxid}{\oxsitype} } }$. We can then see that the
+  well-formedness of the remainder of the stack is unaffected, and that the
+  domains when extended with $\oxid$ remain equal. The last obligation is to
+  show that the $\oxvalue$ is well-typed in the current stack typing, but we
+  already have that from our premise. Thus, we can apply \oxname{WF-StackFrame}
+  with the extended stack to get $\oxstorevalidity{\oxglobalctx}{
+    \oxextendctx{\oxvarctx}{ \oxvarctxentry{\oxid}{\oxsitype} } }{
+    \oxextendctx{\oxstore}{ \oxstoreentry{\oxid}{\oxvalue} } }$.
+\end{proof}
+
+\subsection{Preservation after Assignment Lemmas}
+\label{sec:assign-lemmas}
+
+\begin{oxlemma}{Ownership Safety is Preserved after Assignment}
+  {lemma:ownership-safety-assignment}
+  If $\oxlookup{\oxvarctx}{\oxplace_a}{\oxsxtype}$ and
+  $\oxtunify[\oxnoop]{\oxtvarctx}{\oxkontctx}{
+    \oxrsub{\oxvarctx}{\oxderef{\oxplace_a}}
+  }{\oxsitype}{\oxsxtype}{\oxvarctx^\prime}$ and
+  $\oxrgnuniqueto{\oxsxtype}{\oxplace_a}{\oxvarctx}$ and
+  $\oxmusafetyinner{\oxemptyctx}{\oxkontctx}{
+    \oxnewframe{\oxvarctx}{\oxframe}
+  }{\oxmuta}{\overline{\oxplace_o}}{\oxplaceexpr}{\oxset{\oxloans}}$ and
+  $\oxset{\overline{\oxplace_n}} = \oxset{\overline{\oxplace_o}} \setminus \oxplace_a$,
+  then $\oxmusafetyinner{\oxemptyctx}{\oxkontctx}{
+    \oxnewframe{
+      \oxgcloans{\oxkontctx}{\oxtupdate{\oxvarctx^\prime}{\oxplace_a}{\oxsitype}}
+    }{\oxframe}
+  }{\oxmuta}{\overline{\oxplace_n}}{\oxplaceexpr}{\oxset{\oxloans^\prime}}$.
+\end{oxlemma}
+
+\begin{proof}
+  We proceed by induction on the ownership safety derivation.
+
+  \vspace{1em}
+  \noindent \framebox[\textwidth]{ \figuresize
+    \begin{mathpar}
+      \OSafePlace
+    \end{mathpar}
+  } \vspace{1em}
+
+  Consider an arbitrary region $\oxcprov$ from the domain of
+  $\oxnewframe{\oxvarctx}{\oxframe}$. For this $\oxcprov$, we wish to show that
+  either of the two clauses in \oxname{O-SafePlace} which were previously true
+  are maintained after going through
+  $\oxtunify[\oxnoop]{\oxtvarctx}{\oxkontctx}{
+    \oxrsub{\oxvarctx}{\oxderef{\oxplace_a}}
+  }{\oxsitype}{\oxsxtype}{\oxvarctx^\prime}$ and $\oxgcloans{\oxkontctx}{\cdot}$,
+  which kills loans prefixed by $\oxderef{\oxplace}$, checks that the new type
+  for $\oxplace_a$ is compatible with its old type, and clears out loans
+  associated with its outermost region. So, we will consider each clause as a
+  separate case.
+
+  We will first consider the case where we have $\forall
+  \oxloanpkg{\oxmuta^\prime}{\oxplaceexprctx[\oxplace^\prime]} \in \oxset{\overline{\oxloan}}.
+  (\oxmuta = \oxmut \vee \oxmuta^\prime = \oxmut) \implies
+  \oxrelevant{\oxplace^\prime}{\oxplace}$. In this case, we know by definition of
+  $\rsub$ that $\forall \oxcprov \in \oxdomain{\oxvarctx}. \;
+  (\oxrsub{\oxvarctx}{\oxderef{\oxplace_a}})(\oxcprov) \subseteq \oxvarctx(\oxcprov)$.
+  We then know, again by definition (see \oxname{OL-CheckConcrete}), that
+  $\forall \oxcprov \in \oxdomain{\oxvarctx}. \;
+  (\oxrsub{\oxvarctx}{\oxderef{\oxplaceexpr}})(\oxcprov) =
+  \oxvarctx^\prime(\oxcprov)$. As such, we know that the $\rsub$ and
+  $\oxgcloans{\oxkontctx}{\cdot}$ has at most shrank the obligations in this case to
+  having fewer disjointedness obligations, and it is otherwise unchanged.
+
+  This leaves us to consider the second case
+  $\exists \oxvarctxentry{\oxplace^\prime}{\oxtref{\oxcprov^\prime}{\oxmuta^\prime}{\oxtype^\prime}} \in \oxexplode{\oxvarctx} \; \wedge \; \not \exists
+  \oxtref{\oxcprov^\prime}{\oxmuta^\prime}{\oxtype^\prime} \in \oxkontctx \;
+  \wedge
+  (\forall \oxvarctxentry{\oxplace^\prime}{\oxtref{\oxcprov^\prime}{\oxmuta^\prime}{\oxtype^\prime}} \in \oxexplode{\oxvarctx}. \;
+  \oxplace^\prime \in \oxset{
+    \overline{\oxplace_e}
+  })$. Recall that, definitionally, neither $\rsub$ nor the region
+  rewriting judgment change variable bindings and their associated types in the
+  environment (instead both affect only the loan sets associated with regions,
+  though the latter does not when run in the checking mode $\oxnoop$).
+  Thus, we know that $\oxexplode{\oxvarctx} = \oxexplode{\oxvarctx^\prime}$. We then
+  need to consider two distinct possibilities for how the exclusion list has
+  changed. We know from the premise that $\oxset{\overline{\oxplace_n}} =
+  \oxset{\overline{\oxplace_o}} \setminus \oxplace_a$ which means that either the two sets
+  are exactly identical (when $\oxplace_a \not\in \oxset{\overline{\oxplace_o}}$) or
+  smaller by $\oxplace_a$ in particular
+  (when $\oxplace_a \in \oxset{\overline{\oxplace_o}}$). In the former case, the
+  exclusion list is unchanged which means the whole clause is true for every
+  $\oxcprov^\prime$ in $\oxvarctx^\prime$ for which it was true in $\oxvarctx$. In the
+  latter case, the regions $\oxcprov^\prime$ is in the type of $\oxplace_a$ which
+  \emph{has} been removed from the exclusion list $\oxset{\overline{\oxplace_n}}$.
+  Thus, we need to show for the loans $\oxset{\overline{\oxloan}}$ associated
+  with $\oxcprov^\prime$ that $\forall \oxloanpkg{\oxmuta^\prime}{\oxplaceexprctx[\oxplace^\prime]}
+  \in \oxset{\overline{\oxloan}}. (\oxmuta = \oxmut \vee \oxmuta^\prime = \oxmut)
+  \implies \oxrelevant{\oxplace^\prime}{\oxplace}$. By definition,
+  $\oxrgnuniqueto{\oxsxtype}{\oxplace}{\oxvarctx}$ tells us that the outermost
+  region $\oxcprov^\prime$ is unique to the type $\oxsxtype$ and place $\oxplace_a$,
+  and thus when we replace it with $\oxsitype$, we ensure that $\oxcprov^\prime$ does
+  not occur in any type in $\oxvarctx^\prime$. Thus, the surrounding call of
+  $\oxgcloans{\oxkontctx}{\cdot}$ necessarily clears out the loan set meaning that
+  the set associated with $\oxcprov^\prime$ is always empty in new environment,
+  meaning the disjointness condition from \oxname{O-SafePlace} holds trivially.
+
+  \vspace{1em}
+  \noindent \framebox[\textwidth]{ \figuresize
+    \begin{mathpar}
+      \ODeref
+    \end{mathpar}
+  } \vspace{1em}
+
+  We want to produce a new derivation using \oxname{O-Deref} for
+  $\oxmusafetyinner{\oxemptyctx}{\oxkontctx}{
+    \oxnewframe{\oxrsub{\oxvarctx}{\oxderef{\oxplace_a}}}{\oxframe}
+  }{\oxmuta}{
+    \overline{\oxplace_e}
+  }{
+    \oxplaceexprctx[\oxderef{\oxplace}]
+  }{
+    \oxset{\overline{\oxloan^{\prime\prime}}}
+  }$. We have $\oxlookup{(\oxnewframe{\oxvarctx}{\oxframe})}{\oxplace}{
+    \oxtref{\oxcprov}{\oxmuta_\oxplace}{\oxtype_\oxplace}
+  }$ from the premise of \oxname{O-Deref}. We then know by the definition of
+  $\rsub$ that $\oxlookup{
+    (\oxnewframe{\oxrsub{\oxvarctx}{\oxderef{\oxplace_a}}}{\oxframe})
+  }{\oxplace}{
+    \oxtref{\oxcprov}{\oxmuta_\oxplace}{\oxtype_\oxplace}
+  }$ since $\rsub$ only affects the loan set portion of the codomain of its
+  input environment. We also know from the premise of \oxname{O-Deref} that
+  $\oxlookup{
+    (\oxnewframe{\oxvarctx}{\oxframe})
+  }{\oxcprov}{
+    \oxset{\overline{\oxloanpkg{\oxmuta^\prime}{\oxplaceexpr}}^n}
+  }$. Again, by the definition of $\rsub$, we have that
+  $\oxlookup{
+    (\oxnewframe{\oxrsub{\oxvarctx}{\oxderef{\oxplace_a}}}{\oxframe})
+  }{\oxcprov}{
+    \oxset{\overline{\oxloanpkg{\oxmuta^k}{\oxplaceexpr^k}}^m}
+  }$ where we know $m \leq n$ and
+  $\oxset{\overline{\oxloanpkg{\oxmuta^k}{\oxplaceexpr^k}}^m} \subseteq
+  \oxset{\overline{\oxloanpkg{\oxmuta^\prime}{\oxplaceexpr}}^n}$.
+
+  We know by the definition of $\rsub$ also that every place expression
+  $\oxplaceexpr_d$ in
+  $\oxset{\overline{\oxloanpkg{\oxmuta^\prime}{\oxplaceexpr}}^n} \setminus \oxset{\overline{\oxloanpkg{\oxmuta^k}{\oxplaceexpr^k}}^m}$
+  can be decomposed into $\oxplaceexprctx_d[\oxderef{\oxplace_a}]$. This means
+  that for computing the set $\textrm{excl}$, it is either the same or has
+  shrunk by precisely $\oxplace_a$. This lines up with our induction hypothesis
+  which we apply to each of $\forall i \in \oxset{1 \oxdots n}. \;
+  \oxmusafetyinner{\oxemptyctx}{\oxkontctx}{\oxvarctx}{\oxmuta}{
+    \overline{\oxplace_e} \oxcomma \textrm{excl} \oxcomma \oxplace
+  }{
+    \oxplaceexprctx[\oxplaceexpr_i]
+  }{
+    \oxset{\overline{\oxloanpkg{\oxmuta}{\oxplaceexpr_i^\prime}}}
+  }$ from the premise of \oxname{O-Deref}. This gives us
+  $\forall i \in \oxset{1 \oxdots n}. \;
+  \oxmusafetyinner{\oxemptyctx}{\oxkontctx}{
+    \oxrsub{\oxvarctx}{\oxderef{\oxplace_a}}
+  }{\oxmuta}{
+    \overline{\oxplace_e} \oxcomma \textrm{excl} \oxcomma \oxplace
+  }{
+    \oxplaceexprctx[\oxplaceexpr_i]
+  }{
+    \oxset{\overline{\oxloanpkg{\oxmuta}{\oxplaceexpr_i^{\prime\prime}}}}
+  }$.
+
+  Finally, for the last premise of \oxname{O-Deref}, the proof precedes
+  identically to the case for \oxname{O-SafePlace} since the obligation is
+  exactly the same.
+
+  \vspace{1em}
+  \noindent \framebox[\textwidth]{ \figuresize
+    \begin{mathpar}
+      \ODerefAbs
+    \end{mathpar}
+  } \vspace{1em}
+
+  Since $\oxtvarctx = \oxemptyctx$, there are no valid reference types that have
+  an abstract region, meaning the first hypothesis is a contradiction.
+\end{proof}
+
+\begin{oxlemma}{Outlives is Preserved after Assignment}
+  {lemma:outlives-assignment} If
+  $\oxlookup{\oxvarctx}{\oxplace_a}{\oxsxtype}$
+  and $\oxtunify[\oxnoop]{\oxtvarctx}{\oxkontctx}{
+    \oxrsub{\oxvarctx}{\oxderef{\oxplace_a}}
+  }{\oxsitype}{\oxsxtype}{\oxvarctx^\prime}$ and
+  $\oxrunify{\oxemptyctx}{\oxkontctx}{\oxvarctx}{\oxprov_1}{\oxprov_2}{\oxvarctx_o}$, then
+  $\oxrunify{\oxemptyctx}{\oxkontctx}{\oxvarctx^\prime}{\oxprov_1}{\oxprov_2}{
+    \oxvarctx^\prime_o
+  }$.
+\end{oxlemma}
+
+\begin{proof}
+  We proceed by induction on the outlives judgment. This gives us seven cases,
+  \oxname{OL-Refl}, \oxname{OL-Trans}, \oxname{OL-BothAbstract},
+  \oxname{OL-CombineConcrete}, \oxname{OL-CombineConcrete},
+  \oxname{OL-ConcreteAbstract} and \oxname{OL-AbstractConcrete}.
+
+  \oxname{OL-Refl}, \oxname{OL-BothAbstract} and \oxname{OL-AbstractConcrete}
+  are immediate.
+
+  \oxname{OL-Trans} follows from the induction hypothesis.
+
+  \oxname{OL-ConcreteAbstract} follows from the induction hypothesis and
+  noting that the type computation does not depend on the contents of loan sets.
+
+  This leaves \oxname{OL-CombineConcreteUnrestricted},
+  \oxname{OL-CombineConcrete} and \oxname{OL-CheckConcrete} as the most
+  interesting cases. We note that the checking mode $\oxnoop$ corresponds to
+  making no changes to the environment, thus $\oxvarctx^\prime =
+  \oxrsub{\oxvarctx}{\oxderef{\oxplace_a}}$. Then, for each, we note that the
+  value of each associated loan set in the input environment only has an effect
+  on the output environment and not whether or not the rule applies. Thus, since
+  we know that $\oxvarctx^\prime$ (compared to $\oxvarctx$) has had some loans
+  removed (those rooted at $\oxderef{\oxplace_a}$), then we can still produce a
+  derivation, only with a different, potentially smaller output.
+\end{proof}
+
+\begin{oxlemma}{Region Rewriting is Preserved after Assignment}
+  {lemma:subtyping-assignment} If
+  $\oxlookup{\oxvarctx}{\oxplace_a}{\oxsxtype}$
+  and $\oxtunify[\oxnoop]{\oxtvarctx}{\oxkontctx}{
+    \oxrsub{\oxvarctx}{\oxderef{\oxplace_a}}
+  }{\oxsitype}{\oxsxtype}{\oxvarctx^\prime}$ and
+  $\oxtunify{\oxemptyctx}{\oxkontctx}{\oxvarctx}{\oxtype_1}{\oxtype_2}{\oxvarctx_o}$, then
+  $\oxtunify{\oxemptyctx}{\oxkontctx}{\oxvarctx^\prime}{\oxtype_1}{\oxtype_2}{
+    \oxvarctx^\prime_o
+  }$.
+\end{oxlemma}
+
+\begin{proof}
+  We proceed by induction on the region rewriting judgment. This gives us seven
+  cases, \oxname{RR-Refl}, \oxname{RR-Trans}, \oxname{RR-Array},
+  \oxname{RR-Slice}, \oxname{RR-Reference}, \oxname{RR-Tuple}, and
+  \oxname{RR-Dead}.
+
+  \oxname{RR-Refl} is immediate.
+
+  \oxname{RR-Trans}, \oxname{RR-Array}, \oxname{RR-Slice}, \oxname{RR-Tuple} and
+  \oxname{RR-Dead} all follow directly from the induction hypothesis.
+
+  This leaves \oxname{RR-Reference} which follows from
+  \Lemma{lemma:outlives-assignment} and the induction hypothesis.
+\end{proof}
+
+\begin{oxlemma}{Expressions are Well-Typed after Assignment}
+  {lemma:exprs-well-typed-assignment}
+  If $\oxlookup{\oxvarctx}{\oxplace_a}{\oxsxtype}$
+  and $\oxtunify[\oxnoop]{\oxtvarctx}{\oxkontctx}{
+    \oxrsub{\oxvarctx}{\oxderef{\oxplace_a}}
+  }{\oxsitype}{\oxsxtype}{\oxvarctx^\prime}$ and
+  $\oxmusafety{\oxemptyctx}{\oxkontctx}{\oxvarctx^\prime}{\oxmut}{\oxplace_a}{
+    \oxset{\oxloanpkg{\oxmut}{\oxplace_a}}
+  }$ and
+  $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{
+    \oxnewframe{\oxvarctx}{\oxframe}
+  }{\oxexpr}{\oxsitype}{\oxnewframe{\oxvarctx_o}{\oxframe^\prime}}$, then
+  $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{
+    \oxnewframe{
+      \oxgcloans{\oxkontctx}{\oxtupdate{\oxvarctx^\prime}{\oxplace_a}{\oxsitype}}
+    }{\oxframe}
+  }{\oxexpr}{\oxsitype}{
+    \oxnewframe{
+      \oxtupdate{\oxvarctx^\prime_o}{\oxplace_a}{\oxsitype}
+    }{\oxframe^{\prime\prime}}
+  }$.
+\end{oxlemma}
+
+\begin{proof}
+  We proceed by induction on the typing derivation.
+
+  \oxname{T-Function}, \oxname{T-Abort}, \oxname{T-Unit}, \oxname{T-u32},
+  \oxname{T-True}, \oxname{T-False}, and \oxname{T-Dead} are all immediate.
+
+  \oxname{T-Seq}, \oxname{T-LetRegion}, \oxname{T-While}, \oxname{T-ForArray},
+  \oxname{T-ForSlice}, \oxname{T-Closure}, \oxname{T-Tuple}, \oxname{T-Slice},
+  \oxname{T-Drop}, \oxname{T-Left}, \oxname{T-Right}, and \oxname{T-Shift},
+  \oxname{T-Framed}, and \oxname{T-ClosureValue} all follow directly from the
+  induction hypothesis.
+
+  For \oxname{T-Move}, \oxname{T-Copy}, \oxname{T-Borrow},
+  \oxname{T-BorrowIndex}, \oxname{T-BorrowSlice}, and \oxname{T-IndexCopy}, we
+  rely on \Lemma{lemma:ownership-safety-assignment} and the induction
+  hypothesis for almost all of our obligations. For all of them except
+  \oxname{T-Move}, we also have to show that the type computation for
+  $\oxplaceexpr$ still works in the updated environment. Since we know that
+  $\oxplace_a$ is ownership safe from our premise, we know that $\oxplaceexpr$
+  is disjoint from $\oxplace_a$ and thus the type update could not affect its
+  type computation. Otherwise, the only difference is in loan sets associated
+  with regions, and thus does not affect type computation.
+
+  \oxname{T-Pointer} requires the same argument about type computation as in
+  \oxname{T-Borrow}, but does not need the additional lemmas or the induction
+  hypothesis.
+
+  For \oxname{T-Branch} and \oxname{T-Match}, we use the induction hypothesis in
+  conjunction with \Lemma{lemma:subtyping-assignment} to get most of
+
+  the premises. In the end, we also need to deal with the union between the
+  output environments from the two rewriting derivations. Fortunately, we know
+  that by definition this operation unions corresponding loan sets for the same
+  region and so commutes with $\oxgcloans{\oxkontctx}{\cdot}$ and the type update.
+
+  \oxname{T-Let} follows similarly to \oxname{T-Branch} and \oxname{T-Match}
+  using the induction hypothesis in conjunction with
+  \Lemma{lemma:subtyping-assignment} without the need to address a combined
+  environment.
+
+  \oxname{T-Assign} and \oxname{T-AssignDeref} follow from the induction
+  hypothesis combined with \Lemma{lemma:subtyping-assignment} and
+  \Lemma{lemma:ownership-safety-assignment}.
+
+  \oxname{T-App} follows from the induction hypothesis and
+  \Lemma{lemma:outlives-assignment}.
+\end{proof}
+
+\begin{oxlemma}{Values are Well-Typed after Assignment}
+  {lemma:values-well-typed-assignment}
+  If $\oxlookup{\oxvarctx}{\oxplace_a}{\oxsxtype}$ and
+  $\oxtunify[\oxnoop]{\oxtvarctx}{\oxkontctx}{
+    \oxrsub{\oxvarctx}{\oxderef{\oxplace_a}}
+  }{\oxsitype}{\oxsxtype}{\oxvarctx^\prime}$ and
+  $\oxmusafety{\oxemptyctx}{\oxkontctx}{\oxvarctx^\prime}{\oxmut}{\oxplace_a}{
+    \oxset{\oxloanpkg{\oxmut}{\oxplace_a}}
+  }$ and
+  $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{\oxvarctx}
+  {\oxvalue}{\oxtype}{\oxvarctx}$, then
+  $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{
+    \oxgcloans{\oxkontctx}{\oxtupdate{\oxvarctx^\prime}{\oxplace_a}{\oxsitype}}
+  }{
+    \oxvalue
+  }{\oxtype}{
+    \oxgcloans{\oxkontctx}{\oxtupdate{\oxvarctx^\prime}{\oxplace_a}{\oxsitype}}
+  }$.
+\end{oxlemma}
+
+\begin{proof}
+  We proceed by induction on the value typing derivation. The only non-immediate
+  cases are \oxname{T-Pointer} and \oxname{T-ClosureValue}.
+
+  \vspace{1em}
+  \noindent \framebox[\textwidth]{ \figuresize
+    \begin{mathpar}
+      \TPointer
+    \end{mathpar}
+  } \vspace{1em}
+
+  In \oxname{T-Pointer}, we have a requirement that
+  $\oxloanpkg{\oxmuta}{\oxplace} \in \oxvarctx(\oxcprov)$ which could
+  potentially be affected by the kill rules. However, note that the definition
+  of $\rsub$ is such that we only remove loans of the form
+  $\oxderef{\oxplace_a}$ which necessarily cannot match this loan which has no
+  dereference in it. Thus, we know that $\oxloanpkg{\oxmuta}{\oxplace} \in
+  (\oxrsub{\oxvarctx}{\oxderef{\oxplace}})(\oxcprov)$ and thus,
+  $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{
+    \oxrsub{\oxvarctx}{\oxderef{\oxplace_a}}
+  }{
+    \oxptr{\oxreferentctx[\oxplace]}
+  }{\oxsitype}{
+    \oxrsub{\oxvarctx}{\oxderef{\oxplace_a}}
+  }$. We then know that the checking mode $\oxnoop$ for rewriting does not
+  change the output environment, and thus, $\oxvarctx^\prime =
+  \oxrsub{\oxvarctx}{\oxderef{\oxplace_a}}$. Then, we know that
+  $\oxplace \neq \oxplace_a$ (this would otherwise conflict with the ownership
+  safety derivation for $\oxplace_a$ in our premise), so the type update for
+  $\oxplace_a$ does not impact \oxname{T-Pointer}. Finally, the call to
+  $\oxgcloans{\oxkontctx}{\cdot}$ clears out any unused regions, but the region
+  $\oxcprov$ here is still in use and thus not changed.
+
+  \vspace{1em}
+  \noindent \framebox[\textwidth]{ \figuresize
+    \begin{mathpar}
+      \TClosureVal
+    \end{mathpar}
+  } \vspace{1em}
+
+  
+  First, we invert the stack frame typing hypothesis to get that $\forall \oxid
+  \in \oxdomain{\oxstackframe}. \;
+  \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{
+    \oxnewframe{\oxvarctx}{\oxframe_c}
+  }{\oxstackframe(\oxid)}{\oxframe_c(\oxid)}
+  {\oxnewframe{\oxvarctx}{\oxframe_c}}$.
+  We can apply the induction hypothesis to each of these statements, and apply
+  \oxname{WF-Frame} to get
+  $\oxsubstorevalidity{\oxglobalctx}{
+      \oxgcloans{\oxkontctx}{\oxtupdate{\oxvarctx^\prime}{\oxplace_a}{\oxsitype}}
+  }{\oxstackframe_c}{\oxframe_c}$.
+
+  Next, we need to show that
+  $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{
+    \oxnewframe{
+      \oxgcloans{\oxkontctx}{\oxtupdate{\oxvarctx^\prime}{\oxplace_a}{\oxsitype}}
+    }{
+      \oxframe_c \oxcomma
+      \oxvarctxentry{\oxid_1}{\oxsitype_1} \oxdotsc
+      \oxvarctxentry{\oxid_n}{\oxsitype_n}
+    }
+  }{\oxexpr}{\oxsitype_\oxcprov}{\oxnewframe{\oxvarctx^{\prime\prime}}{\oxframe^\prime}}$
+  for some $\oxvarctx^{\prime\prime}$ and $\oxframe^\prime$. We get this by
+  applying \Lemma{lemma:exprs-well-typed-assignment} to
+  $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{
+    \oxnewframe{\oxvarctx}{
+      \oxframe_c \oxcomma
+      \oxvarctxentry{\oxid_1}{\oxsitype_1} \oxdotsc
+      \oxvarctxentry{\oxid_n}{\oxsitype_n}
+    }
+  }{\oxexpr}{\oxsitype_\oxcprov}{\oxnewframe{\oxvarctx^\prime}{\oxframe^\prime}}$
+  from the premise of \oxname{T-ClosureValue}.
+\end{proof}
+
+\begin{oxlemma}{Stack Validity is Preserved after Assignment}
+  {lemma:stack-validity-assign}
+  If $\oxstorevalidity{\oxglobalctx}{\oxvarctx}{\oxstore}$ and
+  $\oxlookup{\oxvarctx}{\oxplace}{\oxsxtype}$ and
+  $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{\oxvarctx}{
+    \oxvalue
+  }{\oxsitype}{\oxvarctx}$ and
+  $\oxtunify{\oxemptyctx}{\oxkontctx}{
+    \oxrsub{\oxvarctx}{\oxderef{\oxplace}}
+  }{\oxsitype}{\oxsxtype}{\oxvarctx^\prime}$ and
+  $\oxmusafety{\oxemptyctx}{\oxkontctx}{\oxvarctx^\prime}{\oxmut}{\oxplace}{
+    \oxset{\oxloanpkg{\oxmut}{\oxplace}}
+  }$ and
+  $\oxnorm{\oxstore}{\oxplace}{\oxplace}{\oxvaluectx}{\_}$ and
+  $\oxplace = \oxproj{\oxid}{\oxpath}$,
+  then
+  $\oxstorevalidity{\oxglobalctx}{
+    \oxgcloans{\oxkontctx}{\oxtupdate{\oxvarctx^\prime}{\oxplace}{\oxsitype}}
+  }{
+    \oxvupdate{\oxstore}{\oxid}{\oxvaluectx[\oxvalue]}
+  }$.
+\end{oxlemma}
+
+\begin{proof}
+  The proof proceeds by induction on the stack validity judgment
+  $\oxstorevalidity{\oxglobalctx}{\oxvarctx}{\oxstore}$ which has two cases,
+  \oxname{WF-StackEmpty} and \oxname{WF-StackFrame}.
+
+  \vspace{1em}
+  \noindent \framebox[\textwidth]{
+    \figuresize
+    \begin{mathpar}
+      \VStackEmpty
+    \end{mathpar}
+  }
+  \vspace{1em}
+
+  In this case, the stack is empty and therefore, we have a contradiction since
+  our premise says that $\oxlookup{\oxvarctx}{\oxplace}{\oxsxtype}$, but
+  $\oxvarctx = \oxemptyctx$ and $\oxemptyctx(\oxplace)$ necessarily fails.
+
+  \vspace{1em}
+  \noindent \framebox[\textwidth]{
+    \figuresize
+    \begin{mathpar}
+      \VStack
+    \end{mathpar}
+  }
+  \vspace{1em}
+
+  In the premise of \oxname{WF-StackFrame}, we have a collection of typing
+  judgments for values stored in the stack. This naturally leads us to another
+  case split: either $\oxid$ (the root of $\oxplace$ from $\oxplace =
+  \oxproj{\oxid}{\oxpath}$) is in the current frame or it is not.
+
+  If $\oxid$ is not in the current frame, we apply our induction hypothesis to
+  $\oxstorevalidity{\oxglobalctx}{\oxvarctx}{\oxstore}$ to get
+  $\oxstorevalidity{\oxglobalctx}{
+    \oxtupdate{\oxvarctx^\prime}{\oxplace}{\oxsitype}
+  }{
+    \oxvupdate{\oxstore}{\oxid}{\oxvaluectx[\oxvalue]}
+  }$. Then, we apply \oxname{WF-StackFrame} with the same typing judgments we
+  already have to reach our overall conclusion of
+  $\oxstorevalidity{\oxglobalctx}{
+    \oxtupdate{
+      (\oxnewframe{\oxvarctx^\prime}{\oxframe})
+    }{\oxplace}{\oxsitype}
+  }{
+    \oxvupdate{
+      (\oxnewframe{\oxstore}{\oxstackframe})
+    }{\oxid}{\oxvaluectx[\oxvalue]}
+  }$ (noting that substituting inside or outside is definitionally equal when
+  we know that $\oxid \not\in \oxdomain{\oxstore}$).
+
+  If $\oxid$ is in the current frame, then we apply
+  \Lemma{lemma:subtyping-value-typing} to
+  $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{\oxvarctx}{
+    \oxvalue
+  }{\oxsitype}{\oxvarctx}$ and
+  $\oxtunify{\oxemptyctx}{\oxkontctx}{\oxvarctx}{\oxsitype}{\oxsxtype}{\oxvarctx^\prime}$ (both
+  from our premise) to get
+  $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{\oxvarctx^\prime}{
+    \oxvalue
+  }{\oxsitype}{\oxvarctx^\prime}$. Then, we note that it would be a well-formedness
+  violation for this value to depend on $\oxid$ itself (since that would mean it
+  was a cyclical reference) and thus, we can get that
+  $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{
+    \oxtupdate{\oxvarctx^\prime}{\oxplace}{\oxsitype}
+  }{
+    \oxvalue
+  }{\oxsitype}{
+    \oxtupdate{\oxvarctx^\prime}{\oxplace}{\oxsitype}
+  }$. Finally, we can garbage collect the loans from the old type to get
+  $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{
+    \oxgcloans{\oxkontctx}{\oxtupdate{\oxvarctx^\prime}{\oxplace}{\oxsitype}}
+  }{
+    \oxvalue
+  }{\oxsitype}{
+    \oxgcloans{\oxkontctx}{\oxtupdate{\oxvarctx^\prime}{\oxplace}{\oxsitype}}
+  }$
+
+  For the other typing judgments in this frame, we apply
+  \Lemma{lemma:values-well-typed-assignment} to get
+  $\forall \oxid \in \oxdomain{\oxstackframe}. \;
+  \oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxemptyctx}{
+    \oxgcloans{\oxkontctx}{\oxtupdate{\oxvarctx^\prime}{\oxplace}{\oxsitype}}
+  }{
+    (\oxnewframe{\oxstore}{\oxstackframe})(\oxid)
+  }{(\oxnewframe{\oxvarctx^\prime}{\oxframe})(\oxid)}{
+    \oxgcloans{\oxkontctx}{\oxtupdate{\oxvarctx^\prime}{\oxplace}{\oxsitype}}
+  }$. Thus, we can apply \oxname{WF-StackFrame} to conclude
+  $\oxstorevalidity{\oxglobalctx}{
+    \oxgcloans{\oxkontctx}{\oxtupdate{\oxvarctx^\prime}{\oxplace}{\oxsitype}}
+  }{
+    \oxvupdate{\oxstore}{\oxid}{\oxvaluectx[\oxvalue]}
+  }$.
+\end{proof}
+
+\subsection{Values are Well-Types at Rewritten Types Lemma}
+\label{sec:values-typed-supertype-lemma}
+
+\begin{oxlemma}{Values are Well-Typed At Rewritten Types}
+  {lemma:values-typed-supertype} 
+  If $\oxtypjudge{\oxglobalctx}{\oxtvarctx}{\oxkontctx}{\oxvarctx}{\oxvalue}{\oxsitype}
+  {\oxvarctx_i}$ and $\oxtunify{\oxtvarctx}{\oxkontctx}{\oxvarctx_i}{\oxsitype}
+  {{\oxsitype}^\prime}{\oxvarctx^\prime}$, then $\oxtypjudge{\oxglobalctx}
+  {\oxtvarctx}{\oxkontctx}{\oxvarctx^\prime}{\oxvalue}{{\oxsitype}^\prime}{\oxvarctx^\prime}$.
+\end{oxlemma}
+\begin{proof}
+  We proceed by induction on the value typing relation.
+
+  In the case of \oxname{T-Tuple}, we need to apply the induction hypothesis for
+  each entry which has a changed type, and \Lemma{lemma:subtyping-value-typing}
+  for each entry which does not.
+
+  In the case of \oxname{T-Array}, we just apply the induction hypothesis to
+  each entry.
+
+  \vspace{1em}
+  \noindent \framebox[\textwidth]{
+    \figuresize
+    \begin{mathpar}
+      \TPointer
+    \end{mathpar}
+  }
+  \vspace{1em}
+
+  For the \oxname{T-Pointer} case, we proceed by induction on the region
+  rewriting judgement. The only interesting cases are for reference types. From
+  there, we proceed by induction on the outlives relation, for which the only
+  interesting case is \oxname{OL-CombineConcrete}.
+ 
+  \vspace{1em}
+  \noindent \framebox[\textwidth]{
+    \figuresize
+    \begin{mathpar}
+      \UCombineLocalProvs
+    \end{mathpar}
+  }
+  \vspace{1em}
+
+  The \oxname{T-Pointer} case is immediate. We know that the referent type is
+  preserved since we do not change any types in the context, and we know the
+  loan is preserved since loan sets only grow.
+
+  In all other cases, we know the types cannot change, which means $\oxvarctx =
+  \oxvarctx^\prime$, so we are done.
+\end{proof}
+
+\subsection{Function Definitions are Self-Contained Lemma}
+\label{sec:function-defns-lemma}
+
+\begin{oxlemma}{Function Definitions are Self-Contained}
+  {lemma:function-defns-self-contained}\hfill\\
+  If $\oxctxswellformed{\oxglobalctx}{\oxemptyctx}{\oxvarctx}{\oxkontctx}$ and
+  $\oxlookup{\oxglobalctx}{\oxfnname}{
+    \oxfuncdef{\oxfnname}{
+      \overline{\oxenvvar} \oxcomma \overline{\oxabsprov} \oxcomma \overline{\oxtvar}
+    }{
+      \oxascribe{\oxid_1}{\oxsitype_1} \oxdotsc
+      \oxascribe{\oxid_n}{\oxsitype_n}
+    }{\oxsitype_r}{\overline{\oxabsprov_1: \oxabsprov_2}}{\oxexpr}
+  }$, then
+  $\oxtypjudge{\oxglobalctx}{
+    \overline{\oxtvarctxentry{\oxenvvar}{\oxkenv}} \oxcomma
+    \overline{\oxtvarctxentry{\oxabsprov}{\oxkprov}} \oxcomma
+    \overline{\oxabsprov_1 \oxoutlives \oxabsprov_2} \oxcomma
+    \overline{\oxtvarctxentry{\oxtvar}{\oxktype}}
+  }{\oxkontctx}{
+    \oxnewframe{\oxvarctx}{
+      \oxvarctxentry{\oxid_1}{\oxsitype_1} \oxdotsc
+      \oxvarctxentry{\oxid_n}{\oxsitype_n}
+    }
+  }{
+    \oxframed{\oxexpr}
+  }{\oxsitype_f}{\oxvarctx}$.
+\end{oxlemma}
+
+\begin{proof}
+  Begin by noting that \oxname{WF-FunctionDefinition} gives us that
+  \\ $\oxtypjudge{\oxglobalctx}{\overline{\oxtvarctxentry{\oxenvvar}{\oxkenv}}
+    \oxcomma \overline{\oxtvarctxentry{\oxabsprov}{\oxkprov}} \oxcomma
+    \overline{\oxabsprov_1 \oxoutlives \oxabsprov_2} \oxcomma
+    \overline{\oxtvarctxentry{\oxtvar}{\oxktype}}}{\oxemptyctx}{\oxnewframe{\oxemptyctx}
+    {\oxvarctxentry{\oxid_1}{\oxsitype_1} \oxdotsc
+      \oxvarctxentry{\oxid_n}{\oxsitype_n}}}{\oxexpr}{\oxsitype_f}{\oxvarctx^\prime}$.
+  We also have by inspection of the typing rules that $\oxvarctx^\prime =
+  \oxnewframe{\oxemptyctx}{\oxframe^\prime}$ for some frame $\oxframe^\prime$.
+  Then by \oxname{T-Framed}, it suffices to show that
+  $\oxtypjudge{\oxglobalctx}{\overline{\oxtvarctxentry{\oxenvvar}{\oxkenv}}
+    \oxcomma \overline{\oxtvarctxentry{\oxabsprov}{\oxkprov}} \oxcomma
+    \overline{\oxabsprov_1 \oxoutlives \oxabsprov_2} \oxcomma
+    \overline{\oxtvarctxentry{\oxtvar}{\oxktype}}}{\oxkontctx}{\oxnewframe{\oxvarctx}
+    {\oxvarctxentry{\oxid_1}{\oxsitype_1} \oxdotsc
+      \oxvarctxentry{\oxid_n}{\oxsitype_n}}}{\oxexpr}{\oxsitype_f}{\oxnewframe{\oxvarctx}{\oxframe^\prime}}$.
+  But note that this is immediate. The typing derivation with $\oxemptyctx$ and
+  the current frame means that there's absolutely no reliance on context outside
+  $\oxid_1, \ldots \oxid_n$, and these places are necessarily completely
+  disjoint from places in $\oxvarctx$ since any regions in their types must
+  be abstract.
+\end{proof}
+
+\subsection{Subset Related Environments Lemma}
+\label{sec:subset-related-lemmas}
+
+\begin{oxlemma}{Outlives Produces Subset-Related Environments}
+  {lemma:outlives-subset-related-envs}
+  If $\oxrunify{\oxtvarctx}{\oxkontctx}{\oxvarctx}{\oxcprov_1}{\oxcprov_2}{\oxvarctx^\prime}$, then
+  $\forall \oxcprov. \; \oxvarctx(\oxcprov) \subseteq \oxvarctx^\prime(\oxcprov)$.
+\end{oxlemma}
+
+\begin{proof}
+  The proof proceeds by induction on the outlives relation $\oxrunify{\oxtvarctx}{\oxkontctx}
+  {\oxvarctx}{\oxcprov_1}{\oxcprov_2}{\oxvarctx^\prime}$. We will consider each case.
+
+  \vspace{1em}
+  \noindent \framebox[\textwidth]{
+    \figuresize
+    \begin{mathpar}
+      \UReflProv \and \UAbsProvs \and \OLocalAbsProvs \and \UCheckLocalProvs
+    \end{mathpar}
+  }
+  \vspace{1em}
+
+  Each of \oxname{OL-Refl}, \oxname{OL-BothAbstract},
+  \oxname{OL-AbstractConcrete}, and \oxname{OL-CheckConcrete} are immediate
+  since $\oxvarctx^\prime = \oxvarctx$.
+
+  \vspace{1em}
+  \noindent \framebox[\textwidth]{
+    \figuresize
+    \begin{mathpar}
+      \UTransProv \and \OAbsLocalProvs
+    \end{mathpar}
+  }
+  \vspace{1em}
+
+  Both \oxname{OL-Trans} and \oxname{OL-ConcreteAbstract} follow by applying the induction
+  hypothesis to all instances of the outlives judgment in their premise and then relying
+  on transitivity of subset.
+
+  \vspace{1em}
+  \noindent \framebox[\textwidth]{
+    \figuresize
+    \begin{mathpar}
+      \UCombineLocalProvs \and \UCombineLocalProvsUnrest
+    \end{mathpar}
+  }
+  \vspace{1em}
+
+  For \oxname{OL-CombineConcrete} and \oxname{OL-CombineConcreteUnrestricted},
+  the conclusion is almost immediate since $\oxvarctx^\prime$ is very nearly
+  $\oxvarctx$. However, it differs in the loan set for one particular region
+  $\oxcprov_2$. Fortunately, its new loan set in $\oxvarctx^\prime$ is the union
+  of its loan set with the loan set for $\oxcprov_1$ and thus we immediately
+  have $\oxvarctx(\oxcprov_2) \subseteq \oxvarctx^\prime(\oxcprov_2)$.
+\end{proof}
+
+\begin{oxlemma}{Region Rewriting Produces Subset-Related Environments}
+  {lemma:subtyping-subset-related-envs}
+  If $\oxtunify{\oxtvarctx}{\oxkontctx}{\oxvarctx}{\oxtype_1}{\oxtype_2}{\oxvarctx^\prime}$, then
+  $\forall \oxcprov. \; \oxvarctx(\oxcprov) \subseteq \oxvarctx^\prime(\oxcprov)$.
+\end{oxlemma}
+
+\begin{proof}
+  This proof proceeds by induction on the region rewriting relation
+  $\oxtunify{\oxtvarctx}{\oxkontctx}{\oxvarctx}{\oxtype_1}{\oxtype_2}{\oxvarctx^\prime}$. We will
+  consider each case. For \oxname{RR-Refl} and \oxname{RR-Uninit}, the output
+  environment $\oxvarctx^\prime$ is precisely $\oxvarctx$ and thus the result is
+  immediate. For \oxname{RR-Trans}, \oxname{RR-Array}, \oxname{RR-Slice} and
+  \oxname{RR-Tuple}, the result follows from applying the induction hypothesis
+  to every region rewriting derivation in their premise and combining the
+  results by transitivity of subset. This leaves us with one more interesting
+  case, \oxname{RR-Reference}. For this case, apply
+  \Lemma{lemma:outlives-subset-related-envs} to the outlives derivation in the
+  premise. Then, apply our induction hypothesis to the region rewriting
+  derivation in their premise. Finally, combine the two by transitivity of
+  subset.
+\end{proof}
+
+\begin{oxlemma}{Frame Typing Union Produces Subset-Related Environments}
+  {lemma:union-subset-frames}
+  If $\oxframe = \oxframe_1 \oxintersect \oxframe_2$, then
+  $\forall \oxcprov. \; \oxframe_1(\oxcprov) \subseteq \oxframe(\oxcprov)$ and
+  $\forall \oxcprov. \; \oxframe_2(\oxcprov) \subseteq \oxframe(\oxcprov)$.
+\end{oxlemma}
+
+\begin{proof}
+  First, note that the definition of $\oxintersect$ is symmetric and thus we will only
+  prove the first conclusion, the second proceeding immediately the same in all cases.
+
+  We proceed by induction over the frame typing. For $\oxemptyctx \oxintersect
+  \oxemptyctx$, the case follows immediately. For
+  $\oxextendctx{\oxframe_1}{\oxvarctxentry{\oxid}{\oxtype}} \oxintersect
+  \oxextendctx{\oxframe_2}{\oxvarctxentry{\oxid}{\oxtype}}$, the result follows
+  directly from applying the induction hypothesis to $\oxframe_1 \oxintersect
+  \oxframe_2$. The last case is the interesting one,
+  $\oxextendctx{\oxframe_1}{\oxloanctxentry{\oxcprov}{\overline{\oxloan}}}
+  \oxintersect
+  \oxextendctx{\oxframe_2}{\oxloanctxentry{\oxcprov}{\overline{\oxloan^\prime}}}$.
+  In this case, we can apply our induction hypothesis to get $\forall
+  \oxcprov^\prime \in \oxdomain{\oxframe_1}$, $\oxframe_1(\oxcprov^\prime)
+  \subseteq \oxframe_2(\oxcprov^\prime)$. Now we just need that
+  $\oxset{\overline{\oxloan}} \subseteq \oxframe(\oxcprov)$. But this holds immediately
+  since $\oxframe(\oxcprov) = \oxset{\overline{\oxloan}} \cup
+  \oxset{\overline{\oxloan^\prime}}$, so we're done.
+\end{proof}
+
+\begin{oxlemma}{Stack Typing Union Produces Subset-Related Environments}
+  {lemma:union-subset-related-envs}
+  If $\oxvarctx = \oxvarctx_1 \oxintersect \oxvarctx_2$, then
+  $\forall \oxcprov. \; \oxvarctx_1(\oxcprov) \subseteq \oxvarctx(\oxcprov)$ and
+  $\forall \oxcprov. \; \oxvarctx_2(\oxcprov) \subseteq \oxvarctx(\oxcprov)$.
+\end{oxlemma}
+
+\begin{proof}
+  First, note that the definition of $\oxintersect$ is symmetric and thus we will only
+  prove the first conclusion, the second proceeding immediately the same in all cases.
+
+  We proceed by induction over the Stack Typing. 
+
+  For $\oxemptyctx \oxintersect \oxemptyctx$, the result is trivial and thus
+  immediate. For $\oxnewframe{\oxvarctx_1}{\oxframe} \oxintersect
+  \oxnewframe{\oxvarctx_2}{\oxframe}$, we apply the induction hypothesis and
+  \Lemma{lemma:union-subset-frames}.
+\end{proof}
+
+\begin{oxlemma}{Subset-Related Frames are also Frame Typing Union Related}
+  {lemma:subset-related-frame-related} If $\forall \oxcprov \in \oxframe.$
+  $\oxframe^\prime(\oxcprov) \subseteq \oxframe(\oxcprov)$ and
+  $\oxdomain{\oxframe} = \oxdomain{\oxframe^\prime}$, then $\exists \oxframe_o$ such
+  that $\oxframe = \oxframe^\prime \oxintersect \oxframe_o$.
+\end{oxlemma}
+
+\begin{proof}
+  We proceed by induction over the frame typing. For the $\oxemptyctx$ case, the
+  proof follows immediately.
+
+  For $\oxframe = \oxframe_i, \oxid : \oxtype$ and $\oxframe^\prime =
+  \oxframe_i^\prime, \oxid : \oxtype$, we just apply the induction hypothesis
+  on $\oxframe_i$ and $\oxframe_i^\prime$, and add $\oxid : \oxtype$ to
+  $\oxframe_o$.
+
+  For $\oxframe = \oxframe_i, \oxcprov \mapsto \oxset{\oxloans}$ and
+  $\oxframe^\prime = \oxframe_i^\prime, \oxcprov \mapsto
+  \oxset{\oxloans^\prime}$, we apply the induction hypothesis, and add on
+  $\oxcprov \mapsto \oxset{\oxloans} \setminus \oxset{\oxloans^\prime}$, which
+  is well defined because from our premise we have $\oxset{\oxloans^\prime}
+  \subseteq \oxset{\oxloans}$.
+\end{proof}
+    
+
+\begin{oxlemma}{Subset-Related Environments are also Stack Typing Union Related}
+  {lemma:subset-related-stack-related} If $\forall \oxcprov \in \oxvarctx.$
+  $\oxvarctx^\prime(\oxcprov) \subseteq \oxvarctx(\oxcprov)$ and
+  $\oxdomain{\oxvarctx} = \oxdomain{\oxvarctx^\prime}$, then $\exists \oxvarctx_o$ such
+  that $\oxvarctx = \oxvarctx^\prime \oxintersect \oxvarctx_o$.
+\end{oxlemma}
+
+\begin{proof}
+  Proceed by induction on the stack typing. In the $\oxemptyctx$ case, the proof
+  is immediate. In the $\oxvarctx = \oxnewframe{\oxvarctx_i}{\oxframe}$ case, we
+  apply \Lemma{lemma:subset-related-frame-related} and the induction hypothesis.
+\end{proof}
+
+\subsection{Preservation in More Precise Environments Lemmas}
+\label{sec:more-precise-lemmas}
+
+\begin{oxlemma}{Type Computation Preserved in More Precise Environments}
+  {lemma:computety-more-precise}\hfill\\ If $\oxdomain{\oxvarctx} =
+  \oxdomain{\oxvarctx^\prime}$, and $\forall \oxid.$ $\oxvarctx(\oxid) = \oxvarctx^\prime(\oxid)$ and $\forall \oxcprov.$ $\oxvarctx^\prime(\oxcprov)
+  \subseteq \oxvarctx(\oxcprov)$ and
+  $\oxcomputetynoprov{\oxtvarctx}{\oxvarctx}{\oxmuta}{\oxplaceexpr}{\oxxitype}$
+  then
+  $\oxcomputetynoprov{\oxtvarctx}{\oxvarctx^\prime}{\oxmuta}{\oxplaceexpr}{\oxxitype}$.
+\end{oxlemma}
+
+\begin{proof}
+  Proceed by induction over the type computation judgement with $\oxvarctx$. The
+  only non-immediate case is \oxname{TC-Deref}.
+
+  \vspace{1em}
+  \noindent \framebox[\textwidth]{
+    \figuresize
+    \begin{mathpar}
+      \TCDeref
+    \end{mathpar}
+  }
+  \vspace{1em}
+
+  This follows from the induction hypothesis and
+  \Lemma{lemma:outlives-subset-related-envs}.
+
+\end{proof}
+
+\begin{oxlemma}{Type Well-Formedness Preserved in More Precise Environments}
+  {lemma:wf-type-more-precise}\hfill\\
+  If $\oxdomain{\oxvarctx} =
+  \oxdomain{\oxvarctx^\prime}$, and $\forall \oxcprov.$ $\oxvarctx^\prime(\oxcprov)
+  \subseteq \oxvarctx(\oxcprov)$ and
+  $\oxtypevalidity{\oxglobalctx}{\oxtvarctx}{\oxvarctx}{\oxsitype}$
+  then
+  $\oxtypevalidity{\oxglobalctx}{\oxtvarctx}{\oxvarctx^\prime}{\oxsitype}$.
+\end{oxlemma}
+
+\begin{proof}
+  Proceed by induction over the type well formedness under $\oxvarctx$. The only
+  case that isn't immediate or doesn't proceed directly from the induction
+  hypothesis is \oxname{WF-Ref}.
+
+  \vspace{1em}
+  \noindent \framebox[\textwidth]{
+    \figuresize
+    \begin{mathpar}
+      \VRef
+    \end{mathpar}
+  }
+  \vspace{1em}
+
+  We can apply the induction hypothesis to get the premise that $\oxxitype$ is
+  well formed. For our other premise, we need to show that our region is still
+  well-formed. We can look at this by cases. If the region $\oxprov$ is local,
+  we can apply \oxname{WF-LocalRegion} since we know $\oxdomain{\oxvarctx} =
+  \oxdomain{\oxvarctx^\prime}$. If the region $\oxprov$ is abstract, we can apply
+  \oxname{WF-AbstractRegion} since we know that $\oxtvarctx$ is unchanged.
+\end{proof}
+
+
+\begin{oxlemma}{Stack Typing Validity Preserved in More Precise Environments}
+  {lemma:wf-varctx-more-precise}\hfill\\
+  If $\oxdomain{\oxvarctx} =
+  \oxdomain{\oxvarctx^\prime}$, and $\forall \oxcprov.$ $\oxvarctx^\prime(\oxcprov)
+  \subseteq \oxvarctx(\oxcprov)$ and
+  $\oxvarctxwellformed{\oxglobalctx}{\oxtvarctx}{\oxvarctx}$
+  then
+  $\oxvarctxwellformed{\oxglobalctx}{\oxtvarctx}{\oxvarctx^\prime}$
+\end{oxlemma}
+
+\begin{proof}
+  Proceed by induction over the stack typing validity judgement for $\oxvarctx$.
+  The empty case is trivial, so the interesting case is \oxname{WF-StackTyping}.
+
+  \vspace{1em}
+  \noindent \framebox[\textwidth]{
+    \figuresize
+    \begin{mathpar}
+      \WFVarCtx
+    \end{mathpar}
+  }
+  \vspace{1em}
+
+  We get $\oxvarctxwellformed{\oxglobalctx}{\oxtvarctx}{\oxvarctx^\prime}$ by
+  induction. We get the type well formedness from
+  \Lemma{lemma:wf-type-more-precise}. We get the type computation from
+  \Lemma{lemma:computety-more-precise}, and that's all we needed to show.
+
+\end{proof}
+
+\begin{oxlemma}{Ownership Safety Preserved in More Precise Environments}
+  {lemma:ownership-safety-more-precise}\hfill\\ If $\oxdomain{\oxvarctx} =
+  \oxdomain{\oxvarctx^\prime}$, and $\forall \oxcprov.$ $\oxvarctx^\prime(\oxcprov)
+  \subseteq \oxvarctx(\oxcprov)$ and
+  $\oxmusafety{\oxtvarctx}{\oxkontctx}{\oxvarctx}{\oxmuta}{\oxplaceexpr}{
+    \oxset{\overline{\oxloan}}
+  }$
+  then
+  $\oxmusafety{\oxtvarctx}{\oxkontctx}{\oxvarctx^\prime}{\oxmuta}{\oxplaceexpr}{
+    \oxset{\overline{\oxloan^\prime}}
+  }$ and
+  $\oxset{\overline{\oxloan^\prime}} \subseteq \oxset{\overline{\oxloan}}$.
+\end{oxlemma}
+
+\begin{proof}
+  The proof proceeds by induction on the ownership safety judgment
+  $\oxmusafety{\oxtvarctx}{\oxkontctx}{\oxvarctx}{\oxmuta}{\oxplaceexpr}{
+    \oxset{\overline{\oxloan}}
+  }$. This gives us three cases: \oxname{O-SafePlace}, \oxname{O-Deref}, and
+  \oxname{O-DerefAbs}.
+
+  \vspace{1em}
+  \noindent \framebox[\textwidth]{
+    \figuresize
+    \begin{mathpar}
+      \OSafePlace
+    \end{mathpar}
+  }
+  \vspace{1em}
+
+  We need to show $\oxmusafety{\oxtvarctx}{\oxkontctx}{\oxvarctx^\prime}{\oxmuta}{\oxplaceexpr}{
+    \oxset{\oxloanpkg{\oxmuta}{\oxplace}}
+  }$ and that
+  $\oxset{\oxloanpkg{\oxmuta}{\oxplace}} \subseteq \oxset{\oxloanpkg{\oxmuta}{\oxplace}}$.
+  The latter is immediate from the definition of subset which leaves us with the former.
+  For the former, we'll correspondingly wish to apply \oxname{O-SafePlace} but using
+  $\oxvarctx^\prime$ as our context. This means we need to show that
+  $\forall \oxloanctxentry{\oxcprov^\prime}{\oxset{\overline{\oxloan}}} \in \oxvarctx^\prime.
+  \; (\forall \oxloanpkg{\oxmuta^\prime}{\oxplaceexpr} \in \oxset{\overline{\oxloan}}.
+  (\oxmuta = \oxmut \vee \oxmuta^\prime = \oxmut)
+  \implies
+  \oxrelevant{\oxplace^\prime}{\oxplace}) \vee \;
+  (\exists \oxvarctxentry{\oxplace^\prime}{\oxtref{\oxcprov^\prime}{\oxmuta^\prime}{\oxtype^\prime}} \in \oxvarctx \;
+  \wedge
+  (\forall \oxvarctxentry{\oxplace^\prime}{\oxtref{\oxcprov^\prime}{\oxmuta^\prime}{\oxtype^\prime}} \in \oxvarctx. \;
+  \oxplace^\prime \in \oxset{
+    \overline{\oxplace_e}
+  }))$. Fortunately, from $\oxdomain{\oxvarctx} = \oxdomain{\oxvarctx^\prime}$, we know that
+  for every $\oxcprov^\prime \in \oxdomain{\oxvarctx}$, $\oxcprov^\prime \in
+  \oxdomain{\oxvarctx^\prime}$, and further that $\oxvarctx^\prime(\oxcprov^\prime)
+  \subseteq \oxvarctx(\oxcprov^\prime)$. Thus, for each $\oxcprov^\prime$, we know there are only
+  potentially fewer loans to show if the obligation was met using the clause of
+  $\forall \oxloanpkg{\oxmuta^\prime}{\oxplaceexpr} \in \oxset{\overline{\oxloan}}.
+  (\oxmuta = \oxmut \vee \oxmuta^\prime = \oxmut)
+  \implies \oxrelevant{\oxplace^\prime}{\oxplace}$. If the obligation was met using the other
+  clause, note that $\oxvarctx$ and $\oxvarctx^\prime$ can only differ in the loan sets they
+  associate with any given region and so the exact fact must still be true for
+  $\oxvarctx^\prime$.
+
+  \vspace{1em}
+  \noindent \framebox[\textwidth]{
+    \figuresize
+    \begin{mathpar}
+      \ODeref
+    \end{mathpar}
+  }
+  \vspace{1em}
+
+  This case proceeds much like the \oxname{O-SafePlace} case in terms of meeting the direct
+  ownership safety criterion (the last premise of \oxname{O-Deref}) for the new derivation
+  using \oxname{O-Deref} with $\oxvarctx^\prime$. It differs only in that we need also apply
+  our induction hypothesis to each of the $n$ derivations of ownership safety used in
+  $\forall i \in \oxset{1 \oxdots n}. \;
+  \oxmusafetyinner{\oxtvarctx}{\oxkontctx}{\oxvarctx}{\oxmuta}{
+    \overline{\oxplace_e} \oxcomma \overline{\oxplace_i} \oxcomma \oxplace
+  }{
+    \oxplaceexprctx[\oxplaceexpr_i]
+  }{
+    \oxset{\overline{\oxloanpkg{\oxmuta}{\oxplaceexpr_i^\prime}}}
+  }$. This gives us
+  $\forall i \in \oxset{1 \oxdots n}. \;
+  \oxmusafetyinner{\oxtvarctx}{\oxkontctx}{\oxvarctx^\prime}{\oxmuta}{
+    \overline{\oxplace_e} \oxcomma \overline{\oxplace_i} \oxcomma \oxplace
+  }{
+    \oxplaceexprctx[\oxplaceexpr_i]
+  }{
+    \oxset{\overline{\oxloanpkg{\oxmuta}{\oxplaceexpr_i^{\prime\prime}}}}
+  }$ and $\forall i \in \oxset{1 \oxdots n}. \;
+  \oxset{\overline{\oxloanpkg{\oxmuta}{\oxplaceexpr_i^{\prime\prime}}}} \subseteq
+  \oxset{\overline{\oxloanpkg{\oxmuta}{\oxplaceexpr_i^\prime}}}$. The former combined with
+  the same reasoning from the \oxname{O-SafePlace} case gives us
+  $\oxmusafety{\oxtvarctx}{\oxkontctx}{\oxvarctx^\prime}{\oxmuta}{
+    \oxplaceexprctx[\oxderef{\oxplace}]
+  }{
+    \oxset{
+      \overline{\oxloanpkg{\oxmuta}{\oxplaceexpr^{\prime\prime}_1}} \oxcomma
+      \oxdots
+      \overline{\oxloanpkg{\oxmuta}{\oxplaceexpr^{\prime\prime}_n}} \oxcomma
+      \oxloanpkg{\oxmuta}{\oxplaceexprctx[\oxderef{\oxplace}]}
+    }
+  }$ and the latter allows us to conclude
+  $\oxset{
+    \overline{\oxloanpkg{\oxmuta}{\oxplaceexpr^{\prime\prime}_1}} \oxcomma
+    \oxdots
+    \overline{\oxloanpkg{\oxmuta}{\oxplaceexpr^{\prime\prime}_n}} \oxcomma
+    \oxloanpkg{\oxmuta}{\oxplaceexprctx[\oxderef{\oxplace}]}
+  } \subseteq \oxset{
+    \overline{\oxloanpkg{\oxmuta}{\oxplaceexpr^\prime_1}} \oxcomma
+    \oxdots
+    \overline{\oxloanpkg{\oxmuta}{\oxplaceexpr^\prime_n}} \oxcomma
+    \oxloanpkg{\oxmuta}{\oxplaceexprctx[\oxderef{\oxplace}]}
+  }$ since we know that each individual collection of loans has the subset relation from
+  above and the whole set is simply their union.
+
+  \vspace{1em}
+  \noindent \framebox[\textwidth]{
+    \figuresize
+    \begin{mathpar}
+      \ODerefAbs
+    \end{mathpar}
+  }
+  \vspace{1em}
+
+  This case proceeds identically to the case for \oxname{O-SafePlace}.
+  We need to show $\oxmusafety{\oxtvarctx}{\oxkontctx}{\oxvarctx^\prime}{\oxmuta}{\oxplaceexpr}{
+    \oxset{\oxloanpkg{\oxmuta}{\oxplaceexprctx[\oxderef{\oxplace}]}}
+  }$ and that
+  $\oxset{
+    \oxset{\oxloanpkg{\oxmuta}{\oxplaceexprctx[\oxderef{\oxplace}]}}
+  } \subseteq \oxset{
+    \oxset{\oxloanpkg{\oxmuta}{\oxplaceexprctx[\oxderef{\oxplace}]}}
+  }$.
+  The latter is immediate from the definition of subset which leaves us with the former.
+  For the former, we'll correspondingly wish to apply \oxname{O-DerefAbs} but using
+  $\oxvarctx^\prime$ as our context. This means we need to show that
+  $\forall \oxloanctxentry{\oxcprov^\prime}{\oxset{\overline{\oxloan}}} \in \oxvarctx^\prime.
+  \; (\forall \oxloanpkg{\oxmuta^\prime}{\oxplaceexpr} \in \oxset{\overline{\oxloan}}.
+  (\oxmuta = \oxmut \vee \oxmuta^\prime = \oxmut)
+  \implies
+  \oxrelevant{\oxplace^\prime}{\oxplaceexprctx[\oxderef{\oxplace}]}) \vee \;
+  (\exists \oxvarctxentry{\oxplace^\prime}{\oxtref{\oxcprov^\prime}{\oxmuta^\prime}{\oxtype^\prime}} \in \oxvarctx \;
+  \wedge
+  (\forall \oxvarctxentry{\oxplace^\prime}{\oxtref{\oxcprov^\prime}{\oxmuta^\prime}{\oxtype^\prime}} \in \oxvarctx. \;
+  \oxplace^\prime \in \oxset{
+    \overline{\oxplace_e}
+  }))$. Fortunately, from $\oxdomain{\oxvarctx} = \oxdomain{\oxvarctx^\prime}$, we know that
+  for every $\oxcprov^\prime \in \oxdomain{\oxvarctx}$, $\oxcprov^\prime \in
+  \oxdomain{\oxvarctx^\prime}$, and further that $\oxvarctx^\prime(\oxcprov^\prime)
+  \subseteq \oxvarctx(\oxcprov^\prime)$. Thus, for each $\oxcprov^\prime$, we know there are only
+  potentially fewer loans to show if the obligation was met using the clause of
+  $\forall \oxloanpkg{\oxmuta^\prime}{\oxplaceexpr} \in \oxset{\overline{\oxloan}}.
+  (\oxmuta = \oxmut \vee \oxmuta^\prime = \oxmut)
+  \implies \oxrelevant{\oxplace^\prime}{\oxplace}$. If the obligation was met using the other
+  clause, note that $\oxvarctx$ and $\oxvarctx^\prime$ can only differ in the loan sets they
+  associate with any given region and so the exact fact must still be true for
+  $\oxvarctx^\prime$.
+\end{proof}
+
+\begin{oxlemma}{Expressions Remain Well-Typed in More Precise Environments}
+  {lemma:expressions-typing-more-precise}\hfill\\ If $\oxdomain{\oxvarctx} =
+  \oxdomain{\oxvarctx^\prime}$, and $\forall \oxcprov.$ $\oxvarctx^\prime(\oxcprov)
+  \subseteq \oxvarctx(\oxcprov)$ and 
+  $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{\oxvarctx}
+  {\oxexpr}{\oxtype}{\oxvarctx_f}$ then
+  $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{\oxvarctx^\prime}
+  {\oxexpr}{\oxtype}{\oxvarctx_f^\prime}$ and
+  $\oxdomain{\oxvarctx_f} = \oxdomain{\oxvarctx_f^\prime}$, and
+  $\forall \oxcprov.$ $\oxvarctx_f^\prime(\oxcprov) \subseteq \oxvarctx_f(\oxcprov)$
+\end{oxlemma}
+
+\begin{proof}
+  We proceed by induction over the expression typing.
+
+  \oxname{T-Move}, \oxname{T-Copy}, and \oxname{T-Borrow} all follow from the
+  \Lemma{lemma:ownership-safety-more-precise} and the \Lemma{lemma:computety-more-precise}.
+  
+  \oxname{T-BorrowIndex}, \oxname{T-BorrowSlice}, and \oxname{T-IndexCopy} all follow from the
+  induction hypothesis, \Lemma{lemma:ownership-safety-more-precise}, and the
+  \Lemma{lemma:computety-more-precise}.
+
+  \oxname{T-Seq} follows from the observation that garbage collecting loans will
+  preserve subsets and clear in exactly both or neither, and from the induction
+  hypothesis.
+
+  \oxname{T-Branch} and \oxname{T-Match} follow from applying the induction hypothesis,
+  \Lemma{lemma:subtyping-subset-related-envs},
+  \Lemma{lemma:union-subset-related-envs}.
+
+  \oxname{T-Let} follows from the same observation about garbage collection in
+  the \oxname{T-Seq} case, the induction hypothesis, and
+  \Lemma{lemma:subtyping-subset-related-envs}.
+
+  \oxname{T-Assign} follows from the induction hypothesis,
+  \Lemma{lemma:ownership-safety-more-precise},
+  \Lemma{lemma:union-subset-related-envs}.
+
+  \oxname{T-AssignDeref} both follow from the induction hypothesis, follows from
+  the induction hypothesis, \Lemma{lemma:ownership-safety-more-precise},
+  \Lemma{lemma:union-subset-related-envs}, and
+  \Lemma{lemma:computety-more-precise}.
+
+  \oxname{T-AppFunction} follows from the induction hypothesis, and a few pieces
+  about the well-formedness of the instantiations happening in
+  \oxname{T-AppFunction} (namely, frame expressions, regions, and types). For
+  the frame expression validity, we consider each case and note that
+  \oxname{WF-EnvVar} depends only on $\oxtvarctx$ which is unchanged and that
+  \oxname{WF-Env} appeals to stack typing validity and so it suffices to show
+  that that still holds in our more precise environment which we do by appealing
+  to \Lemma{lemma:wf-varctx-more-precise}. For the region validity, there are
+  again two cases to consider \oxname{WF-LocalProv} which applies if the domain
+  of $\oxvarctx$ is the same as the domain of $\oxvarctx^\prime$ which we have
+  directly from our premise and \oxname{WF-AbstractProv} which depends only on
+  $\oxtvarctx$ which is unchanged. For the type validity, we appeal to
+  \Lemma{lemma:wf-type-more-precise}.
+
+  \oxname{T-AppClosure} follows from the induction hypothesis and
+  \Lemma{lemma:subtyping-subset-related-envs}.
+
+  \oxname{T-LetRegion}, \oxname{T-While}, \oxname{T-ForArray},
+  \oxname{T-ForSlice}, \oxname{T-Closure}, \oxname{T-Tuple}, \oxname{T-Array},
+  \oxname{T-Slice}, \oxname{T-Drop}, \oxname{T-Left}, \oxname{T-Right} follow
+  immediately from the induction hypothesis.
+
+  \oxname{T-Function}, \oxname{T-Abort}, \oxname{T-Unit}, \oxname{T-U32},
+  \oxname{T-True}, and \oxname{T-False} are immediate.
+
+\end{proof}
+
+\subsection{Preservation under Safe Loan Updates Lemmas}
+\label{sec:safe-loan-lemmas}
+
+\begin{oxlemma}{Ownership Safety Produces Non Conflicting Loans}
+  {lemma:ownership-safety-no-conflicts}
+  If
+  \begin{enumerate}
+  \item $\oxplaceexprctx_{\oxcprov_p}[\oxplaceexpr_{\oxcprov_p}] \in \oxset{\oxloans}$,
+    where $\oxcprov_p \mapsto \oxset{\oxloans} \in \oxloanmappings{\oxvarctx}{\oxkontctx}$
+  \item $\oxvarctx(\oxcprov_b) = \emptyset$
+  \item $\oxnotreborrowed{\oxvarctx[\oxcprov_b \mapsto \oxset{\oxloans_b}]}{\oxcprov_p}$
+  \item $\oxmusafetyinner{\oxemptyctx}{\oxkontctx}{\oxvarctx}{\oxmuta}{\overline{\oxplace_b}}{\oxplaceexpr_b}{\oxset{\oxloans_b}}$
+  \end{enumerate}
+  then $\forall \oxloanpkg{\oxmuta}{\oxplaceexpr^\prime} \in \oxset{\oxloans_b}$.
+  $\oxrelevant{\oxplaceexpr_{\oxcprov_p}}{\oxplaceexpr^\prime}$.
+\end{oxlemma}
+\begin{proof}
+  Proceed by induction on the ownership safety judgement for $\oxplaceexpr$ in
+  the premise.
+ 
+  \vspace{1em}
+  \noindent \framebox[\textwidth]{ \figuresize
+    \begin{mathpar}
+      \OSafePlace
+    \end{mathpar}
+  } \vspace{1em}
+
+  We need to show that $\oxrelevant{\oxplaceexpr_{\oxcprov_p}}{\oxplace}$.
+  Since $\oxcprov_p \in \oxdomain{\oxloanmappings{\oxvarctx}{\oxkontctx}}$, we know from the hypothesis of
+  \oxname{O-SafePlace} that either $\oxcprov_p$ is excluded, or all loans in it
+  are disjoint from $\oxplace$.
+
+  $\oxcprov_p$ cannot have been exluded because
+  $\oxnotreborrowed{\oxvarctx}{\oxcprov_p}$.
+
+  This just leaves the case where all loans in $\oxvarctx(\oxcprov_p)$ are
+  disjoint from $\oxplace$. Let $\oxplace_{\oxcprov_p}$ be the inner place of
+  $\oxplaceexpr_{\oxcprov_p}$. More formally, $\oxplaceexpr_{\oxcprov_p} =
+  \oxplaceexprctx[\oxplace_{\oxcprov_p}]$. By this disjointness, we know
+  $\oxrelevant{\oxplaceexprctx_{\oxcprov_p}[\oxplaceexprctx[\oxplace_{\oxcprov_p}]]}{\oxplace}$,
+  which directly implies
+  $\oxrelevant{\oxplaceexprctx[\oxplace_{\oxcprov_p}]}{\oxplace}$, which is what
+  we wanted to show.
+  
+  \vspace{1em}
+  \noindent \framebox[\textwidth]{ \figuresize
+    \begin{mathpar}
+      \ODeref
+    \end{mathpar}
+  } \vspace{1em}
+
+  We need to show that $\oxrelevant{\oxplaceexprctx[\oxderef
+      \oxplace]}{\oxplaceexpr_{\oxcprov_p}}$, and that $\forall i,
+  \ \oxloanpkg{\oxmuta}{\oxplaceexpr} \in
+  \oxset{\overline{\oxloanpkg{\oxmuta}{\oxplaceexpr^\prime_i}}}$. $\oxrelevant{\oxplaceexpr_{\oxcprov_p}}{\oxplaceexpr}$.
+
+  The latter we get from applying the induction hypothesis.
+
+  The former follows from the same reasoning as in the previous case. 
+
+  \vspace{1em}
+  \noindent \framebox[\textwidth]{ \figuresize
+    \begin{mathpar}
+      \ODerefAbs
+    \end{mathpar}
+  } \vspace{1em}
+
+  Since $\oxtvarctx = \oxemptyctx$, there are no valid reference types that have
+  an abstract region, meaning the first hypothesis is a contradiction.
+\end{proof}
+
+\begin{oxlemma}{Ownership Safety is Preserved under Safe Loan Updates}
+  {lemma:ownership-safety-loan-update} If
+  \begin{enumerate}
+  \item $\oxmusafety{\oxemptyctx}{\oxkontctx}{\oxvarctx}{\oxmuta_b}{\oxplaceexpr_b}{\oxset{\oxloans_b}}$
+  \item $\oxmusafetyinner{\oxemptyctx}{\oxkontctx}{\oxnewframe{\oxvarctx}{\oxframe}}{\oxmuta}
+     {\overline{\oxplace_1}}{\oxplaceexpr}{\oxset{\oxloans}}$
+   \item and $\oxlookup{\oxvarctx}{\oxcprov_b}{\{\}}$
+   \item $\oxnotreborrowed{\oxvarctx[\oxcprov_b \mapsto \oxset{\oxloans_b}]}{\oxcprov_p}$
+  \item $\oxplace_1 = \oxplace_2$ or $\oxplace_1 = \oxplace_2 \cup \oxset{\oxplace
+    \ | \ \oxplaceexprctx[\oxderef\oxplace] \in
+    \oxset{\oxloans_b}}$
+  \item either $\oxrootof{\oxplaceexpr} \in \oxdomain{\oxframe}$ or
+  $\exists \oxcprov_{p} \in \oxdomain{\oxnewframe{\oxvarctx}{\oxframe}}, \oxplaceexprctx, \oxplaceexpr^\prime.$
+  \item $\oxplaceexpr = \oxplaceexprctx[\oxplaceexpr^\prime]$
+  \item $\oxplaceexpr^\prime \in \oxnewframe{\oxvarctx}{\oxframe}(\oxcprov_p)$
+  \item $\forall \oxcprov \in \oxdomain{\oxframe},
+    \oxloanpkg{\oxmuta}{\oxplaceexpr} \in \oxframe(\oxcprov).$ either
+    $\oxrootof{\oxplaceexpr} \in \oxdomain{\oxframe}$, or $\exists \oxcprov^\prime \mapsto \oxset{\oxloans} \in
+    \oxloanmappings{\oxvarctx}{\oxkontctx}.$ $\oxloanpkg{\oxmuta}{\oxplaceexpr} \in \oxset{\oxloans}$.
+
+      (In english, loans in the closure's frame come from the current frame or a closure's captured frame in $\oxvarctx$ or $\oxkontctx$)
+  \end{enumerate}
+  then $\oxmusafetyinner{\oxemptyctx}{\oxkontctx}{\oxnewframe{\oxvarctx[\oxcprov_b \mapsto
+        \oxloans_b]}{\oxframe}}{\oxmuta}{\overline{\oxplace_2}}{\oxplaceexpr}{\oxset{\oxloans^\prime}}$.
+\end{oxlemma}
+
+\begin{proof}
+  Proceed by induction on the ownership safety judgement for $\oxplaceexpr$ in
+  the premise.
+ 
+  \vspace{1em}
+  \noindent \framebox[\textwidth]{ \figuresize
+    \begin{mathpar}
+      \OSafePlace
+    \end{mathpar}
+  } \vspace{1em}
+
+  Let $\oxcprov^\prime$ be an arbitrary region. If the disjunction was proven
+  using the right part, which talks about the exclusion list, then we can prove
+  it again the same way, since none of the types are changed and the exclusion
+  list $\overline{\oxplace_2}$ includes all of $\overline{\oxplace_1}$ in either case.
+
+  If the disjunction was proven using the left part, the only interesting case
+  is when $\oxcprov^\prime = \oxcprov_b$. If $\oxrootof{\oxplace} \in \oxdomain{\oxframe}$,
+  then we're done, because all loans in $\oxset{\oxloans_b}$ are disjoint just
+  by the well formedness of the environment $\oxvarctx$.
+
+  Otherwise, $\oxrootof{\oxplace} \in \oxdomain{\oxvarctx}$ and $\exists
+  \oxcprov_p$ such that $\oxplace \in
+  \oxnewframe{\oxvarctx}{\oxframe}(\oxcprov_p)$, and we want to show that
+  $\forall \oxloanpkg{\oxmuta^\prime}{\oxplaceexprctx[\oxplace^\prime]} \in
+  \oxset{\oxloans_b}$, $\oxrelevant{\oxplace}{\oxplace^\prime}$.
+
+  If $\oxcprov_p \in \oxdomain{\oxframe}$, then we're done because each loan in
+  $\oxcprov_p$ either comes from $\oxdomain{\oxframe}$, in which case
+  disjointness is immediate, or it comes from a loan mapping in $\oxvarctx$ or
+  $\oxkontctx$, in which case we can apply
+  \Lemma{lemma:ownership-safety-no-conflicts} to finish the proof.
+
+  Otherwise, $\oxcprov_p \in \oxdomain{\oxvarctx}$. By the well formedness 
+  of $\oxnewframe{\oxvarctx[\oxcprov_b \mapsto \oxset{\oxloans_b}]}{\oxframe}$,
+  $\oxnotreborrowed{\oxvarctx[\oxcprov_b \mapsto
+      \oxset{\oxloans_b}]}{\oxcprov^\prime}$. Given all of this we can apply
+  \Lemma{lemma:ownership-safety-no-conflicts} to finish the proof.
+
+  \vspace{1em}
+  \noindent \framebox[\textwidth]{ \figuresize
+    \begin{mathpar}
+      \ODeref
+    \end{mathpar}
+  } \vspace{1em}
+
+  Firstly, we would like to apply our induction hypothesis. In order to do so,
+  we need to show that the new \texttt{excl} is either the same, or only has
+  places from $\oxset{\oxloans_b}$ added. If $\oxcprov \neq \oxcprov_b$, then
+  $\oxnewframe{\oxvarctx}{\oxframe}(\oxcprov) = \oxnewframe{\oxvarctx[\oxcprov_b
+      \mapsto \oxset{\oxloans_b}]}{\oxframe}$, so the exclusion list is the
+  same. If $\oxcprov = \oxcprov_b$, then \texttt{excl} was empty, and now
+  includes the places $\oxset{\oxplace \ | \ \oxplaceexprctx[\oxderef\oxplace]
+    \in \oxset{\oxloans_b}}$. We also need to show that either that either the
+  place expression is in the domain of $\oxframe$ or that it has a sub place
+  expression in a loan set, but this is immediate from our hypotheses. So in
+  either case we satisfy the necessary hypothesis and can apply the induction
+  hypothesis.
+
+  Whats left to show is the disjointness or exclusion condition, which follows
+  identically to the reasoning in the previous case.
+
+  \vspace{1em}
+  \noindent \framebox[\textwidth]{ \figuresize
+    \begin{mathpar}
+      \ODerefAbs
+    \end{mathpar}
+  } \vspace{1em}
+
+  Since $\oxtvarctx = \oxemptyctx$, there are no valid reference types that have
+  an abstract region, meaning the first hypothesis is a contradiction.
+\end{proof}
+
+\begin{oxlemma}{Ownership Safety is Preserved after Environment Union}
+  {lemma:ownership-safety-environment-union} If
+  $\oxmusafetyinner{\oxemptyctx}{\oxkontctx}{\oxvarctx_1}{\oxmuta}{\overline{\oxplace_1}}{\oxplaceexpr}{\oxset{\oxloans}}$
+  and
+  $\oxmusafetyinner{\oxemptyctx}{\oxkontctx}{\oxvarctx_2}{\oxmuta}{\overline{\oxplace_2}}{\oxplaceexpr}{\oxset{\oxloans^\prime}}$
+  then $\oxmusafetyinner{\oxemptyctx}{\oxkontctx}{\oxvarctx_1 \oxintersect
+    \oxvarctx_2}{\oxmuta}{\overline{\oxplace_1},\overline{\oxplace_2}}{\oxplaceexpr}{\oxset{\oxloans^{\prime\prime}}}$
+  and $\oxplace_1 = \oxplace_2$ or $\oxplace_1 = \oxplace_2 \cup \oxset{\oxplace
+    \ | \ \oxplaceexprctx[\oxderef\oxplace] \in
+    \oxset{\overline{\oxloans_b}}}$.
+\end{oxlemma}
+\begin{proof}
+  Proceed by induction on the ownership safety judgements in the premise. Note
+  that they both have the same sequence of proof rule applications, because the
+  judgement is inductive over $\oxplaceexpr$.
+ 
+  \vspace{1em}
+  \noindent \framebox[\textwidth]{ \figuresize
+    \begin{mathpar}
+      \OSafePlace
+    \end{mathpar}
+  } \vspace{1em}
+
+  Let $\oxcprov$ be an arbitrary region.
+
+  If either the derivation with
+  $\oxvarctx_1$ or $\oxvarctx_2$ used the second part of the disjunction, we can
+  proceed by the second part of the disjunction.
+
+  Otherwise, both derivations used the first part of the disjunction. Since
+  $\oxvarctx_1 \oxintersect \oxvarctx_2(\oxcprov) = \oxvarctx_1(\oxcprov) \cup
+  \oxvarctx_2(\oxcprov)$, we can just combine these two facts and proceed by the
+  first part of the disjunction.
+
+  \vspace{1em}
+  \noindent \framebox[\textwidth]{ \figuresize
+    \begin{mathpar}
+      \ODeref
+    \end{mathpar}
+  } \vspace{1em}
+
+  In order to apply the induction hypothesis, we need show that our new
+  \texttt{excl} is the union of the two from the derivations. This is immediate
+  because $\oxvarctx_1 \oxintersect \oxvarctx_2(\oxcprov) =
+  \oxvarctx_1(\oxcprov) \cup \oxvarctx_2(\oxcprov)$.
+
+  To finish the case, follow the same reasoning from the previous case for the
+  disjunction.
+
+
+  \vspace{1em}
+  \noindent \framebox[\textwidth]{ \figuresize
+    \begin{mathpar}
+      \ODerefAbs
+    \end{mathpar}
+  } \vspace{1em}
+
+  Since $\oxtvarctx = \oxemptyctx$, there are no valid reference types that have
+  an abstract region, meaning the first hypothesis is a contradiction.
+
+\end{proof}
+
+\begin{oxlemma}{Ownership Safety is Preserved after Type Checking a Closure Body}
+  {lemma:ownership-safety-closure-body} If
+  \begin{enumerate}
+  \item $\oxmusafety{\oxemptyctx}{\oxkontctx}{\oxvarctx}{\oxmuta}{\oxplaceexpr_b}{\oxset{\oxloans_b}}$
+  \item $\oxlookup{\oxvarctx}{\oxcprov}{\{\}}$ 
+  \item $\forall \oxid \in \oxfvars{\oxexpr}.$ $\oxid \in \oxdomain{\oxframe}$ 
+  \item $\forall \oxcprov \in \oxfprovs{\oxexpr}.$ $\oxcprov \in \oxdomain{\oxframe}$
+  \item $\forall \oxcprov \in \oxdomain{\oxframe},
+    \oxloanpkg{\oxmuta}{\oxplaceexpr} \in \oxframe(\oxcprov).
+    \oxrootof{\oxplaceexpr} \in \oxdomain{\oxframe} \vee
+    \exists \oxcprov^\prime \mapsto \oxset{\oxloans} \in
+    \oxloanmappings{\oxvarctx}{\oxkontctx}.$ $\oxloanpkg{\oxmuta}{\oxplaceexpr} \in \oxset{\oxloans}$.
+    
+    (In English, loans in the closure's frame come from the current frame or a closure's captured
+    frame in $\oxvarctx$ or $\oxkontctx$)
+  \item $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{\oxnewframe{\oxvarctx}{\oxframe}}
+    {\oxexpr}{\oxsitype}{\oxnewframe{\oxvarctx_o}{\oxframe_o}}$
+  \end{enumerate}
+  then
+  \begin{enumerate}
+  \item $\oxmusafety{\oxemptyctx}{\oxkontctx}{\oxvarctx_o}{\oxmuta}{\oxplaceexpr_b}{\oxset{\oxloans_b^\prime}}$
+  \item $\forall \oxcprov \in \oxdomain{\oxframe_o},
+    \oxloanpkg{\oxmuta}{\oxplaceexpr} \in \oxframe_o(\oxcprov). \oxrootof{\oxplaceexpr} \in \oxdomain{\oxframe_o} \vee \exists \oxcprov^\prime \mapsto \oxset{\oxloans} \in
+    \oxloanmappings{\oxvarctx_o}{\oxkontctx}.$ $\oxloanpkg{\oxmuta}{\oxplaceexpr} \in \oxset{\oxloans}$.
+    
+    (In English, loans in the closure's frame come from the current frame or a closure's captured
+    frame in $\oxvarctx_o$ or $\oxkontctx$)
+  \end{enumerate}
+\end{oxlemma}
+\begin{proof}
+  In the \oxname{T-Move} case, the context is updated, but since $\oxplace \in
+  \oxdomain{\oxframe}$, $\oxvarctx_o = \oxvarctx$, so the conclusions follow
+  from the premises.
+
+  In the \oxname{T-Copy}, \oxname{T-Function}, \oxname{T-Abort},
+  \oxname{T-Unit}, \oxname{T-u32}, \oxname{T-True}, and \oxname{T-False} cases,
+  $\oxvarctx_o = \oxvarctx$ so the conclusions follow from the premises.
+
+  In the \oxname{T-IndexCopy}, \oxname{T-LetRegion}, \oxname{T-While},
+  \oxname{T-ForArray}, \oxname{T-ForSlice}, \oxname{T-Closure},
+  \oxname{T-Tuple}, \oxname{T-Array}, \oxname{T-Slice}, \oxname{T-Drop},
+  \oxname{T-Left}, and \oxname{T-Right} cases, the proof is immediate from the
+  induction hypothesis.
+
+  In the \oxname{T-Borrow}, \oxname{T-BorrowIndex}, and \oxname{T-BorrowSlice}
+  cases, the proof follows from the induction hypothesis and
+  \Lemma{lemma:ownership-safety-loan-update}. The last condition is the
+  restriction on loans in $\oxframe$, but this is immediate by inspection of the
+  ownership safety judgement. The only way to create new loans is to directly
+  borrow a place, in which case we'd have that the loan is in the domain of
+  $\oxframe$, and otherwise the loans originated from the loan set in
+  $\oxnewframe{\oxvarctx}{\oxframe}$ of a reference being reborrowed, and we
+  already know the property for $\oxnewframe{\oxvarctx}{\oxframe}$.
+
+  In the \oxname{T-Seq} case, the proof follows from the induction hypothesis
+  and \Lemma{lemma:ownership-safety-related-envs} (note that
+  \texttt{gc-loans} does not change any types in the environment and produces
+  related environments).
+
+  In the \oxname{T-Branch} and \oxname{T-Match} cases, the proof follows from
+  the induction hypothesis, \Lemma{lemma:subtyping-ownership-safety}, and
+  \Lemma{lemma:ownership-safety-environment-union}. We also need to show that
+  rewriting preserves the restriction on loans in $\oxframe$, but this is
+  immediate because the most that rewriting can do is union together loan sets.
+  The rest of the cases that use rewriting also use this same reasoning.
+
+  In the \oxname{T-Let} case, the proof follows from the induction hypothesis,
+  \Lemma{lemma:subtyping-ownership-safety}, and
+  \Lemma{lemma:ownership-safety-related-envs} (note that
+  \texttt{gc-loans} does not change any types in the environment and produces
+  related environments).
+
+  In the \oxname{T-AssignDeref} case the proof follows from the induction
+  hypothesis, and \Lemma{lemma:subtyping-ownership-safety}.
+
+  In the \oxname{T-Assign} case, the proof follows from the induction
+  hypothesis, \Lemma{lemma:subtyping-ownership-safety}, and
+  \Lemma{lemma:ownership-safety-assignment}.
+
+  In the \oxname{T-App} case, the proof follows from the induction hypothesis
+  and \Lemma{lemma:subtyping-ownership-safety}.
+\end{proof}
+
+\begin{oxlemma}{Outlives is Preserved under Safe Loan Updates}
+  {lemma:outlives-loan-update} If
+  \begin{enumerate}
+  \item $\oxmusafety{\oxemptyctx}{\oxkontctx}{\oxvarctx}{\oxmuta}{\oxplaceexpr}{
+    \oxset{\overline{\oxloan}} }$
+  \item $\oxlookup{\oxvarctx}{\oxcprov}{\{\}}$
+  \item $\oxcprov \not \in \oxdomain{\oxframe}$
+  \item $\oxcprov \not = \oxcprov_1$ and $\oxcprov \not = \oxcprov_2$
+  \item $\forall \oxtype^\prime \in \oxdomain{\oxvarctx}.$ $\oxcprov_1$ and
+    $\oxcprov_2$ does not occur outside of a closure in $\oxtype^\prime$
+  \item $\oxrunify{\oxemptyctx}{\oxkontctx}{
+    \oxnewframe{\oxvarctx}{\oxframe}
+  }{\oxcprov_1}{\oxcprov_2}{
+    \oxnewframe{\oxvarctx^\prime}{\oxframe^\prime}
+  }$
+  \end{enumerate}
+  then
+  $\oxrunify{\oxemptyctx}{\oxkontctx}{
+    \oxnewframe{\oxvarctx[\oxcprov \mapsto \oxset{\oxloans_b}]}{\oxframe}
+  }{\oxcprov_1}{\oxcprov_2}{
+    \oxnewframe{\oxvarctx^{\prime}[\oxcprov \mapsto \oxset{\oxloans_b}]}{\oxframe^{\prime}}
+  }$
+\end{oxlemma}
+
+\begin{proof}
+  Proceed by induction on the outlives relation. The only interesting cases are
+  \oxname{OL-CombineConcrete}, \oxname{OL-CombineConcreteUnrestricted}, and
+  \oxname{OL-CheckConcrete}. They all proceed similarly. The closure restriction
+  is immediate from the premise because no types are changed. The region not
+  reborrowed restriction follows from the fact that $\oxcprov_1$ and
+  $\oxcprov_2$ don't occur in any types in $\oxvarctx$ outside of a closure,
+  which means there's no place in the domain of $\oxvarctx$ for there to be a
+  reborrow of in $\oxloans$.
+\end{proof}
+
+\begin{oxlemma}{Rewriting is Preserved under Safe Loan Updates}
+  {lemma:rewriting-loan-update} If
+  \begin{enumerate}
+  \item $\oxmusafety{\oxemptyctx}{\oxkontctx}{\oxvarctx}{\oxmuta}{\oxplaceexpr}{
+    \oxset{\overline{\oxloan}} }$
+  \item $\oxlookup{\oxvarctx}{\oxcprov}{\{\}}$
+  \item $\oxcprov \not \in \oxdomain{\oxframe}$
+  \item $\forall \oxtype \in \oxframe$. $\oxcprov$ does not occur in $\oxtype$ or $\oxtype_1$ or $\oxtype_2$
+  \item $\forall \oxcprov \in \oxfprovs{\oxtype_1} \cup \oxfprovs{\oxtype_2}$.
+    $\forall \oxtype^\prime \in \oxdomain{\oxvarctx}.$ $\oxcprov$ does not occur
+    outside of a closure in $\oxtype^\prime$.
+  \item $\oxtunify{\oxemptyctx}{\oxkontctx}{
+    \oxnewframe{\oxvarctx}{\oxframe}
+  }{\oxtype_1}{\oxtype_2}{
+    \oxnewframe{\oxvarctx^\prime}{\oxframe^\prime}
+  }$
+  \end{enumerate}
+  then
+  $\oxtunify{\oxemptyctx}{\oxkontctx}{
+    \oxnewframe{\oxvarctx[\oxcprov \mapsto \oxset{\oxloans_b}]}{\oxframe}
+  }{\oxtype_1}{\oxtype_2}{
+    \oxnewframe{\oxvarctx^{\prime}[\oxcprov \mapsto \oxset{\oxloans_b}]}{\oxframe^{\prime}}
+  }$.
+
+\end{oxlemma}
+\begin{proof}
+  Proceed by induction on the rewriting derivation. The only interesting case is
+  \oxname{RR-Reference}, in which case we apply
+  \Lemma{lemma:outlives-loan-update} and the induction hypothesis. The other
+  cases all follow immediately or from the induction hypothesis.
+\end{proof}
+
+\begin{oxlemma}{Closure Bodies are Well-Typed under Safe Loan Updates}
+  {lemma:exprs-well-typed-loan-update}
+  If
+  \begin{enumerate}
+  \item $\oxmusafety{\oxtvarctx}{\oxkontctx}{\oxvarctx}{\oxmuta}{\oxplaceexpr}{
+    \oxset{\overline{\oxloan}}
+  }$
+  \item $\oxlookup{\oxvarctx}{\oxcprov}{\{\}}$
+  \item $\oxcprov \not \in \oxdomain{\oxframe}$
+  \item $\forall \oxtype \in \oxframe$. $\oxcprov$ does not occur in $\oxtype$
+  \item $\forall \oxid \in \oxfvars{\oxexpr}.$ $\oxid \in \oxdomain{\oxframe}$
+  \item $\forall \oxcprov \in \oxfprovs{\oxexpr}.$ $\oxcprov \in \oxdomain{\oxframe}$
+  \item $\forall \oxcprov \in \oxdomain{\oxframe},
+    \oxloanpkg{\oxmuta}{\oxplaceexpr} \in \oxframe(\oxcprov).
+    \oxrootof{\oxplaceexpr} \in \oxdomain{\oxframe} \vee
+    \exists \oxcprov^\prime \mapsto \oxset{\oxloans} \in
+    \oxloanmappings{\oxvarctx}{\oxkontctx}.$ $\oxloanpkg{\oxmuta}{\oxplaceexpr} \in \oxset{\oxloans}$.
+    
+    (In English, loans in the closure's frame come from the current frame or a closure's captured
+    frame in $\oxvarctx$ or $\oxkontctx$)
+  \item $\forall \oxcprov \in \oxfprovs{\oxsitype}.\ \forall \oxtype^\prime \in
+    \oxdomain{\oxvarctx}.\ \oxcprov\text{ does not occur in }\oxtype^\prime$
+  \item $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{\oxnewframe{\oxvarctx}{\oxframe}}
+    {\oxexpr}{\oxsitype}{\oxnewframe{\oxvarctx_o}{\oxframe_o}}$
+  \item $\oxvarctxwellformed{\oxglobalctx}{\oxemptyctx}{\oxnewframe{
+      \oxvarctx[\oxcprov \mapsto \oxset{\oxloans}]
+    }{\oxframe}}$
+  \end{enumerate}
+  then
+  \begin{enumerate}
+  \item $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{
+    \oxnewframe{
+      \oxupdate{\oxvarctx}{
+        \oxloanctxentry{\oxcprov}{ \oxset{\overline{\oxloan}} }
+      }
+    }{\oxframe}
+  }{\oxexpr}{\oxsitype}{
+    \oxnewframe{
+      \oxupdate{\oxvarctx_o}{
+        \oxloanctxentry{\oxcprov}{\oxset{\overline{\oxloan}}
+        }
+      }
+    }{\oxframe_o}
+  }$.
+  \item $\forall \oxcprov \in \oxdomain{\oxframe_o},
+    \oxloanpkg{\oxmuta}{\oxplaceexpr} \in \oxframe_o(\oxcprov).
+    \oxrootof{\oxplaceexpr} \in \oxdomain{\oxframe_o} \vee
+    \exists \oxcprov^\prime \mapsto \oxset{\oxloans} \in
+    \oxloanmappings{\oxvarctx_o}{\oxkontctx}.$ $\oxloanpkg{\oxmuta}{\oxplaceexpr} \in \oxset{\oxloans}$.
+    
+    (In English, loans in the closure's frame come from the current frame or a closure's captured
+    frame in $\oxvarctx_o$ or $\oxkontctx$)
+  \end{enumerate}
+\end{oxlemma}
+\begin{proof}
+  Proceed by induction over the typing derivation for $\oxexpr$.
+
+  In \oxname{T-Move} and \oxname{T-Copy}, and \oxname{T-Borrow} cases, we can apply
+  \Lemma{lemma:ownership-safety-loan-update} and note that type computation is
+  unaffected by changes in loan sets.
+
+  In the \oxname{T-Borrow} case, we can apply
+  \Lemma{lemma:ownership-safety-loan-update} and note that type computation is
+  unaffected by changes in loan sets. The last condition is the restriction on
+  loans in $\oxframe$, but this is immediate by inspection of the ownership
+  safety judgement. The only way to create new loans is to directly borrow a
+  place, in which case we'd have that the loan is in the domain of $\oxframe$,
+  and otherwise the loans originated from the loan set in
+  $\oxnewframe{\oxvarctx}{\oxframe}$ of a reference being reborrowed, and we
+  already know the loan set restriction for $\oxnewframe{\oxvarctx}{\oxframe}$.
+  The rest of the cases that involve borrowing use similar reasoning.
+
+  In the \oxname{T-BorrowIndex} and \oxname{T-IndexCopy} cases, we can apply
+  \Lemma{lemma:ownership-safety-loan-update}, the induction hypothesis, and the
+  note about type computation.
+
+  In the \oxname{T-BorrowSlice} case, we can apply
+  \Lemma{lemma:ownership-safety-loan-update}, the induction hypothesis, the note
+  about type computation, and \Lemma{lemma:ownership-safety-closure-body}.
+
+  In the \oxname{T-Seq} case, we can apply the induction hypothesis, for which
+  we need to apply \Lemma{lemma:ownership-safety-closure-body} and use the fact
+  that garbage collection produces related environments with
+  \Lemma{lemma:ownership-safety-related-envs}.
+
+  In the \oxname{T-Branch} case we can apply the induction hypothesis,
+  \Lemma{lemma:ownership-safety-closure-body}, and
+  \Lemma{lemma:rewriting-loan-update}. We also need to show that
+  rewriting preserves the restriction on loans in $\oxframe$, but this is
+  immediate because the most that rewriting can do is union together loan sets.
+  The rest of the cases that use rewriting also use this same reasoning.
+
+  In the \oxname{T-Let} case, we can apply the induction hypothesis,
+  \Lemma{lemma:ownership-safety-closure-body},
+  \Lemma{lemma:rewriting-loan-update}, and the fact that garbage collection
+  produces related environments with
+  \Lemma{lemma:ownership-safety-related-envs}. The last obligation is the region
+  not reborrowed condition. Note that by environment well formedness and our
+  hypothesis, any free regions in the types are not in any non closure types.
+  Therefore, there are no places in $\oxvarctx$ with the region for the new
+  loans in $\oxloans$ to even contain a reborrow of, meaning the regions are not
+  reborrowed. The other cases which require region not reborrowed proceed by the
+  same reasoning.
+
+  In the \oxname{T-LetRegion}, \oxname{T-While}, \oxname{T-Closure},
+  \oxname{T-Tuple}, \oxname{T-Array}, \oxname{T-Slice}, \oxname{T-Left}, and
+  \oxname{T-Right} cases, the proofs follows from the induction hypothesis and
+  \Lemma{lemma:ownership-safety-closure-body}.
+
+  In the \oxname{T-AssignDeref} case, we can apply the induction hypothesis,
+  \Lemma{lemma:ownership-safety-closure-body}, the fact that type computation is
+  unaffected by loan updates, \Lemma{lemma:rewriting-loan-update}, and
+  \Lemma{lemma:ownership-safety-loan-update}.
+
+  In the \oxname{T-Assign} case, we can apply the induction hypothesis,
+  \Lemma{lemma:ownership-safety-closure-body}, the fact that type computation is
+  unaffected by loan updates, \Lemma{lemma:rewriting-loan-update}, and
+  \Lemma{lemma:ownership-safety-loan-update}. The last obligation is the unique
+  to judgement, which is unaffected by loan updates.
+
+  In the \oxname{T-ForArray} and \oxname{T-ForSlice} cases, we can apply the
+  induction hypothesis and \Lemma{lemma:ownership-safety-closure-body}. The
+  remaining region not reborrowed obligation follows from the same reasoning in
+  the \oxname{T-Let} case.
+
+  In the \oxname{T-Function}, \oxname{T-Abort}, \oxname{T-Unit}, \oxname{T-u32},
+  \oxname{T-True}, and \oxname{T-False} cases, the proof is immediate.
+
+  In the \oxname{T-App} case, we can apply the induction hypothesis,
+  \Lemma{lemma:ownership-safety-closure-body} and
+  \Lemma{lemma:rewriting-loan-update}. Note that the well formedness judgements
+  are unaffected by loan updates. The last obligation is the region not
+  reborrowed judgement, follows from the same reasoning in
+  the \oxname{T-Let} case.
+
+  In the \oxname{T-Drop} case, we can apply the induction hypothesis,
+  \Lemma{lemma:ownership-safety-closure-body}, and
+  \Lemma{lemma:ownership-safety-related-envs}, noting that making the type of a
+  place dead produces a related environment.
+
+  In the \oxname{T-Match} case we can apply the induction hypothesis,
+  \Lemma{lemma:ownership-safety-closure-body}, and
+  \Lemma{lemma:rewriting-loan-update}. The last obligation is the region not
+  reborrowed judgement, follows from the same reasoning in
+  the \oxname{T-Let} case.
+\end{proof}
+
+\begin{oxlemma}{Values are Well-Typed under Safe Loan Updates}
+  {lemma:values-well-typed-loan-update} If
+  $\oxmusafety{\oxemptyctx}{\oxkontctx}{\oxvarctx}{\oxmuta}{\oxplaceexpr}{
+    \oxset{\overline{\oxloan}} }$ and
+  $\oxnotinclosure{\oxkontctx}{\oxvarctx}{\oxcprov}$ and
+  $\oxlookup{\oxvarctx}{\oxcprov}{\emptyset}$ and
+  $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{\oxvarctx}
+  {\oxvalue}{\oxsitype}{\oxvarctx}$, then
+  $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{ \oxupdate{\oxvarctx}{
+      \oxloanctxentry{\oxcprov}{ \oxset{\overline{\oxloan}} } }
+  }{\oxvalue}{\oxsitype}{ \oxupdate{\oxvarctx}{ \oxloanctxentry{\oxcprov}{
+        \oxset{\overline{\oxloan}} } } }$.
+\end{oxlemma}
+
+\begin{proof}
+  We proceed by induction on the value typing relation.
+
+  For \oxname{T-u32}, \oxname{T-True}, \oxname{T-False}, the result is
+  immediate.
+
+  For \oxname{T-Tuple} and \oxname{T-Array}, we apply the induction
+  hypothesis to each entry.
+
+  \vspace{1em}
+  \noindent \framebox[\textwidth]{
+    \figuresize
+    \begin{mathpar}
+      \TPointer
+    \end{mathpar}
+  }
+  \vspace{1em}
+
+  In the \oxname{T-Pointer} case, both judgements in the premise are unaffected
+  by taking an empty loan set and adding loans to it, so the case is immediate.
+
+  \vspace{1em}
+  \noindent \framebox[\textwidth]{
+    \figuresize
+    \begin{mathpar}
+      \TClosureVal
+    \end{mathpar}
+  }
+  \vspace{1em}
+
+  In the \oxname{T-ClosureValue} case, first we invert the stack frame typing
+  hypothesis to get that $\forall x \in \oxdomain{\oxstackframe}.$
+  $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx}{
+    \oxnewframe{\oxvarctx}{\oxframe_c} }{\oxstackframe(x)}{\oxframe_c(x)}{
+    \oxnewframe{\oxvarctx}{\oxframe_c} }$. We can apply the induction hypothesis
+  to each of these statements, and apply \oxname{WF-Frame} to get
+  $\oxsubstorevalidity{\oxglobalctx}{
+    \oxvarctx[\oxloanctxentry{\oxcprov}{\oxset{\overline{\oxloan}}}]
+  }{\oxstackframe_c}{\oxframe_c}$.
+
+  Next we need to show that the body remains well typed. This follows from
+  \Lemma{lemma:exprs-well-typed-loan-update}.
+
+  In all other value cases, the typing judgement holds immediately.
+\end{proof}
+
+\begin{oxlemma}{Stack Validity is Preserved under Safe Loan Updates}
+  {lemma:store-validity-loan-update} If
+  $\oxmusafety{\oxemptyctx}{\oxkontctx}{\oxvarctx}{\oxmuta}{\oxplaceexpr}{
+    \oxset{\overline{\oxloan}} }$ and
+  $\oxnotinclosure{\oxkontctx}{\oxvarctx}{\oxcprov}$ and
+  and $\oxvarctx(\oxcprov) = \emptyset$ and
+  $\oxstorevalidity{\oxglobalctx}{\oxvarctx}{\oxstore}$, then
+  $\oxstorevalidity{\oxglobalctx}{ \oxupdate{\oxvarctx}{
+      \oxloanctxentry{\oxcprov}{\oxset{\overline{\oxloan}}} } }{\oxstore}$.
+\end{oxlemma}
+
+\begin{proof}
+  We proceed by induction on the stack validity. There are two cases,
+  \oxname{WF-StackEmpty}, and \oxname{WF-StackFrame}. \oxname{WF-StackEmpty} is
+  impossible, since we already know that $\oxcprov$ is in $\oxvarctx$.
+
+  \vspace{1em}
+  \noindent \framebox[\textwidth]{ \figuresize
+    \begin{mathpar}
+      \VStack\and \VStackEmpty
+    \end{mathpar}
+  } \vspace{1em}
+
+  In the case of \oxname{WF-StackFrame}, we have to show that the
+  values remain well-typed in the updated environment. For the remaining
+  $\oxvarctx^\prime$, if $\oxcprov \in \oxvarctx^\prime$, then we apply the
+  induction hypothesis, otherwise we just use the derivation from the premise.
+
+  To show that the values in the stack are still well typed in
+  $\oxvarctx[\oxcprov \mapsto \{\overline{\oxloan}\}]$, we apply
+  \Lemma{lemma:values-well-typed-loan-update}.
+\end{proof}
+
+\subsection{Preservation of Rewriting under Parallel Type Checking Lemmas}
+\label{sec:parallel-lemmas}
+
+\begin{oxlemma}{Region Rewriting is Preserved by Parallel Loan Updates}
+  {lemma:rewriting-parallel-ownership}
+  If
+  \begin{enumerate}
+  \item $\oxtunify{\oxemptyctx}{\oxkontctx}{\oxvarctx^\prime}{\oxtype_1}{\oxtype_2}{\oxvarctx_s}$
+  \item $\oxmusafety{\oxemptyctx}{\oxkontctx, \oxtype_1, \oxkontctx^\prime}{\oxvarctx}{\oxmuta}{\oxplaceexpr}{\oxset{\oxloans}}$
+  \item $\oxmusafety{\oxemptyctx}{\oxkontctx, \oxtype_2, \oxkontctx^\prime}{\oxvarctx^\prime}{\oxmuta}{\oxplaceexpr}{\oxset{\oxloans^\prime}}$
+  \item $\oxdomain{\oxvarctx} = \oxdomain{\oxvarctx^\prime}$ and $\oxdomain{\oxvarctx_o} = \oxdomain{\oxvarctx_o^\prime}$
+  \item $\forall \oxcprov \in \oxdomain{\oxvarctx}.$ $\oxvarctx^\prime(\oxcprov) \subseteq \oxvarctx(\oxcprov)$
+  \item $\forall \oxcprov \in \oxdomain{\oxvarctx_o}.$ $\oxvarctx^\prime_o(\oxcprov) \subseteq \oxvarctx_o(\oxcprov)$
+  \end{enumerate}
+  then
+  $\oxtunify{\oxemptyctx}{\oxkontctx}{\oxvarctx^\prime[\oxcprov \mapsto \oxset{\oxloans^\prime}]}{\oxtype_1}{\oxtype_2}{\oxvarctx_s^\prime}$.
+\end{oxlemma}
+
+\begin{proof}
+  Proceed by induction on the rewriting derivation. The only interesting case is
+  \oxname{RR-Reference}, in which case we proceed by induction on the outlives
+  derivation.
+
+  The interesting cases are \oxname{OL-CombineConcrete},
+  \oxname{OL-CombineConcreteUnrestricted}, and \oxname{OL-CheckConcrete} since
+  the type variable environment is guaranteed to be empty and the other cases
+  all involve abstract regions. The only interesting obligations are the region
+  not reborrowed ones, since the types in the environments are unchanged. This
+  amounts to showing that for all loans in $\oxset{\oxloans^\prime}$, none are
+  reborrows of references that have either $\oxcprov_1$ or $\oxcprov_2$ as their
+  region.
+
+  Assume one such loan $\oxloanpkg{\oxmuta^\prime}{\oxderef \oxplace} \in
+  \oxloans^\prime$ exists. Assume without loss of generality that $\oxplace:
+  \oxtref{\oxcprov_1}{\oxmuta^{\prime\prime}}{\oxtype} \in \oxvarctx$. By the
+  well formedness of $\oxkontctx, \oxtype_1, \oxkontctx^\prime$, since
+  $\oxtype_1$ contains $\oxcprov_1$, it must be the case that
+  $\oxvarctx(\oxcprov_1) \not = \emptyset$. When checking ownership safety for
+  $\oxderef \oxplace$, we'll need to show that excluding $\oxplace$, there are
+  no conflicts in $\oxcprov^\prime$ with any lons in $\oxcprov^\prime$. But
+  since the exclusion clause doesn't exclude when we have a reference in theta,
+  and $\oxtype_1$ contains $\oxcprov_1$, it must be the case that $\oxcprov_1$
+  will not be excluded, and we will then find loan conflicts, which is a
+  contradiction.
+\end{proof}
+
+\begin{oxlemma}{Region Rewriting is Preserved by Type Checking Parallel Expressions}
+  {lemma:rewriting-parallel-expression} \; \\
+  If
+  \begin{enumerate}
+  \item $\oxtunify{\oxemptyctx}{\oxkontctx}{\oxvarctx^\prime}{\oxtype_1}{\oxtype_2}{\oxvarctx_s}$
+  \item $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx, \oxtype_1, \oxkontctx^\prime}{\oxvarctx}{\oxexpr}{\oxtype}{\oxvarctx_o}$
+  \item $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxkontctx, \oxtype_2, \oxkontctx^\prime}{\oxvarctx^\prime}{\oxexpr}{\oxtype}{\oxvarctx_o^\prime}$
+  \item $\oxdomain{\oxvarctx} = \oxdomain{\oxvarctx^\prime}$ and $\oxdomain{\oxvarctx_o} = \oxdomain{\oxvarctx_o^\prime}$
+  \item $\forall \oxcprov \in \oxdomain{\oxvarctx}.$ $\oxvarctx^\prime(\oxcprov) \subseteq \oxvarctx(\oxcprov)$
+  \item $\forall \oxcprov \in \oxdomain{\oxvarctx_o}.$ $\oxvarctx^\prime_o(\oxcprov) \subseteq \oxvarctx_o(\oxcprov)$
+  \end{enumerate}
+  then
+  $\oxtunify{\oxemptyctx}{\oxkontctx}{\oxvarctx_o^\prime}{\oxtype_1}{\oxtype_2}{\oxvarctx_s^\prime}$.
+\end{oxlemma}
+
+\begin{proof}
+  Proceed by induction on the typing derivation using $\oxvarctx^\prime$ (note
+  that since the typing derivation is by the structure of $\oxexpr$, we can
+  simultaneously induct on the typing derivation using $\oxvarctx$).
+
+  In the \oxname{T-Copy}, \oxname{T-Function}, \oxname{T-Abort},
+  \oxname{T-Unit}, \oxname{T-u32}, \oxname{T-True}, and \oxname{T-False} cases,
+  the proof is immediate, with $\oxvarctx_o = \oxvarctx$ and
+  $\oxvarctx^{\prime\prime} = \oxvarctx^\prime$.
+
+  In the \oxname{T-IndexCopy}, \oxname{T-LetRegion}, \oxname{T-While},
+  \oxname{T-ForArray}, \oxname{T-ForSlice}, \oxname{T-Closure},
+  \oxname{T-Tuple}, \oxname{T-Array}, \oxname{T-Slice}, \oxname{T-Left}, and
+  \oxname{T-Right} cases, the proof follows immediately from the induction
+  hypothesis.
+
+  In the \oxname{T-Move} case, the proof is immediate because making a type a
+  dead does not add additional obligations in the rewriting judgement.
+
+  In the \oxname{T-Borrow}, \oxname{T-BorrowIndex}, and \oxname{T-BorrowSlice}
+  cases, we proceed by the induction hypothesis and apply
+  \Lemma{lemma:rewriting-parallel-ownership}.
+
+  In the \oxname{T-Seq} case, we just need to show that garbage collecting loans
+  preserves rewriting. But this is immediate, because garbage collection loans
+  can only clear loan sets, which makes the requirements in rewriting strictly
+  easier since it could only \emph{remove} reborrows, not add them.
+
+  In the \oxname{T-AssignDeref}, \oxname{T-AppFunction}, and
+  \oxname{T-AppClosure} cases, we first apply the induction hypothesis. Note
+  that the output of the region rewriting at most only combines loan sets. As
+  such, the region rewriting is preserved, because the main condition, the
+  region not reborrowed requirement on the regions in the types, will still
+  consider the same set of loans. For all region rewriting cases below, use this
+  same reasoning.
+
+  In the \oxname{T-Assign} case, we apply the induction hypothesis and reason
+  about the rewriting as above, but we additionally need to know that the type
+  update maintains the region not reborrowed and closure restrictions. For both,
+  it's immediate because the rewriting in the hypothesis of the typing rule will
+  check the same restrictions.
+
+  In the \oxname{T-Branch} and \oxname{T-Match} cases, we apply the induction
+  hypothesis, the reasoning above about rewriting, and the fact that
+  $\oxintersect$ only unions together the loan sets from $\oxvarctx_2$ and
+  $\oxvarctx_3$, both of which had the rewriting restrictions true by the
+  induction hypothesis.
+
+  In the \oxname{T-Let} case, we again apply the induction hypothesis and the
+  reasoning above about rewriting, but additionally use the same reasoning as
+  the garbage collection case as well.
+
+  In the \oxname{T-Drop} case, we just need to show that rewriting is preserved
+  by making a place dead in order to apply the induction hypothesis. This is
+  immediate though, because all of the obligations in rewriting are either the
+  same difficulty or made easier by making a place dead.
+\end{proof}
+
+\begin{oxlemma}{Outlives Still Holds with Smaller Continuation Contexts}
+  {lemma:outlives-smaller-kont}
+  If $\oxrunify{\oxemptyctx}{\oxkontctx, \oxtype}{\oxvarctx}{\oxcprov_1}{\oxcprov_2}{\oxvarctx^\prime}$
+  then $\oxrunify{\oxemptyctx}{\oxkontctx}{\oxvarctx}{\oxcprov_1}{\oxcprov_2}{\oxvarctx^\prime}$.
+\end{oxlemma}
+\begin{proof}
+  Proceed by induction on the outlives judgement. The only interesting cases are
+  the \oxname{OL-CombineConcrete}, \oxname{OL-CombineConcreteUnrestricted}, and
+  \oxname{OL-CheckConcrete} cases which all proceed similarly. The main
+  obligations, the region not reborrowed and closure restriction judgements, are
+  immediate since they are either unaffected by or have strictly fewer
+  obligations in the smaller temporary typing $\oxkontctx$.
+\end{proof}
+
+\begin{oxlemma}{Region Rewriting Still Holds with Smaller Continuation Contexts}
+  {lemma:rewriting-smaller-kont}
+  If $\oxtunify{\oxemptyctx}{\oxkontctx, \oxtype}{\oxvarctx}{\oxtype_1}{\oxtype_2}{\oxvarctx^\prime}$
+  then $\oxtunify{\oxemptyctx}{\oxkontctx}{\oxvarctx}{\oxtype_1}{\oxtype_2}{\oxvarctx^\prime}$.
+\end{oxlemma}
+\begin{proof}
+  Proceed by induction on the rewriting judgement. The only interesting case is
+  \oxname{RR-Reference}, in which case we just apply
+  \Lemma{lemma:outlives-smaller-kont}.
+\end{proof}
+
+\newpage
+\subsection{Progress}
+\label{sec:progress}
+
+\input{progress_proof}
+
+\newpage
+\subsection{Preservation}
+\label{sec:preservation}
+
+\input{preservation_proof}
+
+\subsection{Type Safety}
+\label{sec:type-safety}
+
+\begin{oxtheorem}{Type Safety}{theorem:type-safety-app}
+  If $\oxtypjudge{\oxglobalctx}{\oxemptyctx}{\oxemptyctx}{\oxemptyctx}{\oxexpr}
+  {\oxsitype}{\oxvarctx}$ and $\oxglobalctxvalidity{\oxglobalctx}$, then
+  $\oxreducemany{\oxglobalctx}{\oxemptyctx}{\oxexpr}{\oxstore^\prime}{\oxvalue}$ or
+  evaluation of $\oxexpr$ aborts or diverges.
+\end{oxtheorem}
+
+\begin{proof}
+  By the interleaved use of \textbf{Progress} and \textbf{Preservation}.
+\end{proof}
+
+%%% Local Variables:
+%%% mode: latex
+%%% fill-column: 80
+%%% End:

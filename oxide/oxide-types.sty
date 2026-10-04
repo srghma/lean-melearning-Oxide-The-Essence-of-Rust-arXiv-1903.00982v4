@@ -1,0 +1,347 @@
+%%%%%%%%%%%%%%%%
+%% Base Types %%
+%%%%%%%%%%%%%%%%
+
+\newcommand{\oxtbool}{\oxkey{bool}}
+\newcommand{\oxtnum}{\oxkey{u32}}
+\newcommand{\oxtunit}{\oxkey{unit}}
+
+%%%%%%%%%%%
+%% Types %%
+%%%%%%%%%%%
+
+\newcommand{\oxtvar}{\alpha}
+\newcommand{\oxtref}[3]{\& #1 \oxspace #2 \oxspace #3}
+\newcommand{\oxtfun}[4]{
+  \forall \oxangle{#1} (#2) \oxspace \overset{#4}{\rightarrow} \oxspace #3
+}
+\newcommand{\oxtclosure}[3]{(#1) \oxspace \overset{#3}{\rightarrow} \oxspace #2}
+\newcommand{\oxtfunext}[5]{
+  \oxtfun{#1}{#2}{#3}{#4} \oxspace \oxkey{where} \oxspace #5
+}
+\newcommand{\oxtarr}[2]{[#1 ; \oxspace #2]}
+\newcommand{\oxtslice}[1]{[#1]}
+\newcommand{\oxtprod}[1]{(#1)}
+\newcommand{\oxtuninit}[1]{#1^\dagger}
+\newcommand{\oxtsum}[2]{\oxkey{Either} \oxangle{#1 \oxcomma #2}}
+
+%%%%%%%%%%%%%%%%%%%%%%
+%% Typing Operators %%
+%%%%%%%%%%%%%%%%%%%%%%
+
+\newcommand{\oxtunify}[7][\oxrewritemode]{#2; \; #4; \; #3 \vdash^{#1} #5 \leadsto #6 \dashv #7}
+\newcommand{\oxrunify}[7][\oxrewritemode]{#2; \; #4; \; #3 \vdash^{#1} #5 \oxoutlives #6 \dashv #7}
+\newcommand{\oxtunifymany}[6]{#1; \; #3; \; #2 \vdash \overline{#4 \leadsto #5} \dashv #6}
+\newcommand{\oxrunifymany}[7][\oxrewritemode]{#2; \; #4; \; #3 \vdash \overline{#5 \oxoutlives #6} \dashv #7}
+
+\newcommand{\oxoccursbeforein}[3]{#1  \ \texttt{occurs before} \ #2 \ \texttt{in} \ #3}
+\newcommand{\oxuniquein}[3]{#1 \ \texttt{is unique to} \ #2 \ \texttt{in} \ #3}
+\newcommand{\oxuniqueinner}[4]{
+  #1 \ \texttt{is unique to} \ #2 \ \texttt{excluding} \  #4 \ \texttt{in} \ #3
+}
+
+%%%%%%%%%%%%%%%
+%% Subtyping %%
+%%%%%%%%%%%%%%%
+
+\newcommand{\oxtunifyform}{
+  \framebox{
+    $\oxtunify{\oxtvarctx}{\oxkontctx}{\oxvarctx}{\oxtype_1}{\oxtype_2}{\oxvarctx^\prime}$
+  }
+}
+
+\newcommand{\oxrunifyform}{
+  \framebox{
+    $\oxrunify{\oxtvarctx}{\oxkontctx}{\oxvarctx}{\oxprov_1}{\oxprov_2}{\oxvarctx^\prime}$
+  }
+}
+
+\newcommand{\oxrunifymanyform}{
+  \framebox{
+    $\oxrunifymany{\oxtvarctx}{\oxkontctx}{\oxvarctx}{\oxprov_1}{\oxprov_2}{\oxvarctx^\prime}$
+  }
+}
+
+\newcommand{\UBounds}{
+  \inferrule[OL-Bounds]{
+    %% premises
+    \oxtunify{\oxtvarctx}{\oxkontctx}{\oxvarctx}{\oxprov_1}{\oxprov^\prime_1}{\oxvarctx_1} \\
+    \oxdots \\
+    \oxtunify{\oxtvarctx}{\oxkontctx}{\oxvarctx_{n-1}}{\oxprov_n}{\oxprov^\prime_n}{\oxvarctx_n} \\
+  }{
+    %% conclusions
+    \oxtunifymany{\oxtvarctx}{\oxkontctx}{\oxvarctx}{\oxprov}{\oxprov^\prime}{\oxvarctx_n}
+  }
+}
+
+\newcommand{\URefl}{
+  \inferrule[RR-Refl]{
+    %% premises
+  }{
+    %% conclusions
+    \oxtunify{\oxtvarctx}{\oxkontctx}{\oxvarctx}{\oxtype_1}{\oxtype_1}{\oxvarctx}
+  }
+}
+
+\newcommand{\UTrans}{
+  \inferrule[RR-Trans]{
+    %% premises
+    \oxtunify{\oxtvarctx}{\oxkontctx}{\oxvarctx}{\oxtype_1}{\oxtype_2}{\oxvarctx^\prime} \\
+    \oxtunify{\oxtvarctx}{\oxkontctx}{\oxvarctx^\prime}{\oxtype_2}{\oxtype_3}{\oxvarctx^{\prime\prime}} \\
+  }{
+    %% conclusions
+    \oxtunify{\oxtvarctx}{\oxkontctx}{\oxvarctx}{\oxtype_1}{\oxtype_3}{\oxvarctx^{\prime\prime}}
+  }
+}
+
+\newcommand{\USharedRef}{
+  \inferrule[RR-Reference]{
+    %% premises
+    \oxrunify{\oxtvarctx}{\oxkontctx}{\oxvarctx}{\oxprov_1}{\oxprov_2}{\oxvarctx^\prime} \\
+    \oxtunify{\oxtvarctx}{\oxkontctx}{\oxvarctx^\prime}{\oxtype_1}{\oxtype_2}{\oxvarctx^{\prime\prime}} \\
+  }{
+    %% conclusions
+    \oxtunify{\oxtvarctx}{\oxkontctx}{\oxvarctx}{
+      \oxtref{\oxprov_1}{\oxmuta}{\oxtype_1}
+    }{
+      \oxtref{\oxprov_2}{\oxmuta}{\oxtype_2}
+    }{\oxvarctx^{\prime\prime}}
+  }
+}
+
+\newcommand{\UUniqueRef}{
+  \inferrule[RR-UniqueRef]{
+    %% premises
+    \oxrunify{\oxtvarctx}{\oxkontctx}{\oxvarctx}{\oxprov_1}{\oxprov_2}{\oxvarctx^\prime} \\
+    \oxtunify{\oxtvarctx}{\oxkontctx}{\oxvarctx^\prime}{\oxtype_1}{\oxtype_2}{\oxvarctx^{\prime\prime}} \\
+  }{
+    %% conclusions
+    \oxtunify{\oxtvarctx}{\oxkontctx}{\oxvarctx}{
+      \oxtref{\oxprov_1}{\oxmut}{\oxtype_1}
+    }{
+      \oxtref{\oxprov_2}{\oxmut}{\oxtype_2}
+    }{\oxvarctx^{\prime\prime}}
+  }
+}
+
+\newcommand{\UArray}{
+  \inferrule[RR-Array]{
+    %% premises
+    \oxtunify{\oxtvarctx}{\oxkontctx}{\oxvarctx}{\oxtype_1}{\oxtype_2}{\oxvarctx^\prime}
+  }{
+    %% conclusions
+    \oxtunify{\oxtvarctx}{\oxkontctx}{\oxvarctx}{\oxtarr{\oxtype_1}{\oxnum}}{\oxtarr{\oxtype_2}{\oxnum}}
+    {\oxvarctx^\prime}
+  }
+}
+
+\newcommand{\USlice}{
+  \inferrule[RR-Slice]{
+    %% premises
+    \oxtunify{\oxtvarctx}{\oxkontctx}{\oxvarctx}{\oxtype_1}{\oxtype_2}{\oxvarctx^\prime}
+  }{
+    %% conclusions
+    \oxtunify{\oxtvarctx}{\oxkontctx}{\oxvarctx}{\oxtslice{\oxtype_1}}{\oxtslice{\oxtype_2}}
+    {\oxvarctx^\prime}
+  }
+}
+
+\newcommand{\UTuple}{
+  \inferrule[RR-Tuple]{
+    %% premises
+    \forall i \in \oxset{1 \oxdots n}. \;
+    \oxtunify{\oxtvarctx}{\oxkontctx}{\oxvarctx_{n-1}}{\oxtype_i}{\oxtype^\prime_i}{\oxvarctx_i} \\
+  }{
+    %% conclusions
+    \oxtunify{\oxtvarctx}{\oxkontctx}{\oxvarctx}{
+      \oxtprod{\oxtype_1 \oxdots \oxtype_n}
+    }{
+      \oxtprod{\oxtype^\prime_1 \oxdots \oxtype^\prime_n}
+    }{\oxvarctx_n}
+  }
+}
+
+\newcommand{\UStruct}{
+  \inferrule[RR-Struct]{
+    %% premises
+    \oxtunify{\oxtvarctx}{\oxkontctx}{\oxvarctx}{\oxprov_1}{\oxprov^\prime_1}{\oxvarctx_1} \\
+    \oxdots \\
+    \oxtunify{\oxtvarctx}{\oxkontctx}{\oxvarctx_{n-1}}{\oxprov_n}{\oxprov^\prime_n}{\oxvarctx_n} \\\\
+    \oxtunify{\oxtvarctx}{\oxkontctx}{\oxvarctx_n}{\oxtype_1}{\oxtype^\prime_1}{\oxvarctx^\prime_1} \\
+    \oxdots \\
+    \oxtunify{\oxtvarctx}{\oxkontctx}{\oxvarctx^\prime_{n-1}}{\oxtype_n}{\oxtype^\prime_n}{\oxvarctx^\prime_n} \\\\
+    \oxtunify{\oxtvarctx}{\oxkontctx}{\oxvarctx_n}{\oxtype^\prime_1}{\oxtype_1}{\oxvarctx^\prime_1} \\
+    \oxdots \\
+    \oxtunify{\oxtvarctx}{\oxkontctx}{\oxvarctx^\prime_{n-1}}{\oxtype^\prime_n}{\oxtype_n}{\oxvarctx^\prime_n} \\
+  }{
+    %% conclusions
+    \oxtunify{\oxtvarctx}{\oxkontctx}{\oxvarctx}{
+      \oxdatatype \oxangle{
+        \oxprov_1 \oxdots \oxprov_m \oxcomma
+        \oxtype_1 \oxdots \oxtype_n
+      }
+    }{
+      \oxdatatype \oxangle{
+        \oxprov^\prime_1 \oxdots \oxprov^\prime_m \oxcomma
+        \oxtype^\prime_1 \oxdots \oxtype^\prime_n
+      }
+    }{\oxvarctx^\prime_n}
+  }
+}
+
+\newcommand{\UUninit}{
+  \inferrule[RR-Dead]{
+    %% premises
+    \oxtunify{\oxtvarctx}{\oxkontctx}{\oxvarctx}{\oxsitype_1}{\oxsitype_2}{\oxvarctx^\prime}
+  }{
+    %% conclusions
+    \oxtunify{\oxtvarctx}{\oxkontctx}{\oxvarctx}{\oxsitype_1}{\oxsidtype_2}{\oxvarctx}
+  }
+}
+
+\newcommand{\UReflProv}{
+  \inferrule[OL-Refl]{
+    %% premises
+  }{
+    %% conclusions
+    \oxrunify{\oxtvarctx}{\oxkontctx}{\oxvarctx}{\oxprov}{\oxprov}{\oxvarctx}
+  }
+}
+
+\newcommand{\UTransProv}{
+  \inferrule[OL-Trans]{
+    %% premises
+    \oxrunify{\oxtvarctx}{\oxkontctx}{\oxvarctx}{\oxabsprov_1}{\oxabsprov_2}{\oxvarctx^\prime} \\\\
+    \oxrunify{\oxtvarctx}{\oxkontctx}{\oxvarctx^\prime}{\oxabsprov_2}{\oxabsprov_3}{\oxvarctx^{\prime\prime}} \\
+  }{
+    %% conclusions
+    \oxrunify{\oxtvarctx}{\oxkontctx}{\oxvarctx}{\oxabsprov_1}{\oxabsprov_3}{\oxvarctx^{\prime\prime}}
+  }
+}
+
+\newcommand{\UCombineLocalProvs}{
+  \inferrule[OL-CombineConcrete]{
+    %% premises
+    \oxnotreborrowed{\oxvarctx}{\oxcprov_1} \\
+    \oxnotreborrowed{\oxvarctx}{\oxcprov_2} \\
+    \oxclosrestriction{\oxkontctx}{\oxvarctx}{\oxcprov_1 \oxcomma \oxcprov_2} \\\\
+    \oxoccursbeforein{\oxcprov_1}{\oxcprov_2}{\oxvarctx} \\
+    \oxset{\overline{\oxloan}} = \oxvarctx(\oxcprov_1) \cup \oxvarctx(\oxcprov_2) \\
+  }{
+    %% conclusions
+    \oxrunify[\oxcombine]{\oxtvarctx}{\oxkontctx}{\oxvarctx}{\oxcprov_1}{\oxcprov_2}{
+      \oxtupdate{\oxvarctx}{\oxcprov_2}{\oxset{\overline{\oxloan}}}
+    }
+  }
+}
+
+\newcommand{\UCombineLocalProvsUnrest}{
+  \inferrule[OL-CombineConcreteUnrestricted]{
+    %% premises
+    \oxnotreborrowed{\oxvarctx}{\oxcprov_1} \\
+    \oxnotreborrowed{\oxvarctx}{\oxcprov_2} \\\\
+    \oxoccursbeforein{\oxcprov_1}{\oxcprov_2}{\oxvarctx} \\
+    \oxset{\overline{\oxloan}} = \oxvarctx(\oxcprov_1) \cup \oxvarctx(\oxcprov_2) \\
+  }{
+    %% conclusions
+    \oxrunify[\oxcombineunrest]{\oxtvarctx}{\oxkontctx}{\oxvarctx}{\oxcprov_1}{\oxcprov_2}{
+      \oxtupdate{\oxvarctx}{\oxcprov_2}{\oxset{\overline{\oxloan}}}
+    }
+  }
+}
+
+\newcommand{\UAbsProvs}{
+  \inferrule[OL-BothAbstract]{
+    %% premises
+    \oxtvarctxentry{\oxabsprov_1}{\oxkprov} \in \oxtvarctx \\
+    \oxtvarctxentry{\oxabsprov_2}{\oxkprov} \in \oxtvarctx \\
+    \oxabsprov_1 \oxoutlives \oxabsprov_2 \in \oxtvarctx \\
+  }{
+    %% conclusions
+    \oxrunify{\oxtvarctx}{\oxkontctx}{\oxvarctx}{\oxabsprov_1}{\oxabsprov_2}{\oxvarctx}
+  }
+}
+
+\newcommand{\UCheckLocalProvs}{
+  \inferrule[OL-CheckConcrete]{
+    %% premises
+    \oxnotreborrowed{\oxvarctx}{\oxcprov_1} \\
+    \oxnotreborrowed{\oxvarctx}{\oxcprov_2} \\\\
+    \oxoccursbeforein{\oxcprov_1}{\oxcprov_2}{\oxvarctx} \\
+  }{
+    %% conclusions
+    \oxrunify[\oxnoop]{\oxtvarctx}{\oxkontctx}{\oxvarctx}{\oxcprov_1}{\oxcprov_2}{
+      \oxvarctx
+    }
+  }
+}
+
+\newcommand{\OAbsLocalProvs}{
+  \inferrule[OL-ConcreteAbstract]{
+    %% premises
+    \oxlookup{\oxvarctx_{1,0}}{\oxcprov}{
+      \oxset{\overline{\oxloanpkg{\oxmuta}{\oxplaceexpr}}^{n}}
+    } \neq \emptyset \\
+    \forall i \in \oxset{1 \oxdots n}. \; \not\exists \oxplace. \;
+    \oxplaceexpr_i = \oxplace \\
+    \forall i \in \oxset{1 \oxdots n}. \;
+      \oxcomputety{\oxtvarctx}{\oxvarctx_0}{\oximm}{\oxplaceexpr_i}{\_}{
+        \overline{\oxprov_i}^{m_i}
+      }
+     \\\\
+    \oxtvarctxentry{\oxabsprov}{\oxkprov} \in \oxtvarctx \\
+    \forall i \in \oxset{1 \oxdots n}. \forall j \in \oxset{1 \oxdots m_i}.\;
+    \oxrunify{\oxtvarctx}{\oxkontctx}{\oxvarctx_{i,j-1}}{\oxprov_{i,j}}{\oxabsprov}{\oxvarctx_{i,j}} \\
+  }{
+    %% conclusions
+    \oxrunify{\oxtvarctx}{\oxkontctx}{\oxvarctx_{1,0}}{\oxcprov}{\oxabsprov}{\oxvarctx_{n,m_n}}
+  }
+}
+
+\newcommand{\OLocalAbsProvs}{
+  \inferrule[OL-AbstractConcrete]{
+    %% premises
+    \oxtvarctxentry{\oxabsprov}{\oxkprov} \in \oxtvarctx \\
+    \oxcprov \in \oxdomain{\oxvarctx} \\
+  }{
+    %% conclusions
+    \oxrunify{\oxtvarctx}{\oxkontctx}{\oxvarctx}{\oxabsprov}{\oxcprov}{\oxvarctx}
+  }
+}
+
+\newcommand{\OBounds}{
+  \inferrule[OL-Bounds]{
+    %% premises
+    \forall i \in \oxset{1 \oxdots n}. \;
+    \oxrunify{\oxtvarctx}{\oxkontctx}{\oxvarctx_{i-1}}{\oxprov_i}{\oxprov^\prime_i}{\oxvarctx_i} \\
+  }{
+    %% conclusions
+    \oxrunifymany{\oxtvarctx}{\oxkontctx}{\oxvarctx_0}{\oxprov}{\oxprov^\prime}{\oxvarctx_n}
+  }
+}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Ordering on Ownership Qualifiers %%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\newcommand{\oxmutasubtypeform}{
+  \framebox{\ensuremath{\oxmuta \oxsubtype \oxmuta^\prime}}
+}
+
+\newcommand{\SRefl}{
+  \inferrule[QO-Refl]{
+    %% premises
+  }{
+    %% conclusions
+    \oxmuta \oxsubtype \oxmuta
+  }
+}
+
+\newcommand{\SShrdUniq}{
+  \inferrule[QO-ShrdUniq]{
+    %% premises
+  }{
+    %% conclusions
+    \oximm \oxsubtype \oxmut
+  }
+}

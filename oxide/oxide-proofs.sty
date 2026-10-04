@@ -1,0 +1,206 @@
+%%%%%%%%%%%%%
+%% Styling %%
+%%%%%%%%%%%%%
+
+\newcommand{\oxname}[1]{{\small \textsc{#1}}}
+
+%%%%%%%%%%%%%%%%%%%%%%%
+%% Logical Operators %%
+%%%%%%%%%%%%%%%%%%%%%%%
+
+\newcommand{\oxexists}{\exists \oxspace}
+\newcommand{\oxforall}{\forall \oxspace}
+
+\newcommand{\oxand}{\ensuremath{\oxspace \wedge \oxspace}}
+\newcommand{\oxor}{\ensuremath{\oxspace \vee \oxspace}}
+
+%%%%%%%%%%%%%%
+%% Theorems %%
+%%%%%%%%%%%%%%
+
+\newenvironment{oxtheorem}[2]{
+  \begin{theorem}[#1]
+    \label{#2}
+}{\end{theorem}}
+\newenvironment{oxlemma}[2]{
+  \begin{lemma}[#1]
+    \label{#2}
+}{\end{lemma}}
+\newenvironment{oxcorollary}[2]{
+  \begin{corollary}[#1]
+    \label{#2}
+}{\end{corollary}}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Progress Proof Cases %%
+%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\newcommand{\oxprogresscase}[4]{
+  \noindent Case \oxname{#1}: \\[0.5em]
+  \begin{tabular}{ll}
+    From premise: & We want to step with: \\
+    \framebox[0.4875\textwidth]{
+      \figuresize
+      \begin{mathpar}
+        #2
+      \end{mathpar}
+    }
+    & \framebox[0.4875\textwidth]{
+      \figuresize
+      \begin{mathpar}
+      #3
+      \end{mathpar}
+    }
+  \end{tabular} \\[1em]
+  #4 \\
+}
+
+\newcommand{\oxprogresscasewide}[4]{
+  \noindent Case \oxname{#1}: \\[0.5em]
+  \begin{tabular}{l}
+    From premise: \\
+    \framebox[\textwidth]{
+      \figuresize
+      \begin{mathpar}
+        #2
+      \end{mathpar}
+    } \\[1.5em]
+    We want to step with: \\
+    \framebox[\textwidth]{
+      \figuresize
+      \begin{mathpar}
+      #3
+      \end{mathpar}
+    }
+  \end{tabular} \\[1em]
+  #4 \\
+}
+
+\newcommand{\oxprogresscaseinductive}[6]{
+  \noindent Case \oxname{#1}: \\[0.5em]
+  \begin{tabular}{l}
+    From premise: \\
+    \framebox[\textwidth]{
+      \figuresize
+      \begin{mathpar}
+        #2
+      \end{mathpar}
+    }
+  \end{tabular} \\[1em]
+  #3 \\[1em]
+  \begin{tabular}{l}
+    #4 \\
+    \framebox[\textwidth]{
+      \figuresize
+      \begin{mathpar}
+        #5
+      \end{mathpar}
+    }
+  \end{tabular} \\[1em]
+  #6 \\
+}
+
+\newcommand{\oxprogresscasevalue}[3]{
+  \noindent Case \oxname{#1}: \\[0.5em]
+  \begin{tabular}{l}
+    From premise: \\
+    \framebox[\textwidth]{
+      \figuresize
+      \begin{mathpar}
+        #2
+      \end{mathpar}
+    } \\[1.5em]
+  \end{tabular} \\[1em]
+  #3 \\
+}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Preservation Proof Cases %%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\newcommand{\oxpreservationcaseheader}[2]{
+  \noindent Case \oxname{#1}: \\[0.5em]
+  \begin{tabular}{l}
+    \pbox{\textwidth}{\vspace*{0.5em} From premise: \vspace*{0.5em}} \\
+
+    \framebox[\textwidth]{
+    \figuresize
+    \begin{mathpar}
+      #2
+    \end{mathpar}
+    } \\
+  \end{tabular} \\[1em]
+}
+
+\newcommand{\oxpreservationcaseraw}[4]{
+    \noindent Case \oxname{#1}: \\[0.5em]
+    \begin{tabular}{l}
+      \pbox{\textwidth}{\vspace*{0.5em} From premise: \vspace*{0.5em}} \\
+
+      \framebox[\textwidth]{
+      \figuresize
+      \begin{mathpar}
+        #2
+      \end{mathpar}
+      } \\
+    \pbox{\textwidth}{
+    \vspace*{0.5em}
+    Since $\oxexpr = #3$, by inspection of the
+    reduction rules, we know that $\oxexpr$ steps with the following rule:
+    \vspace*{0.5em}
+    } \\
+
+    \framebox[\textwidth]{
+    \figuresize
+    \begin{mathpar}
+      #4
+    \end{mathpar}
+    } \\[1.5em]
+  \end{tabular} \\[1em]
+}
+
+\newcommand{\oxpreservationcase}[6][]{
+  \oxpreservationcaseraw{#2}{#3}{#4}{#5}
+
+  #1
+
+  We then pick $\oxvarctx_i$ to be \framebox{$#6$}, and need to show:
+}
+
+\newcommand{\oxpreservationcasemulti}[5][]{
+  \oxpreservationcaseraw{#2}{#3}{#4}{#5}
+
+  #1
+
+  Then, for each possible rule, we'll pick $\oxvarctx_i$
+  separately. The cases proceed as follows:
+}
+
+\newcommand{\oxpreservationsubcaseheading}[2]{
+  \noindent For \oxname{#1}, we pick $\oxvarctx_i$ to be
+  \framebox{$#2$}, and need to show:
+}
+
+\newenvironment{preservation}
+  {\center \tabularx{\linewidth}{|c|X|} \hline}
+  {\endtabularx \endcenter}
+
+\newcommand{\oxpresline}[2]{
+  {\figuresize \ensuremath{#1}} & #2 \\ \hline
+}
+
+\newcommand{\oxpreservationtable}[8]{
+  \begin{center}
+    \begin{tabularx}{\linewidth}{|c|X|}
+      \hline
+      {\figuresize #1} %$\oxstorevalidity{\oxglobalctx}{\oxvarctx_i}{\oxstore^\prime}$
+        & #2 \\ \hline
+      {\figuresize #3} %$\oxtypjudgeOLD{\oxglobalctx}{\oxtvarctx}{\oxvarctx_i}{\oxexpr^\prime}{\oxtype^\prime}{\oxvarctx^\prime}$
+        & #4 \\ \hline
+        {\figuresize #5} %$\oxtunify{\oxtglobalctx}{\oxloanctx}{\oxtype}{\oxtype^\prime}{\oxloanctx}$
+      & #6 \\ \hline
+      {\figuresize #7} %$\oxloanctx_f \oxsubtype \oxloanctx_f^\prime$
+      & #8 \\ \hline
+    \end{tabularx}
+  \end{center}
+}

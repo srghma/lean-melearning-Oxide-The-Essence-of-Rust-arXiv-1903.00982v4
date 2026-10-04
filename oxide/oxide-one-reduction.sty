@@ -1,0 +1,143 @@
+%%%%%%%%%%%%%%%%%%%%%
+%% Reduction Rules %%
+%%%%%%%%%%%%%%%%%%%%%
+
+\newcommand{\EVecNew}{
+  \inferrule[E-Vec]{
+    %% premises
+  }{
+    %% conclusions
+    \oxreduce{\oxglobalctx}{\oxstore}{
+      \oxvecnew{\oxtype}
+    }{\oxstore}{
+      \oxvecshape{}
+    }
+  }
+}
+
+\newcommand{\EVecPush}{
+  \inferrule[E-VecPush]{
+    %% premises
+  }{
+    %% conclusions
+    \oxreduce{\oxglobalctx}{
+      \oxextendctx{\oxstore}{
+        \oxstoreentry{\oxplace}{\oxvecshape{\overline{\oxvalue}}}
+      }
+    }{
+      \oxvecpush{(\oxptr{\oxplace})}{\oxvalue_n}
+    }
+    {
+      \oxextendctx{\oxstore}{
+        \oxstoreentry{\oxplace}{\oxvecshape{\overline{\oxvalue}, \oxvalue_n}}
+      }
+    }{\oxunit}
+  }
+}
+
+\newcommand{\EVecPop}{
+  \inferrule[E-VecPop]{
+    %% premises
+  }{
+    %% conclusions
+    \oxreduce{\oxglobalctx}{
+      \oxextendctx{\oxstore}{
+        \oxstoreentry{\oxplace}{\oxvecshape{\overline{\oxvalue}, \oxvalue_n}}
+      }
+    }{
+      \oxvecpop{(\oxptr{\oxplace})}
+    }
+    {
+      \oxextendctx{\oxstore}{
+        \oxstoreentry{\oxplace}{\oxvecshape{\overline{\oxvalue}}}
+      }
+    }{\oxvalue_n}
+  }
+}
+
+\newcommand{\EVecPopEmpty}{
+  \inferrule[E-VecPopEmpty]{
+    %% premises
+  }{
+    %% conclusions
+    \oxreduce{\oxglobalctx}{
+      \oxextendctx{\oxstore}{
+        \oxstoreentry{\oxplace}{\oxvecshape{}}
+      }
+    }{
+      \oxvecpop{(\oxptr{\oxplace})}
+    }
+    {
+      \oxextendctx{\oxstore}{
+        \oxstoreentry{\oxplace}{\oxvecshape{}}
+      }
+    }{\oxabort{\textrm{``cannot pop from an empty vec''}}}
+  }
+}
+
+\newcommand{\EVecLen}{
+  \inferrule[E-VecLen]{
+    %% premises
+  }{
+    %% conclusions
+    \oxreduce{\oxglobalctx}{
+      \oxextendctx{\oxstore}{
+        \oxstoreentry{\oxplace}{\oxvecshape{\oxvalue_1 \oxdots \oxvalue_n}}
+      }
+    }{
+      \oxveclen{(\oxptr{\oxplace})}
+    }
+    {
+      \oxextendctx{\oxstore}{
+        \oxstoreentry{\oxplace}{\oxvecshape{\oxvalue_1 \oxdots \oxvalue_n}}
+      }
+    }{n}
+  }
+}
+
+\newcommand{\EVecSwap}{
+  \inferrule[E-VecSwap]{
+    %% premises
+    0 \leq n_1 < n \\
+    0 \leq n_2 < n \\
+    \oxswap{n_1}{n_2}{\oxvalue_1 \oxdots \oxvalue_n} = \overline{\oxvalue_u}
+  }{
+    %% conclusions
+    \oxreduce{\oxglobalctx}{
+      \oxextendctx{\oxstore}{
+        \oxstoreentry{\oxplace}{\oxvecshape{\oxvalue_1 \oxdots \oxvalue_n}}
+      }
+    }{
+      \oxvecswap{(\oxptr{\oxplace})}{n_1}{n_2}
+    }
+    {
+      \oxextendctx{\oxstore}{
+        \oxstoreentry{\oxplace}{\oxvecshape{\overline{\oxvalue_u}}}
+      }
+    }{\oxunit}
+  }
+}
+
+\newcommand{\EVecSwapOOB}{
+  \inferrule[E-VecSwapOOB]{
+    %% premises
+    0 > n_1 \vee n_1 > n \vee
+    0 > n_2 \vee n_2 > n \\
+  }{
+    %% conclusions
+    \oxreduce{\oxglobalctx}{
+      \oxextendctx{\oxstore}{
+        \oxstoreentry{\oxplace}{\oxvecshape{\oxvalue_1 \oxdots \oxvalue_n}}
+      }
+    }{
+      \oxvecswap{(\oxptr{\oxplace})}{n_1}{n_2}
+    }
+    {
+      \oxextendctx{\oxstore}{
+        \oxstoreentry{\oxplace}{\oxvecshape{\oxvalue_1 \oxdots \oxvalue_n}}
+      }
+    }{
+      \oxabort{\textrm{``swap out of bounds''}}
+    }
+  }
+}

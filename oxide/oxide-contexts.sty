@@ -1,0 +1,145 @@
+%%%%%%%%%%%%%%
+%% Contexts %%
+%%%%%%%%%%%%%%
+
+\newcommand{\oxemptyctx}{\bullet}
+\newcommand{\oxextendctx}[2]{#1 \oxcomma #2}
+\newcommand{\oxupdatectx}[2]{#1 [#2]}
+
+\newcommand{\oxglobalctx}{\Sigma}
+\newcommand{\oxglobalentry}{\varepsilon}
+\newcommand{\oxtvarctx}{\Delta}
+\newcommand{\oxvarctx}{\Gamma}
+\newcommand{\oxframe}{\mathcal{F}}
+\newcommand{\oxloanctx}{\mathscr{L}}
+
+\newcommand{\oxkontctx}{\Theta}
+
+\newcommand{\oxframesep}{\, \natural \,}
+\newcommand{\oxnewframe}[2]{#1 \oxframesep #2}
+
+%%%%%%%%%%%%%%%%%%%%
+%% Global Context %%
+%%%%%%%%%%%%%%%%%%%%
+
+\newcommand{\oxfuncdef}[6]{
+  \oxkey{fn} \oxspace #1 \oxangle{#2}(#3) \oxspace \rightarrow \oxspace #4
+  \oxspace \oxkey{where} \oxspace #5 \oxspace \oxset{ #6 }
+}
+
+\newcommand{\oxtupstructdef}[3]{
+  \oxkey{struct} \oxspace #1 \oxangle{#2}(#3)
+}
+
+\newcommand{\oxrecstructdef}[3]{
+  \oxkey{struct} \oxspace #1 \oxangle{#2} \oxscope{#3}
+}
+
+\newcommand{\oxenumdef}[3]{
+  \oxkey{enum} \oxspace #1 \oxangle{#2} \oxscope{#3}
+}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Type Variable Context %%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\newcommand{\oxtvarctxentry}[2]{#1 \oxcolon #2}
+
+%%%%%%%%%%%%%%%%%%%%%%
+%% Variable Context %%
+%%%%%%%%%%%%%%%%%%%%%%
+
+\newcommand{\oxvarctxentry}[2]{#1 \oxspace : \oxspace #2}
+
+\newcommand{\oxkontctxentry}[1]{#1}
+
+\newcommand{\oxsubtypevarctx}[5]{
+  \ensuremath{#1; \oxspace #2;\oxspace #3 \vdash #4 \oxsubtype #5}
+}
+
+\newcommand{\oxsubtypevarctxform}{
+  \framebox{\oxsubtypevarctx{\oxglobalctx}{\oxtvarctx}{\oxloanctx}{\oxvarctx}{\oxvarctx^\prime}}
+}
+
+\newcommand{\SVarEnv}{
+  \inferrule[S-VarEnv]{
+    %% premises
+    \oxctxswellformed{\oxglobalctx}{\oxtvarctx}{\oxvarctx_1}{\oxemptyctx}\\
+    \oxctxswellformed{\oxglobalctx}{\oxtvarctx}{\oxvarctx_2}{\oxemptyctx}\\
+    \oxdomain{\oxvarctx_1} = \oxdomain{\oxvarctx_2} \\
+    \forall \oxid \in \oxdomain{\oxvarctx_1}. \;
+    \oxvarctx_1(\oxid) = \oxvarctx_2(\oxid) \vee \oxvarctx_1(\oxid) = \oxvarctx_2(\oxid)^\dagger \\
+  }{
+    %% conclusions
+    \oxsubtypevarctx{\oxglobalctx}{\oxtvarctx}{\oxloanctx}{\oxvarctx_1}{\oxvarctx_2}
+  }
+}
+
+%%%%%%%%%%%%%%%%%%
+%% Loan Context %%
+%%%%%%%%%%%%%%%%%%
+
+\newcommand{\oxloanctxentry}[2]{#1 \mapsto #2}
+\newcommand{\oxloanpkg}[2]{\,^{#1}#2\,}
+\newcommand{\oxabsloan}{\blacklozenge}
+
+\newcommand{\oxsubtypeloanctx}[5]{
+  \ensuremath{#1; \oxspace #2; \oxspace #3 \vdash #4 \oxsubtype #5}
+}
+
+\newcommand{\oxsubtypeloanctxform}{
+  \framebox{\oxsubtypeloanctx{\oxglobalctx}{\oxtvarctx}{\oxvarctx}{\oxloanctx}{\oxloanctx^\prime}}
+}
+
+\newcommand{\SLoanEnv}{
+  \inferrule[S-LoanEnv]{
+    %% premises
+    \oxctxswellformed{\oxglobalctx}{\oxtvarctx}{\oxvarctx}{\oxemptyctx}\\
+    \oxctxswellformed{\oxglobalctx}{\oxtvarctx}{\oxvarctx}{\oxemptyctx}\\
+    \oxdomain{\oxloanctx_1} = \oxdomain{\oxloanctx_2} \\
+    \forall \oxcprov \in \oxdomain{\oxloanctx_1}. \;
+    \oxloanctx_1(\oxcprov) \subseteq \oxloanctx_2(\oxcprov) \\
+  }{
+    %% conclusions
+    \oxsubtypeloanctx{\oxglobalctx}{\oxtvarctx}{\oxvarctx}{\oxloanctx_1}{\oxloanctx_2}
+  }
+}
+
+%%%%%%%%%%%%%%%%%%%%%%%
+%% Context subtyping %%
+%%%%%%%%%%%%%%%%%%%%%%%
+
+\newcommand{\oxsubtypectx}[4]{
+  \ensuremath{#1; \oxspace #2 \vdash #3 \rhd #4}
+}
+
+\newcommand{\oxsubtypectxOLD}[6]{
+  \ensuremath{#1; \oxspace #2 \vdash #3 \boxdot #4 \oxsubtype #5 \boxdot #6}
+}
+
+\newcommand{\oxsubtypectxform}{
+  \framebox{\oxsubtypectx{\oxglobalctx}{\oxtvarctx}{\oxvarctx}{\oxvarctx^\prime}}
+}
+
+\newcommand{\SEnv}{
+  \inferrule[R-Env]{
+    %% premises
+    \oxctxswellformed{\oxglobalctx}{\oxtvarctx}{\oxvarctx}{\oxemptyctx}\\
+    \oxctxswellformed{\oxglobalctx}{\oxtvarctx}{\oxvarctx^\prime}{\oxemptyctx}\\
+    \oxdomain{\oxvarctx} = \oxdomain{\oxvarctx^\prime} \\\\
+    \forall \oxvarctxentry{\oxid}{\oxtype} \in \oxvarctx^\prime. \; \forall \oxcprov \text{ that occurs in } \oxtype. \; \oxvarctx(\oxcprov) = \oxvarctx^\prime(\oxcprov)\\\\
+    \forall \oxcprov \in \oxdomain{\oxvarctx}. \; \oxvarctx(\oxcprov) = \oxvarctx^\prime(\oxcprov) \vee \oxvarctx^\prime(\oxcprov) = \emptyset \\\\
+    \forall \oxplace \in \oxdomain{\oxexplode{\oxvarctx}}. \; \oxvarctx^\prime(\oxplace) = \oxvarctx(\oxplace) \vee \oxvarctx^\prime(\oxplace) = \oxvarctx(\oxplace)^\dagger
+  }{
+    %% conclusions
+    \oxsubtypectx{\oxglobalctx}{\oxtvarctx}{\oxvarctx}{\oxvarctx^\prime}
+  }
+}
+
+%%%%%%%%%%%%%%%%%%%%%%
+%% Dynamic Contexts %%
+%%%%%%%%%%%%%%%%%%%%%%
+
+\newcommand{\oxstore}{\sigma}
+\newcommand{\oxstackframe}{\varsigma}
+\newcommand{\oxstoreentry}[2]{\ensuremath{#1 \mapsto #2}}

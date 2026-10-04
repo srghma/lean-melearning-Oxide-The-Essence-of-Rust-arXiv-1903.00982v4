@@ -1,0 +1,66 @@
+%% oxide.sty: the oxide language definition
+
+\newcommand{\rustc}{\oxname{rustc}\xspace}
+\newcommand{\lang}{Oxide\xspace}
+\newcommand{\typechecker}{\oxname{OxideTC}\xspace}
+\newcommand{\compiler}{\oxname{Reducer}\xspace}
+\newcommand{\langl}[1]{Oxide$_{#1}$\xspace}
+
+%% Styling
+\newcommand{\oxtext}[1]{\ensuremath{\mathtt{#1}}}
+\newcommand{\oxkey}[1]{\oxtext{#1}}
+\newcommand{\oxspace}{\:}
+\newcommand{\oxsep}{\oxtext{::}}
+\newcommand{\oxcomma}{\, , \oxspace}
+\newcommand{\oxenvsep}{\boxdot}
+\newcommand{\oxsemicolon}{; \oxspace}
+\newcommand{\oxcolon}{\oxspace {:} \oxspace}
+\newcommand{\oxdot}{. \oxspace \oxspace}
+\newcommand{\oxdots}{\oxspace \ldots \oxspace}
+\newcommand{\oxdotsc}{\oxcomma \ldots \oxcomma}
+\newcommand{\oxneg}{\neg\,}
+\newcommand{\oxunify}{\thicksim}
+\newcommand{\oxsubtype}{\lesssim}
+\newcommand{\oxoutlives}{:>}
+\newcommand{\oxenvminus}{\boxminus}
+\newcommand{\oxupdate}[2]{#1 [#2]}
+\newcommand{\oxtupdate}[3]{\oxupdate{#1}{#2 \mapsto #3}}
+\newcommand{\oxtupdatemany}[3]{\oxupdate{#1}{\overline{#2 \mapsto #3}}}
+\newcommand{\oxvupdate}[3]{\oxupdate{#1}{#2 \mapsto #3}}
+\newcommand{\oxapply}[2]{#1 (#2)}
+\newcommand{\oxangle}[1]{\oxtext{<} #1 \oxtext{>}}
+\newcommand{\oxset}[1]{\{ \oxspace #1 \oxspace \}}
+\newcommand{\oxscope}[1]{\oxspace \oxset{#1} \oxspace}
+\newcommand{\oxturbofish}[2]{#1 \oxsep \oxangle{#2}}
+\newcommand{\oxascribe}[2]{#1 \oxcolon #2}
+\newcommand{\oxlookup}[3]{#1(#2) = #3}
+\newcommand{\oxlookupinframe}[4]{#1_#2(#3) = #4}
+\newcommand{\oxflookup}[4]{#1(#2) =_{#3} #4}
+\newcommand{\oxrootof}[1]{\texttt{root-of}(#1)}
+\newcommand{\oxsubst}[3]{ #1 [ ^{#2} / _{#3} ]}
+\newcommand{\oxsubstmany}[3]{ #1 \, \overline{[ ^{#2} / _{#3} ]}}
+\newcommand{\oxhole}{\square}
+
+\newcommand{\oxequiv}[2]{#1 = #2}
+\newcommand{\oxfresh}[1]{\oxkey{fresh} \oxspace #1}
+\newcommand{\oxcopyable}[2]{\oxkey{copyable}_{#1} \oxspace #2}
+\newcommand{\oxnoncopyable}[2]{\oxkey{noncopyable}_{#1} \oxspace #2}
+
+\RequirePackage{oxide/oxide-grammars}
+\RequirePackage{oxide/oxide-terms}
+\RequirePackage{oxide/oxide-effects}
+\RequirePackage{oxide/oxide-types}
+\RequirePackage{oxide/oxide-typing}
+\RequirePackage{oxide/oxide-reduction}
+\RequirePackage{oxide/oxide-metafunctions}
+\RequirePackage{oxide/oxide-kinds}
+\RequirePackage{oxide/oxide-contexts}
+\RequirePackage{oxide/oxide-proofs}
+\RequirePackage{oxide/oxide-invariants}
+
+%% Oxide1
+\RequirePackage{oxide/oxide-one-grammars}
+\RequirePackage{oxide/oxide-one-terms}
+\RequirePackage{oxide/oxide-one-types}
+\RequirePackage{oxide/oxide-one-typing}
+\RequirePackage{oxide/oxide-one-reduction}

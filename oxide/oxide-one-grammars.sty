@@ -1,0 +1,23 @@
+%%%%%%%%%%%%%%
+%% Grammars %%
+%%%%%%%%%%%%%%
+
+\newcommand{\oxvectypesgrammar}{
+  \bnflabel{Sized Types} & \oxsitype & \bnfdef &
+  \oxdots \bnfalt \oxtvec{\oxtype}
+}
+
+\newcommand{\oxvecexpressionsgrammar}{
+  \bnflabel{Expressions} & \oxexpr & \bnfdef &
+  \oxdots \bnfalt 
+  \oxvecnew{\oxtype} \bnfalt 
+  \oxvecpush{\oxexpr_1}{\oxnoseqexpr_2} \bnfalt
+  \oxvecpop{\oxexpr} \bnfalt 
+  \oxvecswap{\oxexpr_1}{\oxnoseqexpr_2}{\oxnoseqexpr_3} \bnfalt
+  \oxveclen{\oxexpr}
+}
+
+\newcommand{\oxvecvaluegrammar}{
+  \bnflabel{Values} & \oxvalue & \bnfdef &
+  \oxdots \bnfalt \oxvecshape{\overline{\oxvalue}}
+}

@@ -1,0 +1,45 @@
+\begin{lstlisting}
+  $\texttt{places-val}_{\,\oxglobalctx}$ $\oxplace$ $\oxunit$ = $
+  \oxstoreentry{\oxplace}{\oxunit}$
+  $\texttt{places-val}_{\,\oxglobalctx}$ $\oxplace$ $\oxnum$ = $
+  \oxstoreentry{\oxplace}{\oxnum}$
+  $\texttt{places-val}_{\,\oxglobalctx}$ $\oxplace$ $\oxtrue$ = $
+  \oxstoreentry{\oxplace}{\oxtrue}$
+  $\texttt{places-val}_{\,\oxglobalctx}$ $\oxplace$ $\oxfalse$ = $
+  \oxstoreentry{\oxplace}{\oxfalse}$
+  $\texttt{places-val}_{\,\oxglobalctx}$ $\oxplace$ $\oxptr{\oxcprov}{\oxmuta}{
+    \oxplace^\prime
+  }$ = $\oxstoreentry{\oxplace}{\oxptr{\oxcprov}{\oxmuta}{\oxplace^\prime}}$
+  $\texttt{places-val}_{\,\oxglobalctx}$ $\oxplace$ $\oxindexptr{
+    \oxplace^\prime
+  }{\oxnum}$ = $\oxstoreentry{\oxplace}{
+    \oxindexptr{\oxplace^\prime}{\oxnum}
+  }$
+  $\texttt{places-val}_{\,\oxglobalctx}$ $\oxplace$ $\oxsliceptr{\oxcprov}{\oxmuta}{
+    \oxplace^\prime
+  }{\oxnum_1}{\oxnum_2}$ = $\oxstoreentry{\oxplace}{
+    \oxsliceptr{\oxplace^\prime}{\oxnum_1}{\oxnum_2}
+  }$
+  $\texttt{places-val}_{\,\oxglobalctx}$ $\oxplace$ $\oxclosureval{\oxstackframe}{
+    \overline{\oxcprov} \oxcomma \overline{\oxtvar}
+  }{\overline{\oxascribe{\oxid}{\oxtype}}}{\oxtype_r}{\oxexpr}$ =
+      $\oxstoreentry{\oxplace}{
+    \oxclosureval{\oxstackframe}{
+      \overline{\oxcprov} \oxcomma \overline{\oxtvar}
+    }{\overline{\oxascribe{\oxid}{\oxtype}}}{\oxtype_r}{\oxexpr}
+  }$
+  $\texttt{places-val}_{\,\oxglobalctx}$ $\oxplace$ $\oxarr{
+    \oxvalue_0 \oxdotsc \oxvalue_n
+  }$ = $\oxstoreentry{\oxplace}{
+    \oxarr{\oxvalue_0 \oxdotsc \oxvalue_n}
+  }$
+  $\texttt{places-val}_{\,\oxglobalctx}$ $\oxplace$ $\oxprod{
+    \oxvalue_0 \oxdotsc \oxvalue_n
+  }$ =
+      $\oxstoreentry{\oxplace}{
+    \oxprod{\oxshapehole_0 \oxdotsc \oxshapehole_n}
+  }\oxcomma$  ($
+  \texttt{places-val}_{\,\oxglobalctx}$ $\oxproj{\oxplace}{0}$ $\oxvalue_0$)$
+  \oxcomma$ $\oxdots\oxcomma$ ($\texttt{places-val}_{\,\oxglobalctx}$ $\oxproj{\oxplace}{n}$ $
+  \oxvalue_n$)
+\end{lstlisting}

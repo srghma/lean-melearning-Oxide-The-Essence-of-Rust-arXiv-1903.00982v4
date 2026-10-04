@@ -1,0 +1,494 @@
+%% For arXiv
+\documentclass[acmsmall,nonacm]{acmart}
+\settopmatter{printfolios=true,printccs=false,printacmref=false}
+%% For double-blind review submission, w/o CCS and ACM Reference (max submission space)
+% \documentclass[acmsmall,review,anonymous]{acmart}\settopmatter{printfolios=true,printccs=false,printacmref=false}
+%% For double-blind review submission, w/ CCS and ACM Reference
+% \documentclass[acmsmall,review,anonymous]{acmart}\settopmatter{printfolios=true}
+%% For single-blind review submission, w/o CCS and ACM Reference (max submission space)
+% \documentclass[acmsmall,review]{acmart}\settopmatter{printfolios=true,printccs=false,printacmref=false}
+%% For single-blind review submission, w/ CCS and ACM Reference
+% \documentclass[acmsmall,review]{acmart}\settopmatter{printfolios=true}
+%% For final camera-ready submission, w/ required CCS and ACM Reference
+% \documentclass[acmsmall]{acmart}\settopmatter{}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% This stuff makes arXiv work.
+\makeatletter
+\def\mdseries@tt{m}
+\makeatother
+\hypersetup{breaklinks=true}
+\usepackage{breakurl}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\usepackage{pervasives}
+\usepackage{oxide}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% redefines for formatting reasons (ensure they're synced with tech report!!)
+
+\renewcommand{\oxnamegrammar}{
+  \begin{displaymath}
+    \begin{array}{lrclrclr}
+      \bnflabel{Variables} & \oxid &&
+      \bnflabel{Functions} & \oxfnname &&
+      \bnflabel{Type Vars.} & \oxtvar \\
+      \bnflabel{Frame Vars.} & \oxenvvar &&
+      \bnflabel{Concrete Regions} & \oxcprov &&
+      \bnflabel{Abstract Regions} & \oxabsprov \\
+    \end{array}
+  \end{displaymath}
+}
+
+\renewcommand{\bnfdef}{\!\Coloneqq\!}
+\renewcommand{\bnfalt}{\; | \;}
+
+\renewcommand{\oxexpressiongrammar}{
+  \bnflabel{Expressions} & \oxexpr & \bnfdef &
+  \oxprim \bnfalt \oxplaceexpr \bnfalt
+%  \\ && \bnfalt &
+  \oxref{\oxcprov}{\oxmuta}{\oxplaceexpr} \bnfalt
+  \oxref{\oxcprov}{\oxmuta}{\oxindex{\oxplaceexpr}{\oxexpr}} \bnfalt
+  \oxref{\oxcprov}{\oxmuta}{\oxslice{\oxplaceexpr}{\oxexpr_1}{\oxexpr_2}}
+  \\ && \bnfalt &
+  \oxseq{\oxexpr_1}{\oxexpr_2} \bnfalt
+  \oxassign{\oxplaceexpr}{\oxexpr} \bnfalt
+  \oxprod{\oxexpr_1 \oxdotsc \oxexpr_n} \bnfalt
+  \oxarr{\oxexpr_1 \oxdotsc \oxexpr_n}
+  \\ && \bnfalt &
+  \oxletrgn{\oxcprov}{\oxexpr} \bnfalt
+%  \\ && \bnfalt &
+  \oxlet{\oxid}{\oxsitype}{\oxexpr_1}{\oxexpr_2}
+  \\ && \bnfalt &
+  \oxclosure{
+    \oxascribe{\oxid_1}{\oxsitype_1} \oxdotsc
+    \oxascribe{\oxid_n}{\oxsitype_n}
+  }{\oxsitype_r}{
+    \oxexpr
+  }
+  \\ && \bnfalt &
+  \oxapp{\oxexpr_f}{
+    \overline{\oxenv} \oxcomma \overline{\oxprov} \oxcomma \overline{\oxsitype}
+  }{
+    \oxexpr_1 \oxdotsc \oxexpr_n
+  }
+  \\ && \bnfalt &
+  \oxbranch{\oxexpr_1}{\oxexpr_2}{\oxexpr_3} \bnfalt
+  \oxindex{\oxplaceexpr}{\oxexpr} \bnfalt
+  \oxabort{\oxstring}
+  \\ && \bnfalt &
+  \oxfor{\oxid}{\oxexpr_1}{\oxexpr_2} \bnfalt
+  \oxwhile{\oxexpr_1}{\oxexpr_2}
+  \\ && \bnfalt &
+  \oxinl{\oxsitype_1}{\oxsitype_2}{\oxexpr} \bnfalt \oxinr{\oxsitype_1}{\oxsitype_2}{\oxexpr}
+  \\ && \bnfalt &
+  \oxmatch{\oxexpr}{\oxid_1}{\oxexpr_1}{\oxid_2}{\oxexpr_2}
+}
+
+\renewcommand{\oxptrexprgrammar}{
+  \bnflabel{Expressions} & \oxexpr & \bnfdef &
+  \oxdots \bnfalt \oxframed{\oxexpr} \bnfalt \oxshift{\oxexpr}
+  \\ && \bnfalt &
+  \oxsliceval{\oxvalue_1 \oxdotsc \oxvalue_n} \bnfalt \oxuninit
+  \oxptrextension
+}
+
+\renewcommand{\oxvaluegrammar}{
+  \bnflabel{Values} & \oxvalue & \bnfdef &
+  \oxprim \bnfalt \oxfnname \bnfalt \oxuninit \bnfalt
+  \oxprod{\oxvalue_1 \oxdotsc \oxvalue_n} \bnfalt
+  \oxarr{\oxvalue_1 \oxdotsc \oxvalue_n} \bnfalt
+  \oxsliceval{\oxvalue_1 \oxdotsc \oxvalue_n}
+}
+
+\renewcommand{\oxvaluectxgrammar}{
+  \bnflabel{Value Contexts} & \oxvaluectx & \bnfdef &
+  \oxhole \bnfalt
+  \oxprod{\oxvalue_1 \oxdotsc \oxvaluectx \oxdotsc \oxvalue_n} \bnfalt
+  \oxarr{\oxvalue_1 \oxdotsc \oxvaluectx_1 \oxdotsc \oxvaluectx_m \oxdotsc \oxvalue_n}
+}
+
+\renewcommand{\oxsitypegrammar}{
+  \bnflabel{Sized Types} & \oxsitype & \bnfdef &
+  \oxbasetype \bnfalt \oxtvar \bnfalt \oxtref{\oxprov}{\oxmuta}{\oxxitype}
+  \\ && \bnfalt &
+  \oxtprod{\oxsitype_1 \oxdotsc \oxsitype_n} \bnfalt
+  \oxtarr{\oxsitype}{\oxnum} \bnfalt
+  \oxtsum{\oxsitype_1}{\oxsitype_2}
+  \\ && \bnfalt &
+  \oxtfunext{
+    \overline{\oxenvvar} \oxcomma \overline{\oxabsprov} \oxcomma \overline{\oxtvar}
+  }{
+    \oxsitype_1 \oxdotsc \oxsitype_n
+  }{\oxsitype_r}{\oxenv}{\overline{\oxabsprov_1: \oxabsprov_2}}
+}
+
+\renewcommand{\oxevalctxgrammar}{
+  \bnflabel{Eval. Contexts} & \oxevalctx & \bnfdef &
+  \oxhole \bnfalt
+  \oxref{\oxprov}{\oxmuta}{\oxindex{\oxplaceexpr}{\oxevalctx}} \bnfalt
+  \oxref{\oxprov}{\oxmuta}{\oxslice{\oxplaceexpr}{\oxevalctx}{\oxnoseqexpr}} \bnfalt
+  \oxref{\oxprov}{\oxmuta}{\oxslice{\oxplaceexpr}{\oxvalue}{\oxevalctx}}
+  \\ && \bnfalt &
+  \oxlet{\oxid}{\oxsitype}{\oxevalctx}{\oxexpr} \bnfalt
+  \oxletrgn{\oxcprov}{\oxevalctx}
+  \\ && \bnfalt &
+  \oxassign{\oxplaceexpr}{\oxevalctx} \bnfalt
+  \oxseq{\oxevalctx}{\oxexpr} \bnfalt
+  \oxframed{\oxevalctx} \bnfalt
+  \oxshift{\oxevalctx} \bnfalt
+  \oxshiftprov{\oxevalctx}
+  \\ && \bnfalt &
+  \oxapp{\oxevalctx}{\overline{\oxenv} \oxcomma \overline{\oxprov} \oxcomma  \overline{\oxsitype}}{
+    \oxnoseqexpr_1 \oxdotsc \oxnoseqexpr_n
+  }
+  \\ && \bnfalt &
+  \oxapp{\oxvalue}{\overline{\oxenv} \oxcomma \overline{\oxprov} \oxcomma \overline{\oxsitype}}{
+    \oxvalue_1 \oxdotsc \oxvalue_m \oxcomma \oxevalctx \oxcomma
+    \oxnoseqexpr_1 \oxdotsc \oxnoseqexpr_n
+  }
+  \\ && \bnfalt &
+  \oxindex{\oxplaceexpr}{\oxevalctx} \bnfalt
+  \oxbranch{\oxevalctx}{\oxexpr_1}{\oxexpr_2} \bnfalt
+  \oxwhile{\oxexpr_1}{\oxexpr_2}
+  \\ && \bnfalt &
+  \oxprod{
+    \oxvalue_1 \oxdotsc \oxvalue_m \oxcomma \oxevalctx \oxcomma
+    \oxnoseqexpr_1 \oxdotsc \oxnoseqexpr_n
+  }
+  \\ && \bnfalt &
+  \oxinl{\oxsitype_1}{\oxsitype_2}{\oxevalctx} \bnfalt
+  \oxinr{\oxsitype_1}{\oxsitype_2}{\oxevalctx}
+  \\ && \bnfalt &
+  \oxmatch{\oxevalctx}{\oxid_1}{\oxexpr_1}{\oxid_2}{\oxexpr_2}
+}
+
+\setlength{\textfloatsep}{14pt}
+
+
+%% Journal information
+%% Supplied to authors by publisher for camera-ready submission;
+%% use defaults for review submission.
+\acmJournal{PACMPL}
+\acmVolume{1}
+\acmNumber{CONF} % CONF = POPL or ICFP or OOPSLA
+\acmArticle{1}
+\acmYear{2018}
+\acmMonth{1}
+\acmDOI{} % \acmDOI{10.1145/nnnnnnn.nnnnnnn}
+\startPage{1}
+
+%% Copyright information
+%% Supplied to authors (based on authors' rights management selection;
+%% see authors.acm.org) by publisher for camera-ready submission;
+%% use 'none' for review submission.
+\setcopyright{none}
+%\setcopyright{acmcopyright}
+%\setcopyright{acmlicensed}
+%\setcopyright{rightsretained}
+%\copyrightyear{2018}           %% If different from \acmYear
+
+%% Bibliography style
+\bibliographystyle{ACM-Reference-Format}
+%% Citation style
+%% Note: author/year citations are required for papers published as an
+%% issue of PACMPL.
+\citestyle{acmauthoryear}   %% For author/year citations
+
+\begin{document}
+\sloppy %% ironically, this prevents overhang on arXiv
+
+\title{Oxide: The Essence of Rust}
+
+%% Author information
+%% Contents and number of authors suppressed with 'anonymous'.
+%% Each author should be introduced by \author, followed by
+%% \authornote (optional), \orcid (optional), \affiliation, and
+%% \email.
+%% An author may have multiple affiliations and/or emails; repeat the
+%% appropriate command.
+%% Many elements are not rendered, but should be provided for metadata
+%% extraction tools.
+
+\author{Aaron Weiss}
+\affiliation{
+  \position{}
+  % \department{College of Computer and Information Science}
+  \institution{Northeastern University}
+  \city{Boston}
+  \state{MA}
+  \postcode{02115}
+  \country{USA}
+}
+\email{weiss@ccs.neu.edu}
+
+\author{Olek Gierczak}
+\affiliation{
+  \position{}
+  % \department{College of Computer and Information Science}
+  \institution{Northeastern University}
+  \city{Boston}
+  \state{MA}
+  \postcode{02115}
+  \country{USA}
+}
+\email{gierczak.o@northeastern.edu}
+
+\author{Daniel Patterson}
+\affiliation{
+  \position{}
+  % \department{College of Computer and Information Science}
+  \institution{Northeastern University}
+  \city{Boston}
+  \state{MA}
+  \postcode{02115}
+  \country{USA}
+}
+\email{dbp@dbpmail.net}
+
+\author{Amal Ahmed}
+\affiliation{
+  % \position{Associate Professor}
+  % \department{College of Computer and Information Science}
+  \institution{Northeastern University}
+  \city{Boston}
+  \state{MA}
+  \postcode{02115}
+  \country{USA}
+}
+\email{amal@ccs.neu.edu}
+
+%% Abstract
+%% Note: \begin{abstract}...\end{abstract} environment must come
+%% before \maketitle command
+\begin{abstract}
+  \input{abstract}
+\end{abstract}
+
+%% 2012 ACM Computing Classification System (CSS) concepts
+%% Generate at 'http://dl.acm.org/ccs/ccs.cfm'.
+\begin{CCSXML}
+  <ccs2012>
+  <concept>
+  <concept_id>10003752.10010124</concept_id>
+  <concept_desc>Theory of computation~Semantics and reasoning</concept_desc>
+  <concept_significance>500</concept_significance>
+  </concept>
+  <concept>
+  <concept_id>10011007.10011006.10011039</concept_id>
+  <concept_desc>Software and its engineering~Formal language definitions</concept_desc>
+  <concept_significance>500</concept_significance>
+  </concept>
+  </ccs2012>
+\end{CCSXML}
+
+\ccsdesc[500]{Theory of computation~Semantics and reasoning}
+\ccsdesc[500]{Software and its engineering~Formal language definitions}
+
+%% Keywords
+%% comma separated list
+% \keywords{Rust, type systems, semantics, ownership, borrow checking}
+
+%% \maketitle
+%% Note: \maketitle command must come after title commands, author
+%% commands, abstract environment, Computing Classification System
+%% environment and commands, and keywords command.
+\maketitle
+
+\section{Introduction}
+\label{sec:intro}
+\input{intro}
+
+\epigraph{Nothing is yours. It is to use. It is to share. If you will not share
+  it, you cannot use it.}{\textit{The Dispossessed} \\ \textsc{Ursula K. Le Guin}}
+\section{Data They Can Call Their Own}
+\label{sec:main}
+\input{main}
+
+\section{Oxide, Formally}
+\label{sec:formalization}
+\input{formalization}
+
+\section{Related Work}
+\label{sec:related}
+\input{related}
+
+\section{Discussion}
+\label{sec:discussion}
+\input{discussion}
+
+\section{Conclusion and Future Work}
+\label{sec:conclusion}
+\input{conclusion}
+
+% \input{acks}
+\bibliography{awe}
+
+\appendix
+
+%% fixing redefs for the appendix
+\renewcommand{\oxnamegrammar}{
+  \begin{displaymath}
+    \begin{array}{lrclrclrclr}
+      \bnflabel{Variables} & \oxid &&
+      \bnflabel{Functions} & \oxfnname &&
+      \bnflabel{Type Vars.} & \oxtvar &&
+      \bnflabel{Frame Vars.} & \oxenvvar \\
+      \bnflabel{Concrete Regions} & \oxcprov &&
+      \bnflabel{Abstract Regions} & \oxabsprov &&
+      \bnflabel{Strings} & \oxstring &&
+      \bnflabel{Naturals} & m, \oxnum, k \\
+    \end{array}
+  \end{displaymath}
+}
+
+\renewcommand{\oxexpressiongrammar}{
+  \bnflabel{Expressions} & \oxexpr & \bnfdef &
+  \oxprim \bnfalt \oxplaceexpr \bnfalt
+%  \\ && \bnfalt &
+  \oxref{\oxcprov}{\oxmuta}{\oxplaceexpr} \bnfalt
+  \oxref{\oxcprov}{\oxmuta}{\oxindex{\oxplaceexpr}{\oxexpr}} \bnfalt
+  \oxref{\oxcprov}{\oxmuta}{\oxslice{\oxplaceexpr}{\oxexpr_1}{\oxexpr_2}}
+  \bnfalt \oxassign{\oxplaceexpr}{\oxexpr}
+  \\ && \bnfalt &
+  \oxletrgn{\oxcprov}{\oxexpr} \bnfalt
+%  \\ && \bnfalt &
+  \oxlet{\oxid}{\oxsitype}{\oxexpr_1}{\oxexpr_2} \bnfalt
+  \oxseq{\oxexpr_1}{\oxexpr_2}
+  \\ && \bnfalt &
+  \oxclosure{
+    \oxascribe{\oxid_1}{\oxsitype_1} \oxdotsc
+    \oxascribe{\oxid_n}{\oxsitype_n}
+  }{\oxsitype_r}{
+    \oxexpr
+  } \bnfalt
+%  \\ && \bnfalt &
+  \oxapp{\oxexpr_f}{
+    \overline{\oxenv} \oxcomma \overline{\oxprov} \oxcomma \overline{\oxsitype}
+  }{
+    \oxexpr_1 \oxdotsc \oxexpr_n
+  }
+  \\ && \bnfalt &
+  \oxbranch{\oxexpr_1}{\oxexpr_2}{\oxexpr_3} \bnfalt
+  \oxprod{\oxexpr_1 \oxdotsc \oxexpr_n} \bnfalt
+  \oxarr{\oxexpr_1 \oxdotsc \oxexpr_n}
+  \\ && \bnfalt &
+  \oxindex{\oxplaceexpr}{\oxexpr} \bnfalt
+  \oxfor{\oxid}{\oxexpr_1}{\oxexpr_2} \bnfalt
+  \oxwhile{\oxexpr_1}{\oxexpr_2} \bnfalt
+  \oxabort{\oxstring}
+  \\ && \bnfalt &
+  \oxinl{\oxsitype_1}{\oxsitype_2}{\oxexpr} \bnfalt \oxinr{\oxsitype_1}{\oxsitype_2}{\oxexpr}
+  \\ && \bnfalt &
+  \oxmatch{\oxexpr}{\oxid_1}{\oxexpr_1}{\oxid_2}{\oxexpr_2}
+}
+
+\renewcommand{\oxptrexprgrammar}{
+  \bnflabel{Expressions} & \oxexpr & \bnfdef &
+  \oxdots \bnfalt \oxframed{\oxexpr} \bnfalt \oxshift{\oxexpr}
+  \bnfalt \oxsliceval{\oxvalue_1 \oxdotsc \oxvalue_n} \bnfalt \oxuninit
+  \oxptrextension
+}
+
+\renewcommand{\oxvaluegrammar}{
+  \bnflabel{Values} & \oxvalue & \bnfdef &
+  \oxprim \bnfalt
+  \oxprod{\oxvalue_1 \oxdotsc \oxvalue_n} \bnfalt
+  \oxarr{\oxvalue_1 \oxdotsc \oxvalue_n} \bnfalt
+  \oxsliceval{\oxvalue_1 \oxdotsc \oxvalue_n} \bnfalt \oxfnname \bnfalt
+%  \\ && \bnfalt &
+  \oxuninit
+}
+
+\renewcommand{\oxvaluectxgrammar}{
+  \bnflabel{Value Contexts} & \oxvaluectx & \bnfdef &
+  \oxhole \bnfalt
+  \oxprod{\oxvalue_1 \oxdotsc \oxvaluectx \oxdotsc \oxvalue_n} \bnfalt
+  \oxarr{\oxvalue_1 \oxdotsc \oxvaluectx_1 \oxdotsc \oxvaluectx_m \oxdotsc \oxvalue_n}
+}
+
+\renewcommand{\oxsitypegrammar}{
+  \bnflabel{Sized Types} & \oxsitype & \bnfdef &
+  \oxbasetype \bnfalt \oxtvar \bnfalt \oxtref{\oxprov}{\oxmuta}{\oxxitype}
+  \bnfalt \oxtarr{\oxsitype}{\oxnum} \bnfalt \oxtprod{\oxsitype_1 \oxdotsc \oxsitype_n} \bnfalt \oxtsum{\oxsitype_1}{\oxsitype_2}
+  \\ && \bnfalt &
+  \oxtfunext{
+    \overline{\oxenvvar} \oxcomma \overline{\oxabsprov} \oxcomma \overline{\oxtvar}
+  }{
+    \oxsitype_1 \oxdotsc \oxsitype_n
+  }{\oxsitype_r}{\oxenv}{\overline{\oxabsprov_1: \oxabsprov_2}}
+}
+
+\renewcommand{\oxevalctxgrammar}{
+  \bnflabel{Eval. Contexts} & \oxevalctx & \bnfdef &
+  \oxhole
+  \\ && \bnfalt &
+  \oxref{\oxprov}{\oxmuta}{\oxindex{\oxplaceexpr}{\oxevalctx}} \bnfalt
+  \oxref{\oxprov}{\oxmuta}{\oxslice{\oxplaceexpr}{\oxevalctx}{\oxnoseqexpr}} \bnfalt
+  \oxref{\oxprov}{\oxmuta}{\oxslice{\oxplaceexpr}{\oxvalue}{\oxevalctx}}
+  \\ && \bnfalt &
+  \oxlet{\oxid}{\oxsitype}{\oxevalctx}{\oxexpr} \bnfalt
+  \oxletrgn{\oxcprov}{\oxevalctx}
+  \\ && \bnfalt &
+  \oxassign{\oxplaceexpr}{\oxevalctx} \bnfalt
+  \oxseq{\oxevalctx}{\oxexpr} \bnfalt
+  \oxframed{\oxevalctx}
+  \\ && \bnfalt &
+  \oxshift{\oxevalctx} \bnfalt
+  \oxshiftprov{\oxevalctx}
+  \\ && \bnfalt &
+  \oxapp{\oxevalctx}{\overline{\oxenv} \oxcomma \overline{\oxprov} \oxcomma  \overline{\oxsitype}}{
+    \oxnoseqexpr_1 \oxdotsc \oxnoseqexpr_n
+  }
+  \\ && \bnfalt &
+  \oxapp{\oxvalue}{\overline{\oxenv} \oxcomma \overline{\oxprov} \oxcomma \overline{\oxsitype}}{
+    \oxvalue_1 \oxdotsc \oxvalue_m \oxcomma \oxevalctx \oxcomma
+    \oxnoseqexpr_1 \oxdotsc \oxnoseqexpr_n
+  }
+  \\ && \bnfalt &
+  \oxindex{\oxplaceexpr}{\oxevalctx} \bnfalt
+  \oxbranch{\oxevalctx}{\oxexpr_1}{\oxexpr_2}
+  \\ && \bnfalt &
+  \oxfor{\oxid}{\oxevalctx}{\oxexpr}
+  \\ && \bnfalt &
+  \oxprod{
+    \oxvalue_1 \oxdotsc \oxvalue_m \oxcomma \oxevalctx \oxcomma
+    \oxnoseqexpr_1 \oxdotsc \oxnoseqexpr_n
+  }
+  \\ && \bnfalt &
+  \oxarr{
+    \oxvalue_1 \oxdotsc \oxvalue_m \oxcomma \oxevalctx \oxcomma
+    \oxnoseqexpr_1 \oxdotsc \oxnoseqexpr_n
+  }
+  \\ && \bnfalt &
+  \oxinl{\oxsitype_1}{\oxsitype_2}{\oxevalctx} \bnfalt
+  \oxinr{\oxsitype_1}{\oxsitype_2}{\oxevalctx}
+  \\ && \bnfalt &
+  \oxmatch{\oxevalctx}{\oxid_1}{\oxexpr_1}{\oxid_2}{\oxexpr_2}
+  % \\ && \bnfalt &
+  % \oxrecstruct{
+  %   \oxturbofish{\oxdatatype}{\overline{\oxprov} \oxcomma \overline{\oxsitype}}
+  % }{
+  %   \oxascribe{\oxid_1}{\oxvalue_1} \oxdotsc \oxascribe{\oxid_m}{\oxvalue_m}
+  %   \oxcomma  \oxascribe{\oxid_{m+1}}{\oxevalctx} \oxcomma
+  %   \oxascribe{\oxid_{m+2}}{\oxexpr_1} \oxdotsc \oxascribe{\oxid_{m+n+1}}{\oxexpr_n}
+  % }
+  % \\ && \bnfalt &
+  % \oxtupstruct{
+  %   \oxturbofish{\oxdatatype}{\overline{\oxprov} \oxcomma \overline{\oxsitype}}
+  % }{
+  %   \oxvalue_1 \oxdotsc \oxvalue_m
+  %   \oxcomma \oxevalctx \oxcomma
+  %   \oxexpr_{1} \oxdotsc \oxexpr_n
+  % }
+}
+
+\input{full-lang}
+\input{proofs}
+
+\end{document}
+
+%%% Local Variables:
+%%% mode: latex
+%%% fill-column: 80
+%%% End:

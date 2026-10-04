@@ -1,0 +1,31 @@
+\begin{align*}
+  \texttt{explode} \  \oxvarctxentry{\oxplace}{\oxbasetype}
+  &= \oxset{\oxvarctxentry{\oxplace}{\oxbasetype}} \\
+  \texttt{explode} \  \oxvarctxentry{\oxplace}{\oxtvar}
+  &= \oxset{\oxvarctxentry{\oxplace}{\oxtvar}} \\
+  \texttt{explode} \  \oxvarctxentry{\oxplace}{\oxtref{\oxprov}{\oxmuta}{\oxxitype}}
+  &= \oxset{\oxvarctxentry{\oxplace}{\oxtref{\oxprov}{\oxmuta}{\oxxitype}}} \\
+  \texttt{explode} \  \oxvarctxentry{\oxplace}{\oxtarr{\oxsitype}{\oxnum}}
+  &= \oxset{\oxvarctxentry{\oxplace}{\oxtarr{\oxsitype}{\oxnum}}} \\
+  \texttt{explode} \  \oxvarctxentry{\oxplace}{\oxtprod{\oxsxtype_1 \oxdots \oxsxtype_n}}
+  &= \underset{i \;\in\; 1 \oxdots n}{\cup} \ \oxexplode{
+    \oxvarctxentry{\oxproj{\oxplace}{i}}{\oxsxtype_i}
+    } \\
+  \texttt{explode} \  \oxvarctxentry{\oxplace}{
+    \oxtfunext{
+      \overline{\oxenvvar} \oxcomma \overline{\oxabsprov} \oxcomma \overline{\oxtvar}
+    }{
+      \oxsitype_1 \oxdotsc \oxsitype_n
+    }{\oxsitype_r}{\oxenv}{\overline{\oxabsprov_1: \oxabsprov_2}}
+  }
+  &= \oxset{\oxvarctxentry{\oxplace}{
+        \oxtfunext{
+          \overline{\oxenvvar} \oxcomma \overline{\oxabsprov} \oxcomma \overline{\oxtvar}
+        }{
+          \oxsitype_1 \oxdotsc \oxsitype_n
+        }{\oxsitype_r}{\oxenv}{\overline{\oxabsprov_1: \oxabsprov_2}}
+      }
+    } \\
+  \texttt{explode} \  \oxvarctxentry{\oxplace}{\oxsidtype}
+  &= \oxset{\oxvarctxentry{\oxplace}{\oxsidtype}} \\
+\end{align*}

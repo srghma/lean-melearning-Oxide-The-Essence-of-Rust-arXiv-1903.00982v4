@@ -1,0 +1,527 @@
+\section{\lang Syntax}
+\label{sec:full-syntax}
+
+\begin{figure}[H]
+  \small
+  \oxnamegrammar
+
+  \begin{bnf}
+    \oxpathgrammar \\[0em]
+    \oxplacegrammar \\[0em]
+    \oxplaceexprgrammar \\[0em]
+    \oxplaceexprctxgrammar \\[0.75em]
+
+    \oxprovgrammar \\[0em]
+    \oxmutagrammar \\[0em]
+    \oxrewritemodegrammar \\[0em]
+    \oxloangrammar \\[0.75em]
+    
+    \oxkindgrammar \\[0em]
+    \oxbasetypegrammar \\[0em]
+    \oxsitypegrammar \\[0em]
+    \oxxitypegrammar \\[0em]
+    \oxsdtypegrammar \\[0em]
+    \oxsxtypegrammar \\[0em]
+    \oxtypegrammar \\[0.75em]
+
+    \oxprimitivegrammar \\[0em]
+    \oxexpressiongrammar \\[0em]
+    \oxenvgrammar \\[0.75em]
+
+    \oxglobalctxgrammar \\[0em]
+    \oxglobalentrygrammar \\[0.75em]
+    \oxtvarctxgrammar \\[0em]
+    \oxframegrammar\\[0em]
+    \oxvarctxgrammar \\[0em]
+    \oxkontctxgrammar \\[0.75em]
+  \end{bnf}
+\end{figure}
+
+\section{Statics}
+\label{sec:full-statics}
+
+\subsection{Well-Formedness Judgments}
+\label{sec:well-formedness}
+
+\begin{figure}[H]
+  \figuresize
+  \begin{flushleft}\oxglobalctxvalidityform \\
+    read: ``$\oxglobalctx$ is well-formed'' \end{flushleft}
+
+  \begin{mathpar}
+    \WFGlobalCtx
+  \end{mathpar}
+\end{figure}
+
+\begin{figure}[H]
+  \figuresize
+  \begin{flushleft}\oxglobalentryvalidityform  \\
+    read: ``$\oxglobalentry$ is a well-formed function definition in $\Sigma$'' \end{flushleft}
+
+  \begin{mathpar}
+    \WFFunctionDefn
+  \end{mathpar}
+\end{figure}
+
+\begin{figure}[H]
+  \figuresize
+  \begin{flushleft}\oxtvarctxwellformedform  \\
+    read: ``$\oxtvarctx$ is well-formed'' \end{flushleft}
+
+  \begin{mathpar}
+    \WFTVarEmpty \and \WFTVarExtendEnv \and \WFTVarExtendProv \and \WFTVarExtendType \and
+    \WFTVarExtendConstraint
+  \end{mathpar}
+\end{figure}
+
+\begin{figure}[H]
+  \figuresize
+  \begin{flushleft}\oxvarctxwellformedform  \\
+    read: ``$\oxvarctx$ is well-formed under $\oxglobalctx$ and $\oxtvarctx$'' \end{flushleft}
+
+  \begin{mathpar}
+    \WFEmptyVarCtx \and \WFVarCtx
+  \end{mathpar}
+\end{figure}
+
+\begin{figure}[H]
+  \figuresize
+  \begin{flushleft}\oxkontctxwellformedform  \\
+    read: ``$\oxkontctx$ is well-formed under $\oxglobalctx$, $\oxtvarctx$, and $\oxvarctx$'' \end{flushleft}
+
+  \begin{mathpar}
+    \WFEmptyTemporaryTyping \and \WFTemporaryTyping
+  \end{mathpar}
+\end{figure}
+
+\begin{figure}[H]
+  \figuresize
+  \begin{flushleft}\oxctxswellformedform  \\
+    read: ``$\oxglobalctx$, $\oxtvarctx$, and $\oxvarctx$ are well-formed.'' \end{flushleft}
+
+  \begin{mathpar}
+    \WFCtx
+  \end{mathpar}
+\end{figure}
+
+\begin{figure}[H]
+  \figuresize
+  \begin{flushleft}\oxenvwellformedform  \\
+    read: ``$\oxenv$ is a well-formed captured environment''\end{flushleft}
+
+  \begin{mathpar}
+    \WFEnvVar \and \WFEnv
+  \end{mathpar}
+\end{figure}
+
+\begin{figure}[H]
+  \figuresize
+  \begin{flushleft}\oxrgnvalidityform  \\
+    read: ``$\oxprov$ is a well-formed region''\end{flushleft}
+
+  \begin{mathpar}
+    \VLocalProv \and \VAbsProv
+  \end{mathpar}
+\end{figure}
+
+\begin{figure}[H]
+  \figuresize
+  \begin{flushleft}
+    \oxtypevalidityform  \\
+    read: ``$\oxtype$ is a well-formed type under $\oxglobalctx$, $\oxtvarctx$, and $\oxvarctx$''
+  \end{flushleft}
+
+  \begin{mathpar}
+    \VBaseType \and \VTVar \and \VRef \and \VTuple \and \VFunction
+    \and \VUninit \and \VArray \and \VSlice
+  \end{mathpar}
+\end{figure}
+
+\subsection{Region Rewriting \& Outlives Relations}
+\label{sec:subtyping}
+
+\begin{figure}[H]
+  \figuresize
+  \begin{flushleft}\oxtunifyform \\
+    read: ``terms at the type $\oxtype_1$ under $\oxtvarctx$ and $\oxvarctx$ can be
+    rewritten according to $\oxrewritemode$ as type $\oxtype_2$ under $\oxvarctx^\prime$''
+  \end{flushleft}
+
+  \begin{mathpar}
+    \URefl \and \UTrans \and \UArray \and \USlice \and \USharedRef \and \UTuple \and \UUninit
+  \end{mathpar}
+\end{figure}
+
+\begin{figure}[H]
+  \figuresize
+  \begin{flushleft}\oxrunifyform \\
+    read: ``$\oxprov_1$ outlives $\oxprov_2$ under $\oxtvarctx$ and $\oxvarctx$,
+    and can be rewritten according to $\oxrewritemode$ under the environment $\oxvarctx^\prime$''
+  \end{flushleft}
+
+  \begin{mathpar}
+    \UReflProv \and \UAbsProvs \and \UTransProv \and \UCombineLocalProvs \and
+    \UCombineLocalProvsUnrest \and \UCheckLocalProvs \and \OLocalAbsProvs \and \OAbsLocalProvs
+  \end{mathpar}
+\end{figure}
+
+\begin{figure}[H]
+  \figuresize
+  \begin{flushleft}\oxrunifymanyform\end{flushleft}
+
+  \begin{mathpar}
+    \OBounds
+  \end{mathpar}
+\end{figure}
+
+\subsection{Ownership Safety}
+\label{sec:ownership-safety}
+
+\begin{figure}[H]
+  \figuresize
+  \begin{flushleft}
+    \oxmusafetyform where $\oxmusafetyshape$ means
+    $\oxmusafetyinner{\oxtvarctx}{\oxkontctx}{\oxvarctx}{\oxmuta}{ \oxemptyctx }{\oxplaceexpr}{ \oxset{\overline{\oxloanpkg{\oxmuta}{\oxplaceexpr}}}
+    }$. \\
+    read: ``$\oxplaceexpr$ is $\oxmuta$-safe under $\oxtvarctx$ and $\oxvarctx$, with reborrow
+    exclusion list $\overline{\oxplace}$, and may point to any of the loans in
+    $\overline{\oxloanpkg{\oxmuta}{\oxplaceexpr}}$''
+  \end{flushleft}
+
+  \begin{mathpar}
+    \OSafePlace \and \ODeref \and \ODerefAbs
+  \end{mathpar}
+\end{figure}
+
+\subsection{Typing}
+\label{sec:typing}
+
+\begin{figure}[H]
+  \figuresize
+  \begin{flushleft}
+    \oxtypjudgeform where \oxctxswellformed{\oxglobalctx}{\oxtvarctx}{\oxvarctx}{\oxkontctx} and
+    \oxtypevalidity{\oxglobalctx}{\oxtvarctx}
+    {\oxvarctx^\prime}{\oxtype} \\
+    read: ``$\oxexpr$ has type $\oxtype$ under $\oxglobalctx$, $\oxtvarctx$, and $\oxvarctx$,
+    producing output context $\oxvarctx$''
+  \end{flushleft}
+
+  \begin{mathpar}
+    \TMove \and \TCopy \and \TBorrow \and \TBorrowIndex \and \TBorrowSlice \and \TIndexCopy \and
+    \TSeq \and \TBranch \and \TLet \and \TLetProv \and \TAssignDeref \and \TAssign
+  \end{mathpar}
+\end{figure}
+
+\begin{figure}[H]
+  \figuresize
+  
+  \begin{mathpar}
+    \TWhile \and \TForArray \and \TForSlice \and \TFunction \and \TClosure \and \TApp \and
+    \TAppClosure \and \TAbort \and \TUnit \and \TuThreeTwo \and \TTrue \and \TFalse \and \TTuple
+  \end{mathpar}
+\end{figure}
+
+\begin{figure}[H]
+  \figuresize
+
+  \begin{mathpar}
+    \TArray \and \TSlice \and \TDrop \and \TInl \and \TInr \and \TMatch
+  \end{mathpar}
+\end{figure}
+
+\subsection{Additional Judgments}
+\label{sec:additional-judgments}
+
+\begin{figure}[H]
+  \figuresize
+  \begin{flushleft}\oxmutasubtypeform \\
+    read: ``$\oxmuta$ is less than $\oxmuta^\prime$ in the qualifier
+    ordering''\end{flushleft}
+
+  \begin{mathpar}
+    \SRefl \and \SShrdUniq
+  \end{mathpar}
+\end{figure}
+
+
+\begin{figure}[H]
+  \figuresize
+  \begin{flushleft}\oxsubtypectxform \\
+    read: ``$\oxvarctx$ is related to $\oxvarctx^\prime$ under $\oxglobalctx$ and $\oxtvarctx$'' \end{flushleft}
+
+  \begin{mathpar}
+    \SEnv
+  \end{mathpar}
+\end{figure}
+
+\begin{figure}[H]
+  \figuresize
+  \begin{flushleft}\oxcomputetyform \\
+    read: ``$\oxplaceexpr$ in an $\oxmuta$ context has type
+    $\oxtype$ under $\oxtvarctx$ and $\oxvarctx$, passing through
+    the regions in $\overline{\oxprov}$''\end{flushleft}
+
+  \begin{mathpar}
+    \TCVar \and \TCProj \and \TCDeref
+  \end{mathpar}
+
+  \begin{flushleft}\oxcomputetynoprovform \\
+  read: ``$\oxplaceexpr$ in an $\oxmuta$ context has type
+  $\oxtype$ under $\oxtvarctx$ and $\oxvarctx$''\end{flushleft}
+
+  $\oxcomputetynoprov{\oxtvarctx}{\oxvarctx}{\oxmuta}{\oxplaceexpr}{\oxtype} = \oxcomputety{\oxtvarctx}{\oxvarctx}{\oxmuta}{\oxplaceexpr}{\oxtype}{\_}$ \\[0.5em]
+\end{figure}
+
+% \begin{figure}[H]
+%   \figuresize
+%   \begin{flushleft}\oxgoodaliasingform \\
+%     read: ``$\oxstore$'s rightmost occurences are well-aliased under
+%     $\oxglobalctx$ and $\oxvarctx$'' \end{flushleft}
+
+%   \DefAliasing
+% \end{figure}
+
+\begin{figure}[H]
+  \figuresize
+  \begin{flushleft}\oxwfkontctxform \\
+    read: ``the given values $\overline{\oxvalue}$ satisfy $\oxkontctx$ under $\oxglobalctx$ and $\oxvarctx$''\end{flushleft}
+
+  \begin{mathpar}
+    \WFKontCtx
+  \end{mathpar}
+
+\end{figure}
+
+\begin{figure}[H]
+  \figuresize
+  \begin{flushleft}\oxnotreborrowedform \\
+    read: ``the region $\oxcprov$ is not reborrowed in $\oxvarctx$'' \end{flushleft}
+
+  \begin{mathpar}
+    \NRBOrigin
+  \end{mathpar}
+\end{figure}
+
+\begin{figure}[H]
+  \figuresize
+  \begin{flushleft}\oxclosrestrictionform \\
+    read: ``the regions $\overline{\oxcprov}$ follow the closure restriction in $\oxkontctx$ or
+    $\oxvarctx$''
+  \end{flushleft}
+
+  \begin{mathpar}
+    \CLSRestriction
+  \end{mathpar}
+
+  \begin{flushleft}\oxnotinclosureform \\
+    read: ``the region $\oxcprov$ is not in a closure's signature in $\oxkontctx$ or $\oxvarctx$''
+  \end{flushleft}
+
+  \begin{mathpar}
+    \CLSRegionNotIn
+  \end{mathpar}
+\end{figure}
+   
+\section{Metafunctions}
+\label{sec:metafunctions}
+
+\begin{figuresize}
+  \begin{flushleft}
+    \DefFvars 
+    \DefRelevant\\
+    \DefPRelevant\\[1em]
+
+    \oxintersectform \\[0.5em]
+    \DefIntersect
+
+    \oxframeintersectform \\[0.5em]
+    \DefFrameIntersect
+
+    \vspace{0.5em}
+
+    \oxplacesform
+    \DefPlaces
+
+    \oxvaluedecomposeform
+    \begin{mathpar}
+      \DVEnd \and \DVProj
+    \end{mathpar}
+
+    \oxvupdateform
+    \DefValueUpdate
+
+    \oxvlookupform
+    \DefValueLookup
+
+    \oxdecomposeform
+    \begin{mathpar}
+      \DEnd \and \DProj
+    \end{mathpar}
+
+    \oxtupdateform
+    \DefTypeUpdate
+
+    \pagebreak
+    
+    \oxtlookupform
+    \DefTypeLookup
+
+    \oxnoncopyableform
+    \DefComputeNoncopyable
+    \oxcopyableform
+    \DefComputeCopyable
+
+    \oxexplodeform \\[0.5em]
+    \DefExplode \\[0.5em]
+    \oxexplodeinnerform \\
+    \DefExplodeInner
+
+    \oxoccursbeforeinform
+    \begin{mathpar}
+      \OCOccursBase \and \OCOccursExtendFrame \and \OCOccursNewFrame
+    \end{mathpar}
+
+    \oxgcloansform \\[0.5em]
+    \Defgcloans \\[0.5em]
+
+    \oxrgnuniquetoform \\[0.5em]
+    \DefRgnUniqueTo \\[0.5em]
+
+    \oxrsubform \\[0.5em]
+    \Defrsub \\[0.5em]
+    \oxrsubmanyform \\[0.5em]
+    \Defrsubmany \\[0.5em]
+
+    \oxloanmappingsform\\[0.5em]
+    \Defoxloanmappings\\[0.5em]
+  \end{flushleft}
+\end{figuresize}
+
+\section{Dynamics}
+\label{sec:full-dynamics}
+
+\begin{figure}[H]
+  \figuresize
+  \begin{bnf}
+    \oxreferentgrammar \\[0em]
+    \oxreferentctxgrammar \\[0em]
+    \oxptrexprgrammar \\[1em]
+
+    \oxvaluegrammar \oxptrextension \\[0em]
+
+    \oxevalctxgrammar \\[0em]
+    \oxvaluectxgrammar \\[0em]
+    \oxstoregrammar \\[0em]
+    \oxstackframegrammar \\[0em]
+  \end{bnf}
+\end{figure}
+
+\begin{figure}[H]
+  \figuresize
+  \begin{flushleft}\oxreferentvalidityform\end{flushleft}
+
+  \begin{mathpar}
+    \WFRefId \and \WFRefProj \and \WFRefIndexArray \and \WFRefIndexSlice \and
+    \WFRefSliceArray \and \WFRefSliceSlice
+  \end{mathpar}
+\end{figure}
+
+\begin{figure}[H]
+  \figuresize
+  \begin{flushleft}\oxevalreferentform\end{flushleft}
+
+  \begin{mathpar}
+    \ERId \and \ERProj \and \ERIndexArray \and \ERIndexSlice \and \ERSliceArray
+    \and \ERSliceSlice
+  \end{mathpar}
+\end{figure}
+
+\begin{figure}[H]
+  \figuresize
+  \begin{flushleft}\oxnormform \\
+    read: ``$\oxplaceexpr$ computes to $\oxreferent$, which maps to
+    $\oxvalue$ in $\oxstore$.'' \\[0.5em]
+    Let $\oxnorm{\oxstore}{\oxplaceexprctx[\oxid]}{\oxreferent}{\oxvaluectx}{\oxvalue} =
+    \oxnorminner{\oxstore}{\oxplaceexprctx}{\oxid}{\oxreferent}{\oxvaluectx}{\oxvalue}$.
+  \end{flushleft}
+\end{figure}
+
+\begin{figure}[H]
+  \figuresize
+  \begin{flushleft}
+    \oxnorminnerform \\
+    read: ``$\oxreferent$ in a context $\oxplaceexprctx$ computes to
+    $\oxreferent^\prime$ which maps to $\oxvalue$ in $\oxstore$ with a context of $\oxvaluectx$.''
+  \end{flushleft}
+
+  \begin{mathpar}
+    \PId \and \PProj \and \PDerefPtr \and \PDerefIndexPtrArray \and
+    \PDerefIndexPtrSlice \and \PDerefSlicePtrArray \and \PDerefSlicePtrSlice
+  \end{mathpar}
+\end{figure}
+
+\begin{figure}[H]
+  \figuresize
+  \begin{flushleft}\oxstorevalidityform \\
+    read: ``$\oxstore$ satisfies $\oxvarctx$ under global context
+    $\oxglobalctx$''\end{flushleft}
+
+  \begin{mathpar}
+    \VStackEmpty \and \VStack
+  \end{mathpar}
+\end{figure}
+
+\begin{figure}[H]
+  \figuresize
+  \begin{flushleft}\oxsubstorevalidityform \\
+    read: ``$\oxstackframe$ satisfies $\oxframe_c$ under $\oxglobalctx$ and
+    $\oxvarctx$'' \end{flushleft}
+
+  \begin{mathpar}
+    \VSubStack
+  \end{mathpar}
+\end{figure}
+
+\begin{figure}[H]
+  \figuresize
+  \begin{flushleft}\oxtypjudgeform where
+    \oxctxswellformed{\oxglobalctx}{\oxtvarctx}{\oxvarctx}{\oxkontctx} and
+    \oxtypevalidity{\oxglobalctx}{\oxtvarctx}
+    {\oxvarctx^\prime}{\oxtype} \end{flushleft}
+
+  \begin{mathpar} \oxdots \end{mathpar}
+  \begin{mathpar}
+    \TShift \and \TFramed \and \TPointer \and \TClosureVal \and \TUninit
+  \end{mathpar}
+\end{figure}
+
+\begin{figure}[H]
+  \figuresize
+  \begin{flushleft}\oxreduceform \\
+  read: ``$\oxstore$ and $\oxexpr$ step to $\oxstore^\prime$ and $\oxexpr^\prime$ under $\oxglobalctx$'' \end{flushleft}
+
+  \begin{mathpar}
+    \EMove \and \ECopy \and \EBorrow \and \EBorrowIndex \and \EBorrowSlice
+  \end{mathpar}
+\end{figure}
+
+\begin{figure}[H]
+  \figuresize
+
+  \begin{mathpar}
+    \EBorrowIndexOOB \and \EBorrowSliceOOB \and \EIndexCopy \and \EIndexCopyOOB \and \EFramed \and
+    \EShift \and \EIfTrue \and \EIfFalse \and \EMatchLeft \and \EMatchRight \and \ELetProv \and
+    \ELet \and \ESeq \and \EAssign \and \EWhile \and \EForArray \and \EForSlice \and \EForEmptyArray
+    \and \EForEmptySlice \and \EClosure
+  \end{mathpar}
+\end{figure}
+
+\begin{figure}[H]
+  \figuresize
+  \begin{mathpar}
+    \EApp \and \EAppFun \and \EEvalCtx \and \EEvalCtxAbort
+  \end{mathpar}
+\end{figure}
+
+
+\pagebreak

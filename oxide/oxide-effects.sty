@@ -1,0 +1,17 @@
+%%%%%%%%%%%%%
+%% Effects %%
+%%%%%%%%%%%%%
+
+\newcommand{\oxeempty}{\diamond}
+
+\newcommand{\oxeborrow}[3]{
+  \oxkey{borrow} \oxspace #1 \oxspace #2 \oxspace \oxkey{as} \oxspace #3
+}
+
+\newcommand{\oxedrop}[1]{\oxkey{drop} \oxspace #1}
+
+%%%%%%%%%%%%%%%%%%%%%%%
+%% Effect Operations %%
+%%%%%%%%%%%%%%%%%%%%%%%
+
+\newcommand{\oxeapp}[3]{#1 (#2; #3)}
