@@ -20,16 +20,29 @@ variable {sig : Sig}
 
 /-! ## Canonical forms -/
 
-/-- Values typed by the expression typing judgment are typed by the value typing
+/-- An atom that is a value is typed by the value typing judgment. -/
+theorem HasTypeA.val_inv {S : Ctx} {Θ : TempTy S} {Γ Γ' : StackTy S} {v : Value sig S} {τ : Ty S}
+    (h : HasTypeA sig Θ Γ (.val v) τ Γ') : HasTypeV sig Θ Γ v τ := by
+  cases h
+  assumption
+
+/-- A computation that is a value is typed by the value typing judgment (in a stack
+typing from which the given one is obtained by drops). -/
+theorem HasTypeC.val_inv {S : Ctx} {Θ : TempTy S} {Γ Γ' : StackTy S} {v : Value sig S} {τ : Ty S}
+    (h : HasTypeC sig Θ Γ (.atom (.val v)) τ Γ') : ∃ Γ₀, HasTypeV sig Θ Γ₀ v τ := by
+  change Typing sig (TyJ.comp Θ Γ (Comp.atom (.val v)) τ Γ') at h
+  generalize hJ : TyJ.comp Θ Γ (Comp.atom (.val v)) τ Γ' = J at h
+  induction h generalizing Γ with
+  | atom _ _ _ _ _ h => cases hJ; exact ⟨_, HasTypeA.val_inv h⟩
+  | drop _ _ _ _ _ _ _ _ _ _ _ ih => cases hJ; exact ih rfl
+  | _ => cases hJ
+
+/-- Values typed by the term typing judgment are typed by the value typing
 judgment (in a stack typing from which the given one is obtained by drops). -/
 theorem HasType.val_inv {S : Ctx} {Θ : TempTy S} {Γ Γ' : StackTy S} {v : Value sig S} {τ : Ty S}
     (h : HasType sig Θ Γ (.val v) τ Γ') : ∃ Γ₀, HasTypeV sig Θ Γ₀ v τ := by
-  change Typing sig (TyJ.expr Θ Γ (Term.val v) τ Γ') at h
-  generalize hJ : TyJ.expr Θ Γ (Term.val v) τ Γ' = J at h
-  induction h generalizing Γ with
-  | val => cases hJ; exact ⟨_, by assumption⟩
-  | drop _ _ _ _ _ _ _ _ _ _ _ ih => cases hJ; exact ih rfl
-  | _ => cases hJ
+  cases h with
+  | ret _ _ _ _ _ h => exact HasTypeC.val_inv h
 
 /-- The dead value has no (initialized) type. -/
 theorem HasTypeV.not_dead {S : Ctx} {Θ : TempTy S} {Γ : StackTy S} {τ : Ty S}

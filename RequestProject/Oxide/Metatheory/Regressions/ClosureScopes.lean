@@ -48,10 +48,10 @@ def tpBody : Term sig (vars 0 ++ ([] ++ .frame :: [.rgn])) :=
 def tpInst : Inst [.rgn] [.rgn] := .cons (b := .rgn) (.here : In .rgn [.rgn]) .nil
 
 /-- The closure `|| -> () { Right::<&r shrd (), ()>(()); () }` in the scope `[r]`. -/
-def tpClosure : Term sig [.rgn] := .closure [] .nil [.rgn] tpInst 0 noTys Ty.unit tpBody
+def tpClosure : Comp sig [.rgn] := .closure [] .nil [.rgn] tpInst 0 noTys Ty.unit tpBody
 
 /-- The program `letrgn<r> { || -> () { Right::<&r shrd (), ()>(()); () } }`. -/
-def tpProg : Program sig := .letrgn tpClosure
+def tpProg : Program sig := .ret (.letrgn (.ret tpClosure))
 
 /-- The closure's entries cannot be strengthened past `r`, although its type
 `() → ()` (with an empty captured frame) can: the coverage condition fails. -/
@@ -66,10 +66,10 @@ theorem tp_not_covered {Φc : FrameTy ([] ++ .frame :: [.rgn]) []} :
 
 /-- The closure term is not well typed, in any stack typing. -/
 theorem tp_closure_untyped {Θ : TempTy [.rgn]} {Γ Γ' : StackTy [.rgn]} {τ : Ty [.rgn]} :
-    ¬ HasType sig Θ Γ tpClosure τ Γ' := by
+    ¬ HasTypeC sig Θ Γ tpClosure τ Γ' := by
   intro h
-  change Typing sig (TyJ.expr Θ Γ tpClosure τ Γ') at h
-  generalize hJ : TyJ.expr Θ Γ tpClosure τ Γ' = J at h
+  change Typing sig (TyJ.comp Θ Γ tpClosure τ Γ') at h
+  generalize hJ : TyJ.comp Θ Γ tpClosure τ Γ' = J at h
   induction h generalizing Γ with
   | drop _ _ _ _ _ _ _ _ _ _ _ ih => cases hJ; exact ih rfl
   | closure _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ hcov =>
@@ -82,13 +82,16 @@ well typed. -/
 theorem tp_prog_untyped {τ : Ty []} {Γ' : StackTy []} :
     ¬ HasType sig [] StackTy.empty tpProg τ Γ' := by
   intro h
-  change Typing sig (TyJ.expr [] StackTy.empty tpProg τ Γ') at h
-  generalize hJ : TyJ.expr [] StackTy.empty tpProg τ Γ' = J at h
+  cases h with
+  | ret _ _ _ _ _ h =>
+  change Typing sig (TyJ.comp [] StackTy.empty (Comp.letrgn (.ret tpClosure)) τ Γ') at h
+  generalize hJ : TyJ.comp [] StackTy.empty (Comp.letrgn (.ret tpClosure)) τ Γ' = J at h
   induction h with
   | drop _ _ _ _ π _ _ _ _ _ _ _ => cases hJ; exact π.root.elimNil
   | letrgn _ _ _ _ _ _ _ h =>
       cases hJ
-      exact tp_closure_untyped h
+      cases h with
+      | ret _ _ _ _ _ h => exact tp_closure_untyped h
   | _ => cases hJ
 
 /-- The closure value (with the empty captured frame) in the scope `[r]`. -/

@@ -18,8 +18,9 @@ around the expression in focus, including the bindings and frames to pop.
 * A continuation `Cont S` expects a value in scope `S`.  The frames `popVar`,
   `popRgn` and `popFrame` change the scope: they pop the binders their inner
   continuation does not see.
-* A configuration `⟨S, σ, e, κ⟩` has a stack, an expression in focus and a
-  continuation, all in the same scope `S`.
+* A configuration `⟨S, σ, e, κ⟩` has a stack, a term in focus and a
+  continuation, all in the same scope `S`.  A finished computation is the term
+  `Term.val v`.
 -/
 
 @[expose] public section
@@ -57,50 +58,19 @@ theorem Slots.runtime {sig : Sig} {Γ : Ctx} : {S : Ctx} → Slots sig Γ S → 
       · exact σ.runtime b h
 
 /-- Continuations (the paper's evaluation contexts, made explicit, together with
-the pending pops of `shift`, `shiftprov` and `framed`).  The partially evaluated
-components of a call, a tuple or an array are vectors: `i` values done, the hole,
-and `j` expressions left, for an arity `i + 1 + j`. -/
+the pending pops of `shift`, `shiftprov` and `framed`).  Since terms are in
+A-normal form, the operands of an operation are atoms, which are evaluated in a
+single step: the only work left to do around a computation is the rest of a
+sequence of bindings, the next iteration of a `while` loop, and the pops. -/
 inductive Cont (sig : Sig) : Ctx → Type where
   /-- the end of the program -/
   | halt {S : Ctx} : Cont sig S
-  /-- `&r ω p[□]` -/
-  | borrowIdx {S : Ctx} (r : In .rgn S) (ω : Own) (p : PExpr S) (κ : Cont sig S) : Cont sig S
-  /-- `&r ω p[□..e₂]` -/
-  | borrowSlice₁ {S : Ctx} (r : In .rgn S) (ω : Own) (p : PExpr S) (e₂ : Term sig S)
-      (κ : Cont sig S) : Cont sig S
-  /-- `&r ω p[v..□]` -/
-  | borrowSlice₂ {S : Ctx} (r : In .rgn S) (ω : Own) (p : PExpr S) (v : Value sig S)
-      (κ : Cont sig S) : Cont sig S
-  /-- `p[□]` -/
-  | index {S : Ctx} (p : PExpr S) (κ : Cont sig S) : Cont sig S
-  /-- `p := □` -/
-  | assign {S : Ctx} (p : PExpr S) (κ : Cont sig S) : Cont sig S
-  /-- `let x : τ = □; e₂` -/
-  | letE {S : Ctx} (τ : Ty S) (e₂ : Term sig (.var :: S)) (κ : Cont sig S) : Cont sig S
-  /-- `□; e₂` -/
-  | seq {S : Ctx} (e₂ : Term sig S) (κ : Cont sig S) : Cont sig S
-  /-- `□::<Φ̄, ρ̄, τ̄>(e₁, …, e_k)` -/
-  | appFn {S : Ctx} (b : Binders) (θ : TArgs b S) (k : Nat) (args : Fin k → Term sig S)
-      (κ : Cont sig S) : Cont sig S
-  /-- `v_f::<Φ̄, ρ̄, τ̄>(v₁, …, vᵢ, □, e₁, …, e_j)` -/
-  | appArg {S : Ctx} (f : Value sig S) (b : Binders) (θ : TArgs b S) (i j : Nat)
-      (done : Fin i → Value sig S) (rest : Fin j → Term sig S) (κ : Cont sig S) : Cont sig S
-  /-- `if □ { e₂ } else { e₃ }` -/
-  | ite {S : Ctx} (e₂ e₃ : Term sig S) (κ : Cont sig S) : Cont sig S
-  /-- `for x in □ { e₂ }` -/
-  | forE {S : Ctx} (e₂ : Term sig (.var :: S)) (κ : Cont sig S) : Cont sig S
-  /-- `(v₁, …, vᵢ, □, e₁, …, e_j)` -/
-  | tuple {S : Ctx} (i j : Nat) (done : Fin i → Value sig S) (rest : Fin j → Term sig S)
-      (κ : Cont sig S) : Cont sig S
-  /-- `[v₁, …, vᵢ, □, e₁, …, e_j]` -/
-  | array {S : Ctx} (i j : Nat) (done : Fin i → Value sig S) (rest : Fin j → Term sig S)
-      (κ : Cont sig S) : Cont sig S
-  /-- `Left::<τ₁, τ₂>(□)` -/
-  | inl {S : Ctx} (τ₁ τ₂ : Ty S) (κ : Cont sig S) : Cont sig S
-  /-- `Right::<τ₁, τ₂>(□)` -/
-  | inr {S : Ctx} (τ₁ τ₂ : Ty S) (κ : Cont sig S) : Cont sig S
-  /-- `match □ { Left(x) => e₁, Right(y) => e₂ }` -/
-  | matchE {S : Ctx} (e₁ e₂ : Term sig (.var :: S)) (κ : Cont sig S) : Cont sig S
+  /-- `let x : τ = □; e` -/
+  | letE {S : Ctx} (τ : Ty S) (e : Term sig (.var :: S)) (κ : Cont sig S) : Cont sig S
+  /-- `□; e` -/
+  | seq {S : Ctx} (e : Term sig S) (κ : Cont sig S) : Cont sig S
+  /-- `while □ { e₂ }`, where `□` is the current evaluation of the condition `e₁` -/
+  | whileE {S : Ctx} (e₁ e₂ : Term sig S) (κ : Cont sig S) : Cont sig S
   /-- `shift □`: pop the most recent variable -/
   | popVar {S : Ctx} (κ : Cont sig S) : Cont sig (.var :: S)
   /-- `shiftprov □`: pop the most recent region -/

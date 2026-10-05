@@ -11,10 +11,11 @@ All examples elaborate to scope-indexed terms; the equations are checked by
 `TVar.skipVar`, `TVar.skipRgn` for term variables of the current frame, and
 `In.here`/`In.there` for regions, type variables and frame variables.
 
-A bare place without dereference (`x`, `x.1`) is a *move* (`Term.move`, which
-takes a `TPlace`, so it cannot contain a dereference); a place through a
-dereference (`*r`) is a *copy* (`Term.copy`).  `copy!(p)` and `move!(p)` choose
-explicitly.
+Terms are in A-normal form: the operands of every operation are atoms, and
+intermediate results are named by `let`s.  A bare place without dereference
+(`x`, `x.1`) is a *move* (`Atom.move`, which takes a `TPlace`, so it cannot
+contain a dereference); a place through a dereference (`*r`) is a *copy*
+(`Atom.copy`).  `copy!(p)` and `move!(p)` choose explicitly.
 -/
 
 namespace Oxide.Examples
@@ -23,13 +24,13 @@ open Oxide
 
 /-- `let x : u32 = 5; x`: the use of `x` is a move. -/
 example : ([OXIDE| let x : u32 = 5; x ] : Program []) =
-    Term.letE Ty.u32 (.val (Value.num 5)) (.move ⟨.here, []⟩) := rfl
+    Term.letE Ty.u32 (.atom (.val (Value.num 5))) (.ret (.atom (.move ⟨.here, []⟩))) := rfl
 
 /-- The innermost binding is `TVar.here`; older variables are reached by skipping.
-`copy!(x)` copies. -/
+`copy!(x)` copies.  The components of a tuple are atoms. -/
 example : ([OXIDE| let x : u32 = 1; let y : u32 = 2; (copy!(x), y) ] : Program []) =
-    Term.letE Ty.u32 (.val (Value.num 1)) (.letE Ty.u32 (.val (Value.num 2))
-      (.tuple 2 ![.copy (.place ⟨.skipVar .here, []⟩), .move ⟨.here, []⟩])) := rfl
+    Term.letE Ty.u32 (.atom (.val (Value.num 1))) (.letE Ty.u32 (.atom (.val (Value.num 2)))
+      (.ret (.tuple 2 ![.copy (.place ⟨.skipVar .here, []⟩), .move ⟨.here, []⟩]))) := rfl
 
 /-- Regions bound by `letrgn` are binders of the scope: a borrow names one by a
 typed index `In .rgn _`, and term variables skip region binders with `skipRgn`.
@@ -44,54 +45,70 @@ example : ([OXIDE|
         *r
       }
     } ] : Program []) =
-    Term.letrgn
-      (.letE Ty.u32 (.val (Value.num 5))
-        (.letrgn
+    Term.ret (.letrgn
+      (.letE Ty.u32 (.atom (.val (Value.num 5)))
+        (.ret (.letrgn
           (.letE (.ref (.conc (.there (.there .here))) .uniq (.sized Ty.u32))
             (.borrow (.there (.there .here)) .uniq (.place ⟨.skipRgn .here, []⟩))
             (.seq (.assign (.deref (.place ⟨.here, []⟩) []) (.val (Value.num 6)))
-              (.copy (.deref (.place ⟨.here, []⟩) [])))))) :=
+              (.ret (.atom (.copy (.deref (.place ⟨.here, []⟩) [])))))))))) :=
   rfl
 
 /-- Closures are written in their own scope: the parameters (the first parameter
 is `TVar.here`), then the captured frame (here the variable `y`, recorded by the
 capture list `Cap.var`), then the frame boundary and the outer binders (none
-here). -/
+here).  In A-normal form the closure is bound by a `let` before it is called. -/
 example : ([OXIDE|
     let y : u32 = 1;
     let f : fn(u32, bool) -> u32 = |a : u32, b : bool| -> u32 { if b { a } else { copy!(y) } };
     f(3, true) ] : Program []) =
-    Term.letE Ty.u32 (.val (Value.num 1))
+    Term.letE Ty.u32 (.atom (.val (Value.num 1)))
       (.letE (.fn {} 2 ![Ty.u32, Ty.bool] Ty.u32 FrameExpr.empty [])
         (.closure [.var] (.var .here .nil) [] .nil 2 ![Ty.u32, Ty.bool] Ty.u32
-          (.ite (.move ⟨.skipVar .here, []⟩) (.move ⟨.here, []⟩)
-            (.copy (.place ⟨.skipVar (.skipVar .here), []⟩))))
-        (.app (.move ⟨.here, []⟩) {} .none 2 ![.val (Value.num 3), .val Value.tt])) := rfl
+          (.ret (.ite (.move ⟨.skipVar .here, []⟩) (.ret (.atom (.move ⟨.here, []⟩)))
+            (.ret (.atom (.copy (.place ⟨.skipVar (.skipVar .here), []⟩)))))))
+        (.ret (.app (.move ⟨.here, []⟩) {} .none 2 ![.val (Value.num 3), .val Value.tt]))) := rfl
 
-/-- Sums, `match`, arrays, slices, loops and tuples with projections. -/
+/-- Sums, `match`, arrays, slices, loops and tuples with projections.  Nested
+tuples and the borrowed slice that the loop runs over are named by `let`s, since
+operands are atoms. -/
 example : ([OXIDE|
     letrgn<`a> {
       let s : Either<u32, bool> = Left::<u32, bool>(7);
       let arr : [u32; 3] = [1, 2, 3];
-      let p : (u32, (bool, u32)) = (0, (true, 1));
-      for z in &`a shrd arr[0..2] { () };
+      let q : (bool, u32) = (true, 1);
+      let p : (u32, (bool, u32)) = (0, q);
+      let sl : &`a shrd [u32] = &`a shrd arr[0..2];
+      for z in sl { () };
       while false { () };
       (p.1).0 := false;
       match s { Left(n) => n, Right(b) => arr[2] }
     } ] : Program []) =
-    Term.letrgn
+    Term.ret (.letrgn
       (.letE (.sum Ty.u32 Ty.bool) (.inl Ty.u32 Ty.bool (.val (Value.num 7)))
       (.letE (.array Ty.u32 3)
         (.array 3 ![.val (Value.num 1), .val (Value.num 2), .val (Value.num 3)])
+      (.letE (.tuple 2 ![Ty.bool, Ty.u32]) (.tuple 2 ![.val Value.tt, .val (Value.num 1)])
       (.letE (.tuple 2 ![Ty.u32, .tuple 2 ![Ty.bool, Ty.u32]])
-        (.tuple 2 ![.val (Value.num 0), .tuple 2 ![.val Value.tt, .val (Value.num 1)]])
-      (.seq (.forE (.borrowSlice (.there (.there (.there .here))) .shrd
-          (.place ⟨.skipVar .here, []⟩) (.val (Value.num 0)) (.val (Value.num 2))) (.val Value.unit))
+        (.tuple 2 ![.val (Value.num 0), .move ⟨.here, []⟩])
+      (.letE (.ref (.conc (.there (.there (.there (.there .here))))) .shrd (.slice Ty.u32))
+        (.borrowSlice (.there (.there (.there (.there .here)))) .shrd
+          (.place ⟨.skipVar (.skipVar .here), []⟩) (.val (Value.num 0)) (.val (Value.num 2)))
+      (.seq (.forE (.move ⟨.here, []⟩) (.val Value.unit))
       (.seq (.whileE (.val Value.ff) (.val Value.unit))
-      (.seq (.assign (.place ⟨.here, [1, 0]⟩) (.val Value.ff))
-        (.matchE (.move ⟨.skipVar (.skipVar .here), []⟩) (.move ⟨.here, []⟩)
-          (.index (.place ⟨.skipVar (.skipVar .here), []⟩) (.val (Value.num 2)))))))))) :=
+      (.seq (.assign (.place ⟨.skipVar .here, [1, 0]⟩) (.val Value.ff))
+        (.ret (.matchE (.move ⟨.skipVar (.skipVar (.skipVar (.skipVar .here))), []⟩)
+          (.ret (.atom (.move ⟨.here, []⟩)))
+          (.ret (.index (.place ⟨.skipVar (.skipVar (.skipVar (.skipVar .here))), []⟩)
+            (.val (Value.num 2))))))))))))))) :=
   rfl
+
+/-- An operand that is not an atom is rejected by the concrete syntax: it must be
+bound by a `let` first. -/
+example : True := by
+  fail_if_success
+    have := ([OXIDE| let x : (u32, (u32,)) = (1, (2,)); () ] : Program [])
+  trivial
 
 /-- A polymorphic global function.  Its signature lives in the scope of its
 binders (type variables most recent, then abstract regions); its body in a new
@@ -110,27 +127,34 @@ example : (swapFirst (sig := [])).fsig.params ⟨0, by decide⟩ =
 example : (swapFirst (sig := [])).fsig.params ⟨1, by decide⟩ =
     .ref (.abs (.there (.there .here))) .shrd (.sized Ty.u32) := rfl
 
-example : (swapFirst (sig := [])).body = .copy (.deref (.place ⟨.here, []⟩) []) := rfl
+example : (swapFirst (sig := [])).body = .ret (.atom (.copy (.deref (.place ⟨.here, []⟩) []))) := rfl
 
 /-- A global signature declaring `swap_first`. -/
 abbrev sig₁ : Sig := [(swapFirst (sig := [])).fsig]
 
 /-- Calling a global function with explicit region and type arguments.  Global
 functions are indices into the signature (`FnIdx`), so a call cannot name an
-undeclared function; the type arguments are one bundle `TArgs`. -/
+undeclared function; the type arguments are one bundle `TArgs`.  The borrows
+passed as arguments are named by `let`s first. -/
 example : ([OXIDE{swap_first}|
     letrgn<`r> {
       let x : (u32, u32) = (1, 2);
       let n : u32 = 0;
-      swap_first::<`r, `r; u32>(&`r uniq x, &`r shrd n)
+      let a : &`r uniq (u32, u32) = &`r uniq x;
+      let b : &`r shrd u32 = &`r shrd n;
+      swap_first::<`r, `r; u32>(a, b)
     } ] : Program sig₁) =
-    Term.letrgn (.letE (.tuple 2 ![Ty.u32, Ty.u32])
+    Term.ret (.letrgn (.letE (.tuple 2 ![Ty.u32, Ty.u32])
       (.tuple 2 ![.val (Value.num 1), .val (Value.num 2)])
-      (.letE Ty.u32 (.val (Value.num 0))
-        (.app (.val (.fn .here)) { nϱ := 2, nα := 1 }
-          ⟨![], ![.conc (.there (.there .here)), .conc (.there (.there .here))], ![Ty.u32]⟩ 2
-          ![.borrow (.there (.there .here)) .uniq (.place ⟨.skipVar .here, []⟩),
-            .borrow (.there (.there .here)) .shrd (.place ⟨.here, []⟩)]))) := rfl
+      (.letE Ty.u32 (.atom (.val (Value.num 0)))
+      (.letE (.ref (.conc (.there (.there .here))) .uniq (.sized (.tuple 2 ![Ty.u32, Ty.u32])))
+        (.borrow (.there (.there .here)) .uniq (.place ⟨.skipVar .here, []⟩))
+      (.letE (.ref (.conc (.there (.there (.there .here)))) .shrd (.sized Ty.u32))
+        (.borrow (.there (.there (.there .here))) .shrd (.place ⟨.skipVar .here, []⟩))
+        (.ret (.app (.val (.fn .here)) { nϱ := 2, nα := 1 }
+          ⟨![], ![.conc (.there (.there (.there (.there .here)))),
+            .conc (.there (.there (.there (.there .here))))], ![Ty.u32]⟩ 2
+          ![.move ⟨.skipVar .here, []⟩, .move ⟨.here, []⟩]))))))) := rfl
 
 /-- A global environment for `sig₁`: the body of `swap_first`. -/
 def G₁ : GlobalEnv sig₁ := .cons (swapFirst (sig := sig₁)).body .nil
@@ -148,10 +172,10 @@ frame itself (here `y` points into the frame's own region `s`). -/
 example : ([OXIDE{apply, g, z}|
       letrgn<`r> { apply::<@{x : u32, `s ↦ {}, y : &`s shrd u32}, `r; >(g, z) } ] :
       Program [applyF.fsig, (swapFirst (sig := [])).fsig, (swapFirst (sig := [])).fsig]) =
-    Term.letrgn (.app (.val (.fn .here)) { nφ := 1, nϱ := 1 }
+    Term.ret (.letrgn (.ret (.app (.val (.fn .here)) { nφ := 1, nϱ := 1 }
       ⟨![.frame [.var, .rgn, .var]
         (.var (.ref (.conc (.there .here)) .shrd (.sized Ty.u32)) (.rgn [] (.var Ty.u32 .nil)))],
-       ![.conc .here], ![]⟩ 2 ![.val (.fn (.there .here)), .val (.fn (.there (.there .here)))]) :=
+       ![.conc .here], ![]⟩ 2 ![.val (.fn (.there .here)), .val (.fn (.there (.there .here)))]))) :=
   rfl
 
 /-- A polymorphic function type: the binders scope the parameters, the
@@ -178,8 +202,8 @@ example : ([OXIDE| let a : (u32, u32) = (1, 2);
 /-! ### Running and typing programs written in the concrete syntax -/
 
 /-- The abstract machine runs `let x : u32 = 5; x` to the final configuration
-holding `5`: push the `let`, bind `x` (pushing a `popVar` continuation), move
-out of `x`, and pop `x` again. -/
+holding `5`: push the `let` (its right-hand side `5` is already a value), bind `x`
+(pushing a `popVar` continuation), move out of `x`, and pop `x` again. -/
 example {sig : Sig} (G : GlobalEnv sig) :
     Steps G (Config.init [OXIDE| let x : u32 = 5; x ]) ⟨[], .nil, .val (Value.num 5), .halt⟩ := by
   refine .step _ _ _ (Step.letPush _ _ _ _ _) ?_
@@ -189,6 +213,24 @@ example {sig : Sig} (G : GlobalEnv sig) :
   exact .refl _
 
 example : (⟨[], .nil, .val (Value.num 5), .halt⟩ : Config []).IsFinal := .inl ⟨_, rfl, rfl⟩
+
+/-- The operands of a computation are atoms, evaluated left to right in a single
+step (`EvalAtoms`): here the tuple `(x, 1)` moves out of `x` and builds the pair in
+one step, and the final value survives popping both variables. -/
+example {sig : Sig} (G : GlobalEnv sig) :
+    Steps G (Config.init [OXIDE| let x : u32 = 5; let p : (u32, u32) = (x, 1); p ])
+      ⟨[], .nil, .val (.tuple 2 ![Value.num 5, Value.num 1]), .halt⟩ := by
+  refine .step _ _ _ (Step.letPush _ _ _ _ _) ?_
+  refine .step _ _ _ (Step.letE _ _ _ _ _) ?_
+  refine .step _ _ _ (Step.letPush _ _ _ _ _) ?_
+  refine .step _ _ _ (Step.tuple _ _ _ _ ![Value.num 5, Value.num 1] _
+    (EvalAtoms.cons _ _ _ _ _ _ (EvalAtom.move _ _ ⟨.here, []⟩ _ rfl rfl)
+      (EvalAtoms.cons _ _ _ _ _ _ (EvalAtom.val _ _) (EvalAtoms.nil _ _)))) ?_
+  refine .step _ _ _ (Step.letE _ _ _ _ _) ?_
+  refine .step _ _ _ (Step.move _ _ ⟨.here, []⟩ _ _ rfl rfl) ?_
+  refine .step _ _ _ (Step.popVar _ _ _ _ rfl) ?_
+  refine .step _ _ _ (Step.popVar _ _ _ _ rfl) ?_
+  exact .refl _
 
 /-- The program of the move/copy regression, in concrete syntax. -/
 example : (tsProg : Program []) =

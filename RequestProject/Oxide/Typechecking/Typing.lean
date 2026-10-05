@@ -11,7 +11,12 @@ the well-formedness judgments of appendix B.1 for types and stack typings, and
 referent typing from appendix B.5.
 
 The judgment `Σ; Δ; Γ; Θ ⊢ e : τ ⇒ Γ'` is `HasType sig Θ Γ e τ Γ'`, where `Γ`
-contains `Δ` and all of `Θ`, `Γ`, `e`, `τ`, `Γ'` live in the same scope `S`.  All
+contains `Δ` and all of `Θ`, `Γ`, `e`, `τ`, `Γ'` live in the same scope `S`.
+Following the A-normal form of terms it comes in three layers: atoms
+(`HasTypeA`: `T-Move`, `T-Copy` and values), computations (`HasTypeC`: one rule
+per operation, whose operand premises are atom judgments, plus `T-Drop`) and
+terms (`HasType`: `T-Let`, `T-Seq` and a computation in tail position).  The
+rules are the paper's, with each operand premise now about an atom.  All
 judgments are packed into one inductive family `Typing` so that Lean's induction
 principle covers them simultaneously.
 
@@ -103,15 +108,18 @@ end
 
 /-! ## The typing judgments -/
 
-/-- The forms of the typing judgments of Oxide: expressions
-`Σ; Δ; Γ; Θ ⊢ e : τ ⇒ Γ'`, argument lists (plain and with rewriting), values,
-maybe-unsized values, maybe-dead values (stack slots), lists of values and
-captured frames. -/
+/-- The forms of the typing judgments of Oxide.  Following the A-normal form of
+terms, the paper's expression judgment `Σ; Δ; Γ; Θ ⊢ e : τ ⇒ Γ'` is split into
+three judgments: atoms, computations and terms.  The other forms are argument
+lists (lists of atoms, plain and with rewriting), values, maybe-unsized values,
+maybe-dead values (stack slots), lists of values and captured frames. -/
 inductive TyJ (sig : Sig) where
+  | atom {S : Ctx} (Θ : TempTy S) (Γ : StackTy S) (a : Atom sig S) (τ : Ty S) (Γ' : StackTy S)
+  | comp {S : Ctx} (Θ : TempTy S) (Γ : StackTy S) (c : Comp sig S) (τ : Ty S) (Γ' : StackTy S)
   | expr {S : Ctx} (Θ : TempTy S) (Γ : StackTy S) (e : Term sig S) (τ : Ty S) (Γ' : StackTy S)
-  | args {S : Ctx} (Θ : TempTy S) (Γ : StackTy S) (es : List (Term sig S)) (τs : List (Ty S))
+  | args {S : Ctx} (Θ : TempTy S) (Γ : StackTy S) (as : List (Atom sig S)) (τs : List (Ty S))
       (Γ' : StackTy S)
-  | argsRw {S : Ctx} (Θ : TempTy S) (Γ : StackTy S) (es : List (Term sig S)) (τs : List (Ty S))
+  | argsRw {S : Ctx} (Θ : TempTy S) (Γ : StackTy S) (as : List (Atom sig S)) (τs : List (Ty S))
       (Γ' : StackTy S)
   | val {S : Ctx} (Θ : TempTy S) (Γ : StackTy S) (v : Value sig S) (τ : Ty S)
   | xval {S : Ctx} (Θ : TempTy S) (Γ : StackTy S) (v : Value sig S) (τ : XTy S)
@@ -142,10 +150,10 @@ def Inst.Covered {o S : Ctx} (θ : Inst o S) (τ : Ty S) : Prop :=
 /-- The typing judgments of Oxide (appendix "Statics"), as a single inductive
 family indexed by the form of the judgment. -/
 inductive Typing (sig : Sig) : TyJ sig → Prop
-  -- ## Expressions `Σ; Δ; Γ; Θ ⊢ e : τ ⇒ Γ'`
+  -- ## Atoms `Σ; Δ; Γ; Θ ⊢ a : τ ⇒ Γ'`
   /-- values -/
   | val {S : Ctx} (Θ : TempTy S) (Γ : StackTy S) (v : Value sig S) (τ : Ty S)
-      (h : Typing sig (.val Θ Γ v τ)) : Typing sig (.expr Θ Γ (.val v) τ Γ)
+      (h : Typing sig (.val Θ Γ v τ)) : Typing sig (.atom Θ Γ (.val v) τ Γ)
   /-- `T-Move`: moving out of a place (of any type; the paper restricts `T-Move` to
   non-copyable types, but a move of a copyable value is harmless and is how a
   value is moved out in Rust's MIR) -/
@@ -153,120 +161,68 @@ inductive Typing (sig : Sig) : TyJ sig → Prop
       (hsafe : OwnSafe Θ Γ .uniq [] π.toAbs.toExpr [⟨.uniq, π.toAbs.toExpr⟩])
       (hty : Γ.placeTyI π.toAbs = some τ)
       (hΓ' : Γ.setPlaceTy π.toAbs (.dead τ) = some Γ') :
-      Typing sig (.expr Θ Γ (.move π) τ Γ')
+      Typing sig (.atom Θ Γ (.move π) τ Γ')
   /-- `T-Copy`: copying requires a copyable type -/
   | copy {S : Ctx} (Θ : TempTy S) (Γ : StackTy S) (p : PExpr S) (L : List (Loan S)) (τ : Ty S)
       (ρs : List (Region S))
       (hsafe : OwnSafe Θ Γ .shrd [] p.toAbs L)
       (htc : PlaceTy Γ .shrd p.toAbs (.sized τ) ρs) (hc : τ.copyable = true) :
-      Typing sig (.expr Θ Γ (.copy p) τ Γ)
+      Typing sig (.atom Θ Γ (.copy p) τ Γ)
+  -- ## Computations `Σ; Δ; Γ; Θ ⊢ c : τ ⇒ Γ'`
+  /-- an atom as a computation -/
+  | atom {S : Ctx} (Θ : TempTy S) (Γ Γ' : StackTy S) (a : Atom sig S) (τ : Ty S)
+      (h : Typing sig (.atom Θ Γ a τ Γ')) : Typing sig (.comp Θ Γ (.atom a) τ Γ')
   /-- `T-Borrow` -/
   | borrow {S : Ctx} (Θ : TempTy S) (Γ : StackTy S) (r : In .rgn S) (ω : Own) (p : PExpr S)
       (L : List (Loan S)) (τ : XTy S) (ρs : List (Region S))
       (hr : Γ.loans r = []) (hnic : NotInClosure Θ Γ r)
       (hsafe : OwnSafe Θ Γ ω [] p.toAbs L) (htc : PlaceTy Γ ω p.toAbs τ ρs) :
-      Typing sig (.expr Θ Γ (.borrow r ω p) (.ref (.conc r) ω τ) (Γ.setLoans r L))
+      Typing sig (.comp Θ Γ (.borrow r ω p) (.ref (.conc r) ω τ) (Γ.setLoans r L))
   /-- `T-BorrowIndex` -/
   | borrowIdx {S : Ctx} (Θ : TempTy S) (Γ Γ₁ : StackTy S) (r : In .rgn S) (ω : Own)
-      (p : PExpr S) (e : Term sig S) (L : List (Loan S)) (τ : XTy S) (τ' : Ty S)
+      (p : PExpr S) (a : Atom sig S) (L : List (Loan S)) (τ : XTy S) (τ' : Ty S)
       (ρs : List (Region S))
-      (he : Typing sig (.expr Θ Γ e Ty.u32 Γ₁))
+      (ha : Typing sig (.atom Θ Γ a Ty.u32 Γ₁))
       (hr : Γ₁.loans r = []) (hnic : NotInClosure Θ Γ₁ r)
       (hsafe : OwnSafe Θ Γ₁ ω [] p.toAbs L) (htc : PlaceTy Γ₁ ω p.toAbs τ ρs)
       (hτ : (∃ n, τ = .sized (.array τ' n)) ∨ τ = .slice τ') :
-      Typing sig (.expr Θ Γ (.borrowIdx r ω p e) (.ref (.conc r) ω (.sized τ')) (Γ₁.setLoans r L))
+      Typing sig (.comp Θ Γ (.borrowIdx r ω p a) (.ref (.conc r) ω (.sized τ')) (Γ₁.setLoans r L))
   /-- `T-BorrowSlice` (we allow borrowing a slice of an array as well as of a slice) -/
   | borrowSlice {S : Ctx} (Θ : TempTy S) (Γ Γ₁ Γ₂ : StackTy S) (r : In .rgn S) (ω : Own)
-      (p : PExpr S) (e₁ e₂ : Term sig S) (L : List (Loan S)) (τ : XTy S) (τ' : Ty S)
+      (p : PExpr S) (a₁ a₂ : Atom sig S) (L : List (Loan S)) (τ : XTy S) (τ' : Ty S)
       (ρs : List (Region S))
-      (he₁ : Typing sig (.expr Θ Γ e₁ Ty.u32 Γ₁)) (he₂ : Typing sig (.expr Θ Γ₁ e₂ Ty.u32 Γ₂))
+      (ha₁ : Typing sig (.atom Θ Γ a₁ Ty.u32 Γ₁)) (ha₂ : Typing sig (.atom Θ Γ₁ a₂ Ty.u32 Γ₂))
       (hr : Γ₂.loans r = []) (hnic : NotInClosure Θ Γ₂ r)
       (hsafe : OwnSafe Θ Γ₂ ω [] p.toAbs L) (htc : PlaceTy Γ₂ ω p.toAbs τ ρs)
       (hτ : (∃ n, τ = .sized (.array τ' n)) ∨ τ = .slice τ') :
-      Typing sig (.expr Θ Γ (.borrowSlice r ω p e₁ e₂) (.ref (.conc r) ω (.slice τ')) (Γ₂.setLoans r L))
+      Typing sig (.comp Θ Γ (.borrowSlice r ω p a₁ a₂) (.ref (.conc r) ω (.slice τ'))
+        (Γ₂.setLoans r L))
   /-- `T-IndexCopy` -/
-  | index {S : Ctx} (Θ : TempTy S) (Γ Γ' : StackTy S) (p : PExpr S) (e : Term sig S)
+  | index {S : Ctx} (Θ : TempTy S) (Γ Γ' : StackTy S) (p : PExpr S) (a : Atom sig S)
       (L : List (Loan S)) (τ : XTy S) (τ' : Ty S) (ρs : List (Region S))
-      (he : Typing sig (.expr Θ Γ e Ty.u32 Γ'))
+      (ha : Typing sig (.atom Θ Γ a Ty.u32 Γ'))
       (hsafe : OwnSafe Θ Γ' .shrd [] p.toAbs L) (htc : PlaceTy Γ' .shrd p.toAbs τ ρs)
       (hτ : (∃ n, τ = .sized (.array τ' n)) ∨ τ = .slice τ') (hc : τ'.copyable = true) :
-      Typing sig (.expr Θ Γ (.index p e) τ' Γ')
-  /-- `T-Seq` -/
-  | seq {S : Ctx} (Θ : TempTy S) (Γ Γ₁ Γ₂ : StackTy S) (e₁ e₂ : Term sig S) (τ₁ τ₂ : Ty S)
-      (h₁ : Typing sig (.expr Θ Γ e₁ τ₁ Γ₁)) (h₂ : Typing sig (.expr Θ (gcLoans Θ Γ₁) e₂ τ₂ Γ₂)) :
-      Typing sig (.expr Θ Γ (.seq e₁ e₂) τ₂ Γ₂)
-  /-- `T-Branch` -/
-  | ite {S : Ctx} (Θ : TempTy S) (Γ Γ₁ Γ₂ Γ₃ Γ₂' Γ₃' Γ' : StackTy S) (e₁ e₂ e₃ : Term sig S)
-      (τ τ₂ τ₃ : Ty S)
-      (h₁ : Typing sig (.expr Θ Γ e₁ Ty.bool Γ₁))
-      (h₂ : Typing sig (.expr Θ Γ₁ e₂ τ₂ Γ₂)) (h₃ : Typing sig (.expr Θ Γ₁ e₃ τ₃ Γ₃))
-      (hτ : τ = τ₂ ∨ τ = τ₃)
-      (hr₂ : Rewrite Θ .combine Γ₂ τ₂ τ Γ₂') (hr₃ : Rewrite Θ .combine Γ₃ τ₃ τ Γ₃')
-      (hu : StackTy.union Γ₂' Γ₃' = some Γ') :
-      Typing sig (.expr Θ Γ (.ite e₁ e₂ e₃) τ Γ')
-  /-- `T-Let`: the variable must be dead at the end of the body, and is then
-  popped. -/
-  | letE {S : Ctx} (Θ : TempTy S) (Γ Γ₁ Γ₁' Γ' : StackTy S) (Γ₂ : StackTy (.var :: S))
-      (τa τ₁ τ : Ty S) (τ₂ : Ty (.var :: S)) (e₁ : Term sig S) (e₂ : Term sig (.var :: S))
-      (h₁ : Typing sig (.expr Θ Γ e₁ τ₁ Γ₁))
-      (hr : Rewrite Θ .combine Γ₁ τ₁ τa Γ₁')
-      (hnrb : ∀ r ∈ τa.frgns, NotReborrowed Γ₁' r)
-      (h₂ : Typing sig (.expr (Θ.rename (TRen.wk S .var))
-        (gcLoans (Θ.rename (TRen.wk S .var)) (Γ₁'.pushVar (.init (τa.wk .var)))) e₂ τ₂ Γ₂))
-      (hdead : (Γ₂.varTy .here).IsDead)
-      (hpop : (gcLoans (τ₂ :: Θ.rename (TRen.wk S .var)) Γ₂).popL [.var] = some Γ')
-      (hτ : τ₂.prename (PRen.drop S .var) = some τ) :
-      Typing sig (.expr Θ Γ (.letE τa e₁ e₂) τ Γ')
-  /-- `T-LetRegion`: the body is typed with a fresh region `r ↦ {}`, which is then
-  popped. -/
-  | letrgn {S : Ctx} (Θ : TempTy S) (Γ Γ' : StackTy S) (Γ₁ : StackTy (.rgn :: S))
-      (e : Term sig (.rgn :: S)) (τ₁ : Ty (.rgn :: S)) (τ : Ty S)
-      (h : Typing sig (.expr (Θ.rename (TRen.wk S .rgn)) (Γ.pushRgn []) e τ₁ Γ₁))
-      (hpop : (gcLoans (τ₁ :: Θ.rename (TRen.wk S .rgn)) Γ₁).popL [.rgn] = some Γ')
-      (hτ : τ₁.prename (PRen.drop S .rgn) = some τ) :
-      Typing sig (.expr Θ Γ (.letrgn e) τ Γ')
+      Typing sig (.comp Θ Γ (.index p a) τ' Γ')
   /-- `T-AssignDeref` -/
-  | assignDeref {S : Ctx} (Θ : TempTy S) (Γ Γ₁ Γ' : StackTy S) (p : PExpr S) (e : Term sig S)
+  | assignDeref {S : Ctx} (Θ : TempTy S) (Γ Γ₁ Γ' : StackTy S) (p : PExpr S) (a : Atom sig S)
       (L : List (Loan S)) (τn τo : Ty S) (ρs : List (Region S))
-      (he : Typing sig (.expr Θ Γ e τn Γ₁))
+      (ha : Typing sig (.atom Θ Γ a τn Γ₁))
       (htc : PlaceTy Γ₁ .uniq p.toAbs (.sized τo) ρs)
       (hr : Rewrite Θ .combine Γ₁ τn τo Γ')
       (hsafe : OwnSafe Θ Γ' .uniq [] p.toAbs L) :
-      Typing sig (.expr Θ Γ (.assign p e) Ty.unit Γ')
+      Typing sig (.comp Θ Γ (.assign p a) Ty.unit Γ')
   /-- `T-Assign` -/
-  | assign {S : Ctx} (Θ : TempTy S) (Γ Γ₁ Γ' Γ'' : StackTy S) (p : PExpr S) (e : Term sig S)
+  | assign {S : Ctx} (Θ : TempTy S) (Γ Γ₁ Γ' Γ'' : StackTy S) (p : PExpr S) (a : Atom sig S)
       (π : APlace S) (τ : Ty S) (τx : MTy S)
-      (he : Typing sig (.expr Θ Γ e τ Γ₁))
+      (ha : Typing sig (.atom Θ Γ a τ Γ₁))
       (hp : p.toAbs = π.toExpr)
       (hx : Γ₁.placeTy π = some τx)
       (huniq : ∀ r ω τ', τx = .init (.ref (.conc r) ω τ') → RgnUniqueTo r π Γ₁)
       (hr : RewriteM Θ .noop (Γ₁.rsub π.derefExpr) τ τx Γ')
       (hsafe : τx.IsDead ∨ OwnSafe Θ Γ' .uniq [] π.toExpr [⟨.uniq, π.toExpr⟩])
       (hΓ'' : Γ'.setPlaceTy π (.init τ) = some Γ'') :
-      Typing sig (.expr Θ Γ (.assign p e) Ty.unit Γ'')
-  /-- `T-While` -/
-  | whileE {S : Ctx} (Θ : TempTy S) (Γ Γ₁ Γ₂ : StackTy S) (e₁ e₂ : Term sig S)
-      (h₁ : Typing sig (.expr Θ Γ e₁ Ty.bool Γ₁)) (h₂ : Typing sig (.expr Θ Γ₁ e₂ Ty.unit Γ₂))
-      (h₁' : Typing sig (.expr Θ Γ₂ e₁ Ty.bool Γ₂)) (h₂' : Typing sig (.expr Θ Γ₂ e₂ Ty.unit Γ₂)) :
-      Typing sig (.expr Θ Γ (.whileE e₁ e₂) Ty.unit Γ₂)
-  /-- `T-ForArray` -/
-  | forArray {S : Ctx} (Θ : TempTy S) (Γ Γ₁ : StackTy S) (Γ₂ : StackTy (.var :: S)) (e₁ : Term sig S)
-      (e₂ : Term sig (.var :: S)) (τ : Ty S) (n : Nat)
-      (h₁ : Typing sig (.expr Θ Γ e₁ (.array τ n) Γ₁))
-      (hnrb : ∀ r ∈ τ.frgns, NotReborrowed Γ₁ r)
-      (h₂ : Typing sig (.expr (Θ.rename (TRen.wk S .var)) (Γ₁.pushVar (.init (τ.wk .var))) e₂ Ty.unit Γ₂))
-      (hdead : (Γ₂.varTy .here).IsDead)
-      (hpop : (gcLoans (Θ.rename (TRen.wk S .var)) Γ₂).popL [.var] = some Γ₁) :
-      Typing sig (.expr Θ Γ (.forE e₁ e₂) Ty.unit Γ₁)
-  /-- `T-ForSlice` -/
-  | forSlice {S : Ctx} (Θ : TempTy S) (Γ Γ₁ : StackTy S) (Γ₂ : StackTy (.var :: S)) (e₁ : Term sig S)
-      (e₂ : Term sig (.var :: S)) (ρ : Region S) (ω : Own) (τ : Ty S)
-      (h₁ : Typing sig (.expr Θ Γ e₁ (.ref ρ ω (.slice τ)) Γ₁))
-      (hnrb : ∀ r ∈ (Ty.ref ρ ω (.sized τ)).frgns, NotReborrowed Γ₁ r)
-      (h₂ : Typing sig (.expr (Θ.rename (TRen.wk S .var))
-        (Γ₁.pushVar (.init ((Ty.ref ρ ω (.sized τ)).wk .var))) e₂ Ty.unit Γ₂))
-      (hpop : (gcLoans (Θ.rename (TRen.wk S .var)) Γ₂).popL [.var] = some Γ₁) :
-      Typing sig (.expr Θ Γ (.forE e₁ e₂) Ty.unit Γ₁)
+      Typing sig (.comp Θ Γ (.assign p a) Ty.unit Γ'')
   /-- `T-Closure`.  The closure captures the frame `f` given by `c` (variables and
   regions of the current scope); its body, parameter types and return type are
   written in the closure's own scope, whose outer binders stand for `θ`.  Every
@@ -289,56 +245,91 @@ inductive Typing (sig : Sig) : TyJ sig → Prop
         (body.openBody θ.toTSub) ((θ.ty ret).rename (TRen.frameRen k f S)) Γb))
       (hpop : (gcLoans ((Θ ++ θ.ty ret :: List.ofFn (θ.tys ps)).rename (TRen.frameRen k f S)) Γb).popFrame
         k f = some Γ') :
-      Typing sig (.expr Θ Γ (.closure f c o θ k ps ret body) (θ.closureTy ps ret (.frame f Φc)) Γ')
+      Typing sig (.comp Θ Γ (.closure f c o θ k ps ret body) (θ.closureTy ps ret (.frame f Φc)) Γ')
   /-- `T-AppFunction`: `δ = [Φ̄/φ̄][ρ̄/ϱ̄][τ̄/ᾱ]` (the bounds `ϱ₁ : ϱ₂` are checked as
   `δ(ϱ₁) :> δ(ϱ₂)`) -/
-  | appFn {S : Ctx} (Θ : TempTy S) (Γ Γ₀ Γₙ Γb : StackTy S) (e : Term sig S) (b : Binders)
-      (θ : TArgs b S) (k : Nat) (args : Fin k → Term sig S) (ps : Fin k → Ty (b.ctx ++ S))
+  | appFn {S : Ctx} (Θ : TempTy S) (Γ Γ₀ Γₙ Γb : StackTy S) (a : Atom sig S) (b : Binders)
+      (θ : TArgs b S) (k : Nat) (args : Fin k → Atom sig S) (ps : Fin k → Ty (b.ctx ++ S))
       (τf : Ty (b.ctx ++ S)) (bs : List (Fin b.nϱ × Fin b.nϱ))
       (hΦs : ∀ i, EnvWF Γ (θ.frames i)) (hτs : ∀ i, TyWF Γ (θ.tys i))
-      (hf : Typing sig (.expr Θ Γ e (.fn b k ps τf .empty bs) Γ₀))
+      (hf : Typing sig (.atom Θ Γ a (.fn b k ps τf .empty bs) Γ₀))
       (hargs : Typing sig (.args Θ Γ₀ (List.ofFn args) (List.ofFn fun i => (ps i).inst θ) Γₙ))
       (hnrb : ∀ i, ∀ r ∈ ((ps i).inst θ).frgns, NotReborrowed Γₙ r)
       (hbounds : OutlivesMany Θ .combine Γₙ
         (bs.map fun p => ((b.absAt p.1).inst θ, (b.absAt p.2).inst θ)) Γb) :
-      Typing sig (.expr Θ Γ (.app e b θ k args) (τf.inst θ) Γb)
+      Typing sig (.comp Θ Γ (.app a b θ k args) (τf.inst θ) Γb)
   /-- `T-AppClosure` -/
-  | appClosure {S : Ctx} (Θ : TempTy S) (Γ Γ₀ Γₙ : StackTy S) (e : Term sig S) (k : Nat)
-      (args : Fin k → Term sig S) (ps : Fin k → Ty S) (τf : Ty S) (Φc : FrameExpr S)
+  | appClosure {S : Ctx} (Θ : TempTy S) (Γ Γ₀ Γₙ : StackTy S) (a : Atom sig S) (k : Nat)
+      (args : Fin k → Atom sig S) (ps : Fin k → Ty S) (τf : Ty S) (Φc : FrameExpr S)
       (θ : TArgs {} S)
-      (hf : Typing sig (.expr Θ Γ e (Ty.closure k ps τf Φc) Γ₀))
+      (hf : Typing sig (.atom Θ Γ a (Ty.closure k ps τf Φc) Γ₀))
       (hargs : Typing sig (.argsRw Θ Γ₀ (List.ofFn args) (List.ofFn ps) Γₙ))
       (hnrb : ∀ i, ∀ r ∈ (ps i).frgns, NotReborrowed Γₙ r) :
-      Typing sig (.expr Θ Γ (.app e {} θ k args) τf Γₙ)
+      Typing sig (.comp Θ Γ (.app a {} θ k args) τf Γₙ)
   /-- `T-Tuple` -/
-  | tuple {S : Ctx} (Θ : TempTy S) (Γ Γ' : StackTy S) (k : Nat) (es : Fin k → Term sig S)
-      (τs : Fin k → Ty S) (h : Typing sig (.args Θ Γ (List.ofFn es) (List.ofFn τs) Γ')) :
-      Typing sig (.expr Θ Γ (.tuple k es) (.tuple k τs) Γ')
+  | tuple {S : Ctx} (Θ : TempTy S) (Γ Γ' : StackTy S) (k : Nat) (as : Fin k → Atom sig S)
+      (τs : Fin k → Ty S) (h : Typing sig (.args Θ Γ (List.ofFn as) (List.ofFn τs) Γ')) :
+      Typing sig (.comp Θ Γ (.tuple k as) (.tuple k τs) Γ')
   /-- `T-Array` -/
-  | array {S : Ctx} (Θ : TempTy S) (Γ Γ' : StackTy S) (k : Nat) (es : Fin k → Term sig S) (τ : Ty S)
-      (h : Typing sig (.args Θ Γ (List.ofFn es) (List.replicate k τ) Γ')) :
-      Typing sig (.expr Θ Γ (.array k es) (.array τ k) Γ')
+  | array {S : Ctx} (Θ : TempTy S) (Γ Γ' : StackTy S) (k : Nat) (as : Fin k → Atom sig S) (τ : Ty S)
+      (h : Typing sig (.args Θ Γ (List.ofFn as) (List.replicate k τ) Γ')) :
+      Typing sig (.comp Θ Γ (.array k as) (.array τ k) Γ')
+  /-- `T-Left` -/
+  | inl {S : Ctx} (Θ : TempTy S) (Γ Γ' : StackTy S) (τ₁ τ₂ : Ty S) (a : Atom sig S)
+      (h : Typing sig (.atom Θ Γ a τ₁ Γ')) :
+      Typing sig (.comp Θ Γ (.inl τ₁ τ₂ a) (.sum τ₁ τ₂) Γ')
+  /-- `T-Right` -/
+  | inr {S : Ctx} (Θ : TempTy S) (Γ Γ' : StackTy S) (τ₁ τ₂ : Ty S) (a : Atom sig S)
+      (h : Typing sig (.atom Θ Γ a τ₂ Γ')) :
+      Typing sig (.comp Θ Γ (.inr τ₁ τ₂ a) (.sum τ₁ τ₂) Γ')
   /-- `T-Abort` -/
   | abort {S : Ctx} (Θ : TempTy S) (Γ : StackTy S) (s : String) (τ : Ty S) :
-      Typing sig (.expr Θ Γ (.abort s) τ Γ)
-  /-- `T-Drop` -/
-  | drop {S : Ctx} (Θ : TempTy S) (Γ Γd Γf : StackTy S) (π : APlace S) (τπ τ : Ty S) (e : Term sig S)
-      (hπ : Γ.placeTyI π = some τπ) (hd : Γ.setPlaceTy π (.dead τπ) = some Γd)
-      (h : Typing sig (.expr Θ Γd e τ Γf)) :
-      Typing sig (.expr Θ Γ e τ Γf)
-  /-- `T-Left` -/
-  | inl {S : Ctx} (Θ : TempTy S) (Γ Γ' : StackTy S) (τ₁ τ₂ : Ty S) (e : Term sig S)
-      (h : Typing sig (.expr Θ Γ e τ₁ Γ')) :
-      Typing sig (.expr Θ Γ (.inl τ₁ τ₂ e) (.sum τ₁ τ₂) Γ')
-  /-- `T-Right` -/
-  | inr {S : Ctx} (Θ : TempTy S) (Γ Γ' : StackTy S) (τ₁ τ₂ : Ty S) (e : Term sig S)
-      (h : Typing sig (.expr Θ Γ e τ₂ Γ')) :
-      Typing sig (.expr Θ Γ (.inr τ₁ τ₂ e) (.sum τ₁ τ₂) Γ')
+      Typing sig (.comp Θ Γ (.abort s) τ Γ)
+  /-- `T-LetRegion`: the body is typed with a fresh region `r ↦ {}`, which is then
+  popped. -/
+  | letrgn {S : Ctx} (Θ : TempTy S) (Γ Γ' : StackTy S) (Γ₁ : StackTy (.rgn :: S))
+      (e : Term sig (.rgn :: S)) (τ₁ : Ty (.rgn :: S)) (τ : Ty S)
+      (h : Typing sig (.expr (Θ.rename (TRen.wk S .rgn)) (Γ.pushRgn []) e τ₁ Γ₁))
+      (hpop : (gcLoans (τ₁ :: Θ.rename (TRen.wk S .rgn)) Γ₁).popL [.rgn] = some Γ')
+      (hτ : τ₁.prename (PRen.drop S .rgn) = some τ) :
+      Typing sig (.comp Θ Γ (.letrgn e) τ Γ')
+  /-- `T-Branch` -/
+  | ite {S : Ctx} (Θ : TempTy S) (Γ Γ₁ Γ₂ Γ₃ Γ₂' Γ₃' Γ' : StackTy S) (a : Atom sig S)
+      (e₁ e₂ : Term sig S) (τ τ₂ τ₃ : Ty S)
+      (ha : Typing sig (.atom Θ Γ a Ty.bool Γ₁))
+      (h₂ : Typing sig (.expr Θ Γ₁ e₁ τ₂ Γ₂)) (h₃ : Typing sig (.expr Θ Γ₁ e₂ τ₃ Γ₃))
+      (hτ : τ = τ₂ ∨ τ = τ₃)
+      (hr₂ : Rewrite Θ .combine Γ₂ τ₂ τ Γ₂') (hr₃ : Rewrite Θ .combine Γ₃ τ₃ τ Γ₃')
+      (hu : StackTy.union Γ₂' Γ₃' = some Γ') :
+      Typing sig (.comp Θ Γ (.ite a e₁ e₂) τ Γ')
+  /-- `T-While` -/
+  | whileE {S : Ctx} (Θ : TempTy S) (Γ Γ₁ Γ₂ : StackTy S) (e₁ e₂ : Term sig S)
+      (h₁ : Typing sig (.expr Θ Γ e₁ Ty.bool Γ₁)) (h₂ : Typing sig (.expr Θ Γ₁ e₂ Ty.unit Γ₂))
+      (h₁' : Typing sig (.expr Θ Γ₂ e₁ Ty.bool Γ₂)) (h₂' : Typing sig (.expr Θ Γ₂ e₂ Ty.unit Γ₂)) :
+      Typing sig (.comp Θ Γ (.whileE e₁ e₂) Ty.unit Γ₂)
+  /-- `T-ForArray` -/
+  | forArray {S : Ctx} (Θ : TempTy S) (Γ Γ₁ : StackTy S) (Γ₂ : StackTy (.var :: S)) (a : Atom sig S)
+      (e : Term sig (.var :: S)) (τ : Ty S) (n : Nat)
+      (ha : Typing sig (.atom Θ Γ a (.array τ n) Γ₁))
+      (hnrb : ∀ r ∈ τ.frgns, NotReborrowed Γ₁ r)
+      (h₂ : Typing sig (.expr (Θ.rename (TRen.wk S .var)) (Γ₁.pushVar (.init (τ.wk .var))) e Ty.unit Γ₂))
+      (hdead : (Γ₂.varTy .here).IsDead)
+      (hpop : (gcLoans (Θ.rename (TRen.wk S .var)) Γ₂).popL [.var] = some Γ₁) :
+      Typing sig (.comp Θ Γ (.forE a e) Ty.unit Γ₁)
+  /-- `T-ForSlice` -/
+  | forSlice {S : Ctx} (Θ : TempTy S) (Γ Γ₁ : StackTy S) (Γ₂ : StackTy (.var :: S)) (a : Atom sig S)
+      (e : Term sig (.var :: S)) (ρ : Region S) (ω : Own) (τ : Ty S)
+      (ha : Typing sig (.atom Θ Γ a (.ref ρ ω (.slice τ)) Γ₁))
+      (hnrb : ∀ r ∈ (Ty.ref ρ ω (.sized τ)).frgns, NotReborrowed Γ₁ r)
+      (h₂ : Typing sig (.expr (Θ.rename (TRen.wk S .var))
+        (Γ₁.pushVar (.init ((Ty.ref ρ ω (.sized τ)).wk .var))) e Ty.unit Γ₂))
+      (hpop : (gcLoans (Θ.rename (TRen.wk S .var)) Γ₂).popL [.var] = some Γ₁) :
+      Typing sig (.comp Θ Γ (.forE a e) Ty.unit Γ₁)
   /-- `T-Match` -/
   | matchE {S : Ctx} (Θ : TempTy S) (Γ Γ' Γ₁p Γ₂p Γ₁' Γ₂' Γ'' : StackTy S)
-      (Γ₁ Γ₂ : StackTy (.var :: S)) (e : Term sig S) (e₁ e₂ : Term sig (.var :: S))
+      (Γ₁ Γ₂ : StackTy (.var :: S)) (a : Atom sig S) (e₁ e₂ : Term sig (.var :: S))
       (τl τr τ τ₁' τ₂' : Ty S) (τ₁ τ₂ : Ty (.var :: S))
-      (h : Typing sig (.expr Θ Γ e (.sum τl τr) Γ'))
+      (ha : Typing sig (.atom Θ Γ a (.sum τl τr) Γ'))
       (hnrb : ∀ r ∈ (Ty.sum τl τr).frgns, NotReborrowed Γ' r)
       (h₁ : Typing sig (.expr (Θ.rename (TRen.wk S .var)) (Γ'.pushVar (.init (τl.wk .var))) e₁ τ₁ Γ₁))
       (h₂ : Typing sig (.expr (Θ.rename (TRen.wk S .var)) (Γ'.pushVar (.init (τr.wk .var))) e₂ τ₂ Γ₂))
@@ -350,21 +341,47 @@ inductive Typing (sig : Sig) : TyJ sig → Prop
       (hτ : τ = τ₁' ∨ τ = τ₂')
       (hr₁ : Rewrite Θ .combine Γ₁p τ₁' τ Γ₁') (hr₂ : Rewrite Θ .combine Γ₂p τ₂' τ Γ₂')
       (hu : StackTy.union Γ₁' Γ₂' = some Γ'') :
-      Typing sig (.expr Θ Γ (.matchE e e₁ e₂) τ Γ'')
-  -- ## Argument lists: the `i`-th expression is typed with the types of the
+      Typing sig (.comp Θ Γ (.matchE a e₁ e₂) τ Γ'')
+  /-- `T-Drop`: an initialized place may be dropped before any computation -/
+  | drop {S : Ctx} (Θ : TempTy S) (Γ Γd Γf : StackTy S) (π : APlace S) (τπ τ : Ty S) (c : Comp sig S)
+      (hπ : Γ.placeTyI π = some τπ) (hd : Γ.setPlaceTy π (.dead τπ) = some Γd)
+      (h : Typing sig (.comp Θ Γd c τ Γf)) :
+      Typing sig (.comp Θ Γ c τ Γf)
+  -- ## Terms `Σ; Δ; Γ; Θ ⊢ e : τ ⇒ Γ'`
+  /-- a computation in tail position -/
+  | ret {S : Ctx} (Θ : TempTy S) (Γ Γ' : StackTy S) (c : Comp sig S) (τ : Ty S)
+      (h : Typing sig (.comp Θ Γ c τ Γ')) : Typing sig (.expr Θ Γ (.ret c) τ Γ')
+  /-- `T-Let`: the variable must be dead at the end of the body, and is then
+  popped. -/
+  | letE {S : Ctx} (Θ : TempTy S) (Γ Γ₁ Γ₁' Γ' : StackTy S) (Γ₂ : StackTy (.var :: S))
+      (τa τ₁ τ : Ty S) (τ₂ : Ty (.var :: S)) (c : Comp sig S) (e : Term sig (.var :: S))
+      (h₁ : Typing sig (.comp Θ Γ c τ₁ Γ₁))
+      (hr : Rewrite Θ .combine Γ₁ τ₁ τa Γ₁')
+      (hnrb : ∀ r ∈ τa.frgns, NotReborrowed Γ₁' r)
+      (h₂ : Typing sig (.expr (Θ.rename (TRen.wk S .var))
+        (gcLoans (Θ.rename (TRen.wk S .var)) (Γ₁'.pushVar (.init (τa.wk .var)))) e τ₂ Γ₂))
+      (hdead : (Γ₂.varTy .here).IsDead)
+      (hpop : (gcLoans (τ₂ :: Θ.rename (TRen.wk S .var)) Γ₂).popL [.var] = some Γ')
+      (hτ : τ₂.prename (PRen.drop S .var) = some τ) :
+      Typing sig (.expr Θ Γ (.letE τa c e) τ Γ')
+  /-- `T-Seq` -/
+  | seq {S : Ctx} (Θ : TempTy S) (Γ Γ₁ Γ₂ : StackTy S) (c : Comp sig S) (e : Term sig S) (τ₁ τ₂ : Ty S)
+      (h₁ : Typing sig (.comp Θ Γ c τ₁ Γ₁)) (h₂ : Typing sig (.expr Θ (gcLoans Θ Γ₁) e τ₂ Γ₂)) :
+      Typing sig (.expr Θ Γ (.seq c e) τ₂ Γ₂)
+  -- ## Argument lists (atoms): the `i`-th atom is typed with the types of the
   -- previous ones added to `Θ`.
   | argsNil {S : Ctx} (Θ : TempTy S) (Γ : StackTy S) : Typing sig (.args Θ Γ [] [] Γ)
-  | argsCons {S : Ctx} (Θ : TempTy S) (Γ Γ₁ Γ₂ : StackTy S) (e : Term sig S) (es : List (Term sig S))
-      (τ : Ty S) (τs : List (Ty S)) (h : Typing sig (.expr Θ Γ e τ Γ₁))
-      (t : Typing sig (.args (Θ ++ [τ]) Γ₁ es τs Γ₂)) :
-      Typing sig (.args Θ Γ (e :: es) (τ :: τs) Γ₂)
+  | argsCons {S : Ctx} (Θ : TempTy S) (Γ Γ₁ Γ₂ : StackTy S) (a : Atom sig S) (as : List (Atom sig S))
+      (τ : Ty S) (τs : List (Ty S)) (h : Typing sig (.atom Θ Γ a τ Γ₁))
+      (t : Typing sig (.args (Θ ++ [τ]) Γ₁ as τs Γ₂)) :
+      Typing sig (.args Θ Γ (a :: as) (τ :: τs) Γ₂)
   -- ## Closure arguments (`T-AppClosure`): each argument is rewritten with mode `⊞`.
   | argsRwNil {S : Ctx} (Θ : TempTy S) (Γ : StackTy S) : Typing sig (.argsRw Θ Γ [] [] Γ)
-  | argsRwCons {S : Ctx} (Θ : TempTy S) (Γ Γ₁ Γ₁' Γ₂ : StackTy S) (e : Term sig S) (es : List (Term sig S))
-      (τ' τ : Ty S) (τs : List (Ty S)) (h : Typing sig (.expr Θ Γ e τ' Γ₁))
+  | argsRwCons {S : Ctx} (Θ : TempTy S) (Γ Γ₁ Γ₁' Γ₂ : StackTy S) (a : Atom sig S)
+      (as : List (Atom sig S)) (τ' τ : Ty S) (τs : List (Ty S)) (h : Typing sig (.atom Θ Γ a τ' Γ₁))
       (hr : Rewrite Θ .combineUnrest Γ₁ τ' τ Γ₁')
-      (t : Typing sig (.argsRw (Θ ++ [τ]) Γ₁' es τs Γ₂)) :
-      Typing sig (.argsRw Θ Γ (e :: es) (τ :: τs) Γ₂)
+      (t : Typing sig (.argsRw (Θ ++ [τ]) Γ₁' as τs Γ₂)) :
+      Typing sig (.argsRw Θ Γ (a :: as) (τ :: τs) Γ₂)
   -- ## Values `Σ; Δ; Γ; Θ ⊢ v : τ ⇒ Γ` (values never change the stack typing).
   /-- `T-Unit`, `T-u32`, `T-True`, `T-False`: a constant has its base type -/
   | vPrim {S : Ctx} (Θ : TempTy S) (Γ : StackTy S) {b : BaseTy} (c : Prim b) :
@@ -434,13 +451,21 @@ inductive Typing (sig : Sig) : TyJ sig → Prop
       (Φ : FrameTy T f) (t : Typing sig (.env Γ ρ ε Φ)) :
       Typing sig (.env Γ ρ (.rgn ε) (.rgn L Φ))
 
-/-- `Σ; Δ; Γ; Θ ⊢ e : τ ⇒ Γ'`. -/
+/-- Atom typing `Σ; Δ; Γ; Θ ⊢ a : τ ⇒ Γ'`. -/
+abbrev HasTypeA (sig : Sig) {S : Ctx} (Θ : TempTy S) (Γ : StackTy S) (a : Atom sig S) (τ : Ty S)
+    (Γ' : StackTy S) : Prop := Typing sig (.atom Θ Γ a τ Γ')
+
+/-- Computation typing `Σ; Δ; Γ; Θ ⊢ c : τ ⇒ Γ'`. -/
+abbrev HasTypeC (sig : Sig) {S : Ctx} (Θ : TempTy S) (Γ : StackTy S) (c : Comp sig S) (τ : Ty S)
+    (Γ' : StackTy S) : Prop := Typing sig (.comp Θ Γ c τ Γ')
+
+/-- Term typing `Σ; Δ; Γ; Θ ⊢ e : τ ⇒ Γ'`. -/
 abbrev HasType (sig : Sig) {S : Ctx} (Θ : TempTy S) (Γ : StackTy S) (e : Term sig S) (τ : Ty S)
     (Γ' : StackTy S) : Prop := Typing sig (.expr Θ Γ e τ Γ')
 
-/-- Typing of argument lists. -/
-abbrev HasTypeArgs (sig : Sig) {S : Ctx} (Θ : TempTy S) (Γ : StackTy S) (es : List (Term sig S))
-    (τs : List (Ty S)) (Γ' : StackTy S) : Prop := Typing sig (.args Θ Γ es τs Γ')
+/-- Typing of argument lists (lists of atoms). -/
+abbrev HasTypeArgs (sig : Sig) {S : Ctx} (Θ : TempTy S) (Γ : StackTy S) (as : List (Atom sig S))
+    (τs : List (Ty S)) (Γ' : StackTy S) : Prop := Typing sig (.args Θ Γ as τs Γ')
 
 /-- Value typing `Σ; Δ; Γ; Θ ⊢ v : τ ⇒ Γ`. -/
 abbrev HasTypeV (sig : Sig) {S : Ctx} (Θ : TempTy S) (Γ : StackTy S) (v : Value sig S) (τ : Ty S) :

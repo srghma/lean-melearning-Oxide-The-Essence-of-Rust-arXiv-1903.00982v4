@@ -13,7 +13,7 @@ only once.
 
 Concretely, with a global function
 
-  `fn dup<ϱ>(y : &ϱ uniq u32) -> () { (|| -> () { body })() }`
+  `fn dup<ϱ>(y : &ϱ uniq u32) -> () { let f : τ_f = || -> () { body }; f() }`
 
 whose closure captures `y` twice, as `c₁` and `c₂` (`dcCap`), the body
 
@@ -66,7 +66,7 @@ def dcDeref {Γ : Ctx} (x : TVar Γ) : PExpr Γ := .deref (.place ⟨x, []⟩) [
 `letrgn<r₁> { letrgn<r₂> { let a : &r₁ uniq u32 = &r₁ uniq *c₁;
   let b : &r₂ uniq u32 = &r₂ uniq *c₂; *b := 2; *a := 1; () } }`. -/
 def dcBody : Term sig (vars 0 ++ ([.var, .var] ++ .frame :: [])) :=
-  .letrgn <| .letrgn <|
+  .ret <| .letrgn <| .ret <| .letrgn <|
     .letE (.ref (.conc (.there .here)) .uniq (.sized Ty.u32))
       (.borrow (.there .here) .uniq (dcDeref (.skipRgn (.skipRgn .here)))) <|
     .letE (.ref (.conc (.there .here)) .uniq (.sized Ty.u32))
@@ -76,14 +76,11 @@ def dcBody : Term sig (vars 0 ++ ([.var, .var] ++ .frame :: [])) :=
     .val Value.unit
 
 /-- The closure `|| -> () { … }` capturing `y` twice. -/
-def dcClosure : Term sig dcSig.bodyCtx := .closure [.var, .var] dcCap [] .nil 0 noTys Ty.unit dcBody
-
-/-- The body of `dup`: create the closure and call it. -/
-def dcFnBody : Term sig dcSig.bodyCtx := .app dcClosure {} .none 0 (fun i => i.elim0)
+def dcClosure : Comp sig dcSig.bodyCtx := .closure [.var, .var] dcCap [] .nil 0 noTys Ty.unit dcBody
 
 /-- The opened closure body, in scope `[c₁, c₂, ‡, y, ‡, ϱ]`. -/
 def dcBodyOpen : Term sig (vars 0 ++ ([.var, .var] ++ .frame :: dcSig.bodyCtx)) :=
-  .letrgn <| .letrgn <|
+  .ret <| .letrgn <| .ret <| .letrgn <|
     .letE (.ref (.conc (.there .here)) .uniq (.sized Ty.u32))
       (.borrow (.there .here) .uniq (dcDeref (.skipRgn (.skipRgn .here)))) <|
     .letE (.ref (.conc (.there .here)) .uniq (.sized Ty.u32))
@@ -104,6 +101,13 @@ def dcϱ : In .abs dcB := .there (.there (.there (.there (.there .here))))
 
 /-- `&ϱ uniq u32` in the scope of the opened closure body. -/
 def dcRefB : Ty dcB := .ref (.abs dcϱ) .uniq (.sized Ty.u32)
+
+/-- The body of `dup` in A-normal form: create the closure, bind it to `f`, and call
+it: `let f : (() →^Φ ()) = || -> () { … }; f()`, where the captured frame `Φ` gives
+both copies the type `&ϱ uniq u32`. -/
+def dcFnBody : Term sig dcSig.bodyCtx :=
+  .letE (Ty.closure 0 noTys Ty.unit (.frame [.var, .var] (.var dcRefB (.var dcRefB .nil)))) dcClosure
+    (.ret (.app (.move ⟨.here, []⟩) {} .none 0 (fun i => i.elim0)))
 
 /-- The stack typing in which the closure body starts:
 `c₁ : &ϱ uniq u32, c₂ : &ϱ uniq u32, ‡, y : (&ϱ uniq u32)†, ‡, ϱ`. -/
@@ -238,13 +242,17 @@ unique reference `y`), the body that takes the unique borrows `a = &r₁ uniq *c
 `b = &r₂ uniq *c₂` of the same location, writes through `b` and then through `a`,
 is well typed. -/
 theorem dcBody_typed : HasType sig [] dcΓ0 dcBodyOpen Ty.unit dcΓ0 := by
-  refine' (Typing.letrgn (τ₁ := Ty.unit) (τ := Ty.unit) (h := ?h1) (hpop := ?hpop1) (hτ := rfl))
+  refine' Typing.ret (h := ?r1)
+  case r1 =>
+  refine' Typing.letrgn (τ₁ := Ty.unit) (τ := Ty.unit) (h := ?h1) (hpop := ?hpop1) (hτ := ?hτ1)
   case h1 =>
-    refine' Typing.letrgn (τ₁ := Ty.unit) (τ := Ty.unit) (h := ?h2) (hpop := ?hpop2) (hτ := rfl)
+    refine' Typing.ret (h := ?r2)
+    case r2 =>
+    refine' Typing.letrgn (τ₁ := Ty.unit) (τ := Ty.unit) (h := ?h2) (hpop := ?hpop2) (hτ := ?hτ2)
     case h2 =>
       refine' Typing.letE (τa := _) (τ₁ := _)
         (τ₂ := Ty.unit) (τ := Ty.unit) (h₁ := ?ha) (hr := ?hra) (hnrb := ?hnrba)
-        (h₂ := ?hbodya) (hdead := ?hdeada) (hpop := ?hpopa) (hτ := rfl)
+        (h₂ := ?hbodya) (hdead := ?hdeada) (hpop := ?hpopa) (hτ := ?hτa)
       case ha =>
         refine' Typing.borrow (hr := ?hr) (hnic := ?hnic) (hsafe := ?hsafe) (htc := ?htc)
         case hr => rfl
@@ -257,7 +265,7 @@ theorem dcBody_typed : HasType sig [] dcΓ0 dcBodyOpen Ty.unit dcΓ0 := by
       case hbodya =>
         refine' Typing.letE (τa := _) (τ₁ := _)
           (τ₂ := Ty.unit) (τ := Ty.unit) (h₁ := ?hb) (hr := ?hrb) (hnrb := ?hnrbb)
-          (h₂ := ?hbodyb) (hdead := ?hdeadb) (hpop := ?hpopb) (hτ := rfl)
+          (h₂ := ?hbodyb) (hdead := ?hdeadb) (hpop := ?hpopb) (hτ := ?hτb)
         case hb =>
           refine' Typing.borrow (hr := ?hr) (hnic := ?hnic) (hsafe := ?hsafe) (htc := ?htc)
           case hr => rfl
@@ -274,7 +282,7 @@ theorem dcBody_typed : HasType sig [] dcΓ0 dcBodyOpen Ty.unit dcΓ0 := by
         case hbodyb =>
           refine' Typing.seq (h₁ := ?s1) (h₂ := ?s2)
           case s1 =>
-            refine' Typing.assignDeref (he := ?he) (htc := ?htc) (hr := ?hr) (hsafe := ?hsafe)
+            refine' Typing.assignDeref (ha := ?he) (htc := ?htc) (hr := ?hr) (hsafe := ?hsafe)
             case he => exact Typing.val _ _ _ _ (Typing.vPrim _ _ _)
             case htc => exact dc_placeTy_deref _ (.conc (.there (.there .here))) Ty.u32 .uniq .uniq (.refl _) rfl
             case hr => exact .refl _ _ _
@@ -285,7 +293,7 @@ theorem dcBody_typed : HasType sig [] dcΓ0 dcBodyOpen Ty.unit dcΓ0 := by
           case s2 =>
             refine' Typing.seq (h₁ := ?s3) (h₂ := ?s4)
             case s3 =>
-              refine' Typing.assignDeref (he := ?he) (htc := ?htc) (hr := ?hr) (hsafe := ?hsafe)
+              refine' Typing.assignDeref (ha := ?he) (htc := ?htc) (hr := ?hr) (hsafe := ?hsafe)
               case he => exact Typing.val _ _ _ _ (Typing.vPrim _ _ _)
               case htc =>
                 exact dc_placeTy_deref _ (.conc (.there (.there (.there .here)))) Ty.u32 .uniq .uniq
@@ -296,6 +304,8 @@ theorem dcBody_typed : HasType sig [] dcΓ0 dcBodyOpen Ty.unit dcΓ0 := by
                   (dc_ownSafe_derefAbs' _ (.skipVar (.skipVar (.skipRgn (.skipRgn .here))))
                     dcϱ.there.there.there.there Ty.u32 .uniq _ rfl rfl rfl) rfl
             case s4 =>
+              refine' Typing.ret (h := ?r3)
+              case r3 =>
               refine' Typing.drop (π := ⟨.here, []⟩) (hπ := ?d1) (hd := ?d2) (h := ?d3)
               case d1 => rfl
               case d2 => rfl
@@ -303,7 +313,7 @@ theorem dcBody_typed : HasType sig [] dcΓ0 dcBodyOpen Ty.unit dcΓ0 := by
                 refine' Typing.drop (π := ⟨.there .here, []⟩) (hπ := ?d1) (hd := ?d2) (h := ?d3)
                 case d1 => rfl
                 case d2 => rfl
-                case d3 => exact Typing.val _ _ _ _ (Typing.vPrim _ _ _)
+                case d3 => exact Typing.atom _ _ _ _ _ (Typing.val _ _ _ _ (Typing.vPrim _ _ _))
         all_goals try rfl
       all_goals try rfl
     all_goals try rfl
@@ -342,10 +352,10 @@ theorem dc_closure_other_premises :
 
 /-- The closure capturing `y` twice is not well typed, in any stack typing. -/
 theorem dc_closure_untyped {Θ : TempTy dcSig.bodyCtx} {Γ Γ' : StackTy dcSig.bodyCtx}
-    {τ : Ty dcSig.bodyCtx} : ¬ HasType sig Θ Γ dcClosure τ Γ' := by
+    {τ : Ty dcSig.bodyCtx} : ¬ HasTypeC sig Θ Γ dcClosure τ Γ' := by
   intro h
-  change Typing sig (TyJ.expr Θ Γ dcClosure τ Γ') at h
-  generalize hJ : TyJ.expr Θ Γ dcClosure τ Γ' = J at h
+  change Typing sig (TyJ.comp Θ Γ dcClosure τ Γ') at h
+  generalize hJ : TyJ.comp Θ Γ dcClosure τ Γ' = J at h
   induction h generalizing Γ with
   | drop _ _ _ _ _ _ _ _ _ _ _ ih => cases hJ; exact ih rfl
   | closure _ _ _ _ _ _ _ _ _ _ _ _ _ _ hnodup =>
@@ -357,17 +367,8 @@ theorem dc_closure_untyped {Θ : TempTy dcSig.bodyCtx} {Γ Γ' : StackTy dcSig.b
 theorem dc_fnBody_untyped {Θ : TempTy dcSig.bodyCtx} {Γ Γ' : StackTy dcSig.bodyCtx}
     {τ : Ty dcSig.bodyCtx} : ¬ HasType sig Θ Γ dcFnBody τ Γ' := by
   intro h
-  change Typing sig (TyJ.expr Θ Γ dcFnBody τ Γ') at h
-  generalize hJ : TyJ.expr Θ Γ dcFnBody τ Γ' = J at h
-  induction h generalizing Γ with
-  | drop _ _ _ _ _ _ _ _ _ _ _ ih => cases hJ; exact ih rfl
-  | appFn _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ hf =>
-      cases hJ
-      exact dc_closure_untyped hf
-  | appClosure _ _ _ _ _ _ _ _ _ _ _ hf =>
-      cases hJ
-      exact dc_closure_untyped hf
-  | _ => cases hJ
+  cases h with
+  | letE _ _ _ _ _ _ _ _ _ _ _ _ h₁ => exact dc_closure_untyped h₁
 
 /-- The global function `dup` is not well formed. -/
 theorem dc_fn_not_wf : ¬ FnDefWF (sig := sig) dcSig dcFnBody := by

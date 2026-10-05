@@ -72,29 +72,33 @@ def Cap.subst {Γ Δ : Ctx} (σ : Sub Γ Δ) : {f : Ctx} → Cap Γ f → Cap Δ
 variable {sig : Sig}
 
 mutual
-def Term.subst {Γ Δ : Ctx} (σ : Sub Γ Δ) : Term sig Γ → Term sig Δ
+def Atom.subst {Γ Δ : Ctx} (σ : Sub Γ Δ) : Atom sig Γ → Atom sig Δ
   | .val v => .val (v.subst σ.toTSub)
   | .move π => .move (π.subst σ)
   | .copy p => .copy (p.subst σ)
+def Comp.subst {Γ Δ : Ctx} (σ : Sub Γ Δ) : Comp sig Γ → Comp sig Δ
+  | .atom a => .atom (a.subst σ)
   | .borrow r ω p => .borrow (σ.rgn r) ω (p.subst σ)
-  | .borrowIdx r ω p e => .borrowIdx (σ.rgn r) ω (p.subst σ) (e.subst σ)
-  | .borrowSlice r ω p e₁ e₂ => .borrowSlice (σ.rgn r) ω (p.subst σ) (e₁.subst σ) (e₂.subst σ)
-  | .index p e => .index (p.subst σ) (e.subst σ)
-  | .assign p e => .assign (p.subst σ) (e.subst σ)
-  | .letrgn e => .letrgn (e.subst (σ.lift .rgn))
-  | .letE τ e₁ e₂ => .letE (τ.subst σ.toTSub) (e₁.subst σ) (e₂.subst (σ.lift .var))
-  | .seq e₁ e₂ => .seq (e₁.subst σ) (e₂.subst σ)
+  | .borrowIdx r ω p a => .borrowIdx (σ.rgn r) ω (p.subst σ) (a.subst σ)
+  | .borrowSlice r ω p a₁ a₂ => .borrowSlice (σ.rgn r) ω (p.subst σ) (a₁.subst σ) (a₂.subst σ)
+  | .index p a => .index (p.subst σ) (a.subst σ)
+  | .assign p a => .assign (p.subst σ) (a.subst σ)
   | .closure f c o θ k ps r body => .closure f (c.subst σ) o (θ.subst σ.toTSub) k ps r body
   | .app f b θ k args => .app (f.subst σ) b (θ.subst σ.toTSub) k (fun i => (args i).subst σ)
-  | .ite e₁ e₂ e₃ => .ite (e₁.subst σ) (e₂.subst σ) (e₃.subst σ)
-  | .tuple k es => .tuple k fun i => (es i).subst σ
-  | .array k es => .array k fun i => (es i).subst σ
-  | .forE e₁ e₂ => .forE (e₁.subst σ) (e₂.subst (σ.lift .var))
-  | .whileE e₁ e₂ => .whileE (e₁.subst σ) (e₂.subst σ)
+  | .tuple k as => .tuple k fun i => (as i).subst σ
+  | .array k as => .array k fun i => (as i).subst σ
+  | .inl τ₁ τ₂ a => .inl (τ₁.subst σ.toTSub) (τ₂.subst σ.toTSub) (a.subst σ)
+  | .inr τ₁ τ₂ a => .inr (τ₁.subst σ.toTSub) (τ₂.subst σ.toTSub) (a.subst σ)
   | .abort s => .abort s
-  | .inl τ₁ τ₂ e => .inl (τ₁.subst σ.toTSub) (τ₂.subst σ.toTSub) (e.subst σ)
-  | .inr τ₁ τ₂ e => .inr (τ₁.subst σ.toTSub) (τ₂.subst σ.toTSub) (e.subst σ)
-  | .matchE e e₁ e₂ => .matchE (e.subst σ) (e₁.subst (σ.lift .var)) (e₂.subst (σ.lift .var))
+  | .letrgn e => .letrgn (e.subst (σ.lift .rgn))
+  | .ite a e₁ e₂ => .ite (a.subst σ) (e₁.subst σ) (e₂.subst σ)
+  | .forE a e => .forE (a.subst σ) (e.subst (σ.lift .var))
+  | .whileE e₁ e₂ => .whileE (e₁.subst σ) (e₂.subst σ)
+  | .matchE a e₁ e₂ => .matchE (a.subst σ) (e₁.subst (σ.lift .var)) (e₂.subst (σ.lift .var))
+def Term.subst {Γ Δ : Ctx} (σ : Sub Γ Δ) : Term sig Γ → Term sig Δ
+  | .ret c => .ret (c.subst σ)
+  | .letE τ c e => .letE (τ.subst σ.toTSub) (c.subst σ) (e.subst (σ.lift .var))
+  | .seq c e => .seq (c.subst σ) (e.subst σ)
 def Value.subst {Γ Δ : Ctx} (σ : TSub Γ Δ) : Value sig Γ → Value sig Δ
   | .prim c => .prim c
   | .fn f => .fn f

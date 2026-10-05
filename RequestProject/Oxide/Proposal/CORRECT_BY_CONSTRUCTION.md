@@ -7,6 +7,12 @@ mentioned below are in `Proposal/CorrectByConstruction.lean`. That file builds a
 contains no `sorry`, and it does not change the grammar the rest of the
 development uses.
 
+> **Note (A-normal form).** This note predates the switch of the grammar to
+> A-normal form. Values now enter terms as atoms (`Atom.val`), so `Term.val`
+> below should be read as `Atom.val`. The machine's focus remains a term (a
+> finished computation is `Term.val v`), and the continuation frames for
+> partially evaluated operands (`Cont.appArg`, `Cont.tuple`, …) no longer exist.
+
 Many things are already correct by construction: scopes, top-frame variables,
 sorts of types, move vs. copy, places vs. place expressions, closure scopes,
 typed paths, `MTy` indexed by its declared type, global functions by signature,

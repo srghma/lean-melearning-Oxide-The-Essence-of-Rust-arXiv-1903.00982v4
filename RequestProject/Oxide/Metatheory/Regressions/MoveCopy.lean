@@ -16,8 +16,8 @@ the first use of `x` (typed by `T-Copy`) could therefore step by `E-Move`, which
 overwrote `x` with `dead`, and the program got stuck on `if dead { … }`.  That
 refuted type safety and preservation.
 
-Now every use of a place says whether it moves or copies (`Term.move`,
-`Term.copy`, as `Operand::Move`/`Operand::Copy` in Rust's MIR), `T-Copy` requires a
+Now every use of a place says whether it moves or copies (`Atom.move`,
+`Atom.copy`, as `Operand::Move`/`Operand::Copy` in Rust's MIR), `T-Copy` requires a
 copyable type, and `E-Move` only applies to `move`.  The program is written
 
   `let x : bool = true; copy x; if copy x { () } else { () }`
@@ -36,10 +36,11 @@ variable {sig : Sig}
 def tsX : PExpr [.var] := .place ⟨.here, []⟩
 
 /-- The branch `if copy x { () } else { () }`. -/
-def tsIte : Term sig [.var] := .ite (.copy tsX) (.val Value.unit) (.val Value.unit)
+def tsIte : Comp sig [.var] := .ite (.copy tsX) (.val Value.unit) (.val Value.unit)
 
-/-- The program `let x : bool = true; copy x; if copy x { () } else { () }`. -/
-def tsProg : Program sig := .letE Ty.bool (.val Value.tt) (.seq (.copy tsX) tsIte)
+/-- The program `let x : bool = true; copy x; if copy x { () } else { () }` (already
+in A-normal form). -/
+def tsProg : Program sig := .letE Ty.bool (.atom (.val Value.tt)) (.seq (.atom (.copy tsX)) (.ret tsIte))
 
 /-- The stack typing `x : bool`. -/
 def tsΓ : StackTy [.var] := ⟨.var (.init Ty.bool) .nil, []⟩
@@ -47,7 +48,7 @@ def tsΓ : StackTy [.var] := ⟨.var (.init Ty.bool) .nil, []⟩
 /-- The stack typing `x : bool†`. -/
 def tsΓd : StackTy [.var] := ⟨.var (.dead Ty.bool) .nil, []⟩
 
-theorem ts_copy_x : HasType sig [] tsΓ (.copy tsX) Ty.bool tsΓ := by
+theorem ts_copy_x : HasTypeA sig [] tsΓ (.copy tsX) Ty.bool tsΓ := by
   refine Typing.copy [] tsΓ tsX [⟨.shrd, .place ⟨.here, []⟩⟩] Ty.bool [] ?_
     (PlaceTy.place ⟨.here, []⟩ Ty.bool rfl) rfl
   refine OwnSafe.place (π := ⟨.here, []⟩) [] ?_
@@ -56,10 +57,10 @@ theorem ts_copy_x : HasType sig [] tsΓ (.copy tsX) Ty.bool tsΓ := by
     Ty.closureLoans, Ty.bool, MTy.init] at h
 
 theorem ts_unit_drop : HasType sig [] tsΓ (.val Value.unit) Ty.unit tsΓd :=
-  Typing.drop [] tsΓ tsΓd tsΓd ⟨.here, []⟩ Ty.bool Ty.unit _ rfl rfl
-    (Typing.val _ _ _ _ (Typing.vPrim _ _ .unit))
+  Typing.ret _ _ _ _ _ <| Typing.drop [] tsΓ tsΓd tsΓd ⟨.here, []⟩ Ty.bool Ty.unit _ rfl rfl
+    (Typing.atom _ _ _ _ _ (Typing.val _ _ _ _ (Typing.vPrim _ _ .unit)))
 
-theorem ts_ite : HasType sig [] tsΓ tsIte Ty.unit tsΓd := by
+theorem ts_ite : HasTypeC sig [] tsΓ tsIte Ty.unit tsΓd := by
   refine Typing.ite [] tsΓ tsΓ tsΓd tsΓd tsΓd tsΓd tsΓd _ _ _ Ty.unit Ty.unit Ty.unit
     ts_copy_x ts_unit_drop ts_unit_drop (.inl rfl) (.refl _ _ _) (.refl _ _ _) ?_
   simp [tsΓd, StackTy.union, SlotTys.union]
@@ -68,13 +69,21 @@ theorem ts_ite : HasType sig [] tsΓ tsIte Ty.unit tsΓd := by
 typed. -/
 theorem ts_typed : HasType sig [] StackTy.empty tsProg Ty.unit StackTy.empty := by
   refine Typing.letE [] StackTy.empty StackTy.empty StackTy.empty StackTy.empty tsΓd Ty.bool Ty.bool
-    Ty.unit Ty.unit _ _ (Typing.val _ _ _ _ (Typing.vPrim _ _ (.bool true))) (.refl _ _ _)
-    (by simp [Ty.bool, Ty.frgns]) ?_ rfl rfl rfl
-  exact Typing.seq [] tsΓ tsΓ tsΓd _ _ Ty.bool Ty.unit ts_copy_x ts_ite
+    Ty.unit Ty.unit _ _ (Typing.atom _ _ _ _ _ (Typing.val _ _ _ _ (Typing.vPrim _ _ (.bool true))))
+    (.refl _ _ _) (by simp [Ty.bool, Ty.frgns]) ?_ rfl rfl rfl
+  exact Typing.seq [] tsΓ tsΓ tsΓd _ _ Ty.bool Ty.unit (Typing.atom _ _ _ _ _ ts_copy_x)
+    (Typing.ret _ _ _ _ _ ts_ite)
+
+/-- Evaluating a `copy` atom never changes the stack: it only reads. -/
+theorem EvalAtom.copy_inv {S : Ctx} {σ σ' : Stack sig S} {p : PExpr S} {v : Value sig S}
+    (h : EvalAtom σ (.copy p) v σ') : σ' = σ := by
+  cases h
+  rfl
 
 /-- A `copy` step never changes the stack: it only reads. -/
 theorem Step.copy_inv {G : GlobalEnv sig} {S : Ctx} {σ : Stack sig S} {p : PExpr S} {κ : Cont sig S}
-    {c' : Config sig} (h : Step G ⟨S, σ, .copy p, κ⟩ c') : ∃ v, c' = ⟨S, σ, .val v, κ⟩ := by
+    {c' : Config sig} (h : Step G ⟨S, σ, .ret (.atom (.copy p)), κ⟩ c') :
+    ∃ v, c' = ⟨S, σ, .val v, κ⟩ := by
   cases h
   exact ⟨_, rfl⟩
 
@@ -86,9 +95,7 @@ theorem ts_runs (G : GlobalEnv sig) :
   refine .step _ _ _ (Step.seqPush _ _ _ _) ?_
   refine .step _ _ _ (Step.copy _ tsX _ (.place ⟨.here, []⟩) Value.tt rfl rfl) ?_
   refine .step _ _ _ (Step.seq _ _ _ _) ?_
-  refine .step _ _ _ (Step.itePush _ _ _ _ _) ?_
-  refine .step _ _ _ (Step.copy _ tsX _ (.place ⟨.here, []⟩) Value.tt rfl rfl) ?_
-  refine .step _ _ _ (Step.iteTrue _ _ _ _) ?_
+  refine .step _ _ _ (Step.iteTrue _ _ _ _ _ _ (EvalAtom.copy _ tsX (.place ⟨.here, []⟩) _ rfl rfl)) ?_
   refine .step _ _ _ (Step.popVar _ _ Value.unit _ rfl) ?_
   exact .refl _
 

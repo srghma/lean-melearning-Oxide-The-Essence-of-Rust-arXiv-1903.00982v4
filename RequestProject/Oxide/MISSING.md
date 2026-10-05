@@ -14,7 +14,7 @@ ported: the progress proof and the supporting lemmas of `proofs.tex`.
 | Canonical forms | proved (`canonical_forms`) |
 | Type safety from progress and preservation | proved (`type_safety_of_progress_preservation`) |
 | Progress (for the machine) | **stated, open** (`Progress G`). The former counterexample (a closure whose body mentions a region missing from its type) is now ill typed (`tp_closure_untyped`, `tp_stuck_untyped`) |
-| Preservation | **stated, open** (`Preservation G`). The former counterexample (`E-Move` on a copyable place) cannot arise: `E-Move` only applies to `Term.move` (`Metatheory/Regressions/MoveCopy.lean`) |
+| Preservation | **stated, open** (`Preservation G`). The former counterexample (`E-Move` on a copyable place) cannot arise: `E-Move` only applies to `Atom.move` (`Metatheory/Regressions/MoveCopy.lean`) |
 | Type safety | **stated, open** (`TypeSafety G`); both former counterexample programs are handled (`ts_runs`, `tp_prog_untyped`) |
 
 The earlier refutations (`not_progress`, `not_preservation`, `not_type_safety`)

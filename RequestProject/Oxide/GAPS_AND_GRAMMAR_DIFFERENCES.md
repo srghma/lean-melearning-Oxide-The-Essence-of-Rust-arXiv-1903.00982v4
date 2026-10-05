@@ -10,7 +10,7 @@ and `MISSING.md`.
 | Paper | Lean | Comment |
 | --- | --- | --- |
 | Named variables `x` | `TVar Γ`: a typed index into the current frame | It cannot cross a frame boundary, so a function body cannot name its caller's variables. |
-| `letrgn<r> { e }` binds a named concrete region | `Term.letrgn (e : Term (.rgn :: Γ))` | The region is a binder of the scope. |
+| `letrgn<r> { e }` binds a named concrete region | `Comp.letrgn (e : Term (.rgn :: Γ))` | The region is a binder of the scope. |
 | Regions `ρ ::= ϱ \| r` | `Region.abs (i : In .abs Γ) \| Region.conc (r : In .rgn Γ)` | Same two forms as the paper. No locally nameless opening. |
 | Named `α`, `φ`, `ϱ` in signatures | binders of the scope, `Binders.ctx = ᾱ ++ ϱ̄ ++ φ̄` | `Ty.fn b …` binds `b.ctx` in its parameters, result and environment. |
 | Type environment `Δ` | entries `.fvar`/`.abs`/`.tvar` of the stack typing, plus `StackTy.outlives : List (In .abs S × In .abs S)` | One telescope for `Δ` and `Γ`. |
@@ -24,13 +24,16 @@ and `MISSING.md`.
 
 | Paper | Lean | Comment |
 | --- | --- | --- |
-| One expression grammar; values are a sub-grammar of runtime expressions | `Value Γ` is separate, embedded by `Term.val` | |
-| `&r ω p`: concrete regions only | `Term.borrow (r : In .rgn Γ) …` | Enforced by the syntax. |
+| One expression grammar, subexpressions anywhere | **A-normal form**: atoms `Atom` (`val`, `move`, `copy`), computations `Comp` (one operation on atoms, or a control construct with term blocks) and terms `Term` (`letE τ c e`, `seq c e`, `ret c`) | Every operand is an atom and every intermediate result is named by a `let`. Control constructs are computations, so `let x : τ = if a { e₁ } else { e₂ }; e` is allowed (strict A-normal form would need join points). The condition of `while` is a term. |
+| One expression grammar; values are a sub-grammar of runtime expressions | `Value Γ` is separate, embedded by `Atom.val` (`Term.val v` abbreviates `ret (atom (val v))`) | |
+| `&r ω p`: concrete regions only | `Comp.borrow (r : In .rgn Γ) …` | Enforced by the syntax. |
+| `&r ω p[e]`, `&r ω p[e₁..e₂]`, `p[e]`, `p := e` | `Comp.borrowIdx r ω p (a : Atom Γ)`, `Comp.borrowSlice r ω p a₁ a₂`, `Comp.index p a`, `Comp.assign p a` | Operands are atoms. |
+| `if e₁ { e₂ } else { e₃ }`, `for x in e₁ { e₂ }`, `match e { … }` | `Comp.ite (a : Atom Γ) e₂ e₃`, `Comp.forE a e`, `Comp.matchE a e₁ e₂` | The scrutinee is an atom; the blocks are terms. |
 | `let x : τ^SI`, closure parameters `τ^SI`, `Left::<τ^SI, τ^SI>` | `Ty Γ` | `Ty` only contains sized initialized types. |
-| `\|x₁:τ₁, …, xₖ:τₖ\| → τ_r { e }` | `Term.closure f (c : Cap Γ f) o (θ : Inst o Γ) k (params : Fin k → Ty o) ret (body : Term (vars k ++ (f ++ .frame :: o)))` | The body is written in its own scope: parameters (parameter `i` is the `i`-th most recent binder), captured frame `f` (listed by `c`), and outer binders `o` with entries `θ`. |
-| A place used as an operand `p` | `Term.move (π : TPlace Γ)` or `Term.copy (p : PExpr Γ)` | Move or copy is explicit, as in Rust's MIR. |
-| `e_f::<Φ̄, ρ̄, τ̄>(e₁, …, eₙ)` | `Term.app f b (θ : TArgs b Γ) k (args : Fin k → _)` | `TArgs` bundles `Fin b.nφ → _`, `Fin b.nϱ → _`, `Fin b.nα → _`; the arities match the binders by construction. |
-| `(e₁, …, eₙ)`, `[e₁, …, eₙ]` | `Term.tuple k (es : Fin k → Term Γ)`, `Term.array k es` | |
+| `\|x₁:τ₁, …, xₖ:τₖ\| → τ_r { e }` | `Comp.closure f (c : Cap Γ f) o (θ : Inst o Γ) k (params : Fin k → Ty o) ret (body : Term (vars k ++ (f ++ .frame :: o)))` | The body is written in its own scope: parameters (parameter `i` is the `i`-th most recent binder), captured frame `f` (listed by `c`), and outer binders `o` with entries `θ`. |
+| A place used as an operand `p` | `Atom.move (π : TPlace Γ)` or `Atom.copy (p : PExpr Γ)` | Move or copy is explicit, as in Rust's MIR. |
+| `e_f::<Φ̄, ρ̄, τ̄>(e₁, …, eₙ)` | `Comp.app (f : Atom Γ) b (θ : TArgs b Γ) k (args : Fin k → Atom Γ)` | `TArgs` bundles `Fin b.nφ → _`, `Fin b.nϱ → _`, `Fin b.nα → _`; the arities match the binders by construction. |
+| `(e₁, …, eₙ)`, `[e₁, …, eₙ]` | `Comp.tuple k (as : Fin k → Atom Γ)`, `Comp.array k as` | |
 | Runtime forms `framed e`, `shift e`, `shiftprov e` | none | The machine's continuation frames `popFrame k f`, `popVar` and `popRgn` take their place. |
 
 ## Values
@@ -54,21 +57,25 @@ and `MISSING.md`.
 
 | Paper | Lean |
 | --- | --- |
-| `𝓡[n₁..n₂]` is inclusive | `Referent.slice R start len`; the concrete syntax `p[e₁..e₂]` is half-open `[e₁, e₂)` |
+| `𝓡[n₁..n₂]` is inclusive | `Referent.slice R start len`; the concrete syntax `p[a₁..a₂]` is half-open `[a₁, a₂)` |
 | `𝓡[n].q` | `Referent.index R n q` |
 | `WF-RefIndexSlice`/`WF-RefSliceSlice` have no bound check | bound check against the designated slice |
 
 ## Evaluation contexts
 
-Evaluation contexts are the machine's continuation frames (`Cont`):
-- `while` unfolds directly;
-- `for x in E { e }` and `[v̄, E, ê]` are included, as in the tech-report grammar;
-- `letrgn` pushes a region marker together with a `popRgn` frame.
+Evaluation contexts are the machine's continuation frames (`Cont`). Since terms
+are in A-normal form, operands are atoms, evaluated in one go when their
+computation reduces (`EvalAtom`, `EvalAtoms`), so no frame for a partially
+evaluated operand is needed. The frames are:
+- `let x : τ = □; e` and `□; e`;
+- `while □ { e₂ }`, holding the condition being evaluated;
+- `popVar`, `popRgn` and `popFrame k f` (`letrgn` pushes a region marker together
+  with a `popRgn` frame).
 
 ## Judgments (presentation only)
 
 The typing judgments are one inductive family, `Typing`, indexed by `TyJ`. It
-covers expressions, argument lists, values, maybe-unsized values, maybe-dead
+covers atoms, computations, terms, argument lists (of atoms), values, maybe-unsized values, maybe-dead
 values, value lists and captured environments. Outlives (`OutlivesJ`) and
 rewriting (`RewriteJ`) are handled the same way. Continuations get their own
 judgment, `ContOK`.

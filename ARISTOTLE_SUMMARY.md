@@ -1,3 +1,38 @@
+# Summary of changes for run a86fc9a5-f7b8-4dcc-a8e2-6e5d770abad2
+The Oxide grammar is now in A-normal form. `lake build` succeeds with no `sorry` and no new axioms. The theorems listed below use only `propext`, `Classical.choice` and `Quot.sound`.
+
+**The grammar** (`Syntax/Terms.lean`) has three mutually inductive levels, all indexed by the signature and the scope. A closed program is still a `Term sig []`.
+```
+a ::= v | move π | copy p                                        (Atom)
+c ::= a | &r ω p | &r ω p[a] | &r ω p[a₁..a₂] | p[a] | p := a
+    | closure | a::<…>(ā) | (ā) | [ā] | Left(a) | Right(a) | abort!
+    | letrgn<r> { e } | if a { e } else { e } | for x in a { e }
+    | while e { e } | match a { … }                               (Comp)
+e ::= let x : τ = c; e | c; e | c                                (Term)
+```
+- Every operand is an atom, and every intermediate result is named by a `let`.
+- The right-hand side of a `let` is a computation, never another `let` or a sequence.
+- **Design choice:** `if`, `match`, `for`, `while` and `letrgn` count as computations, so they can be bound by a `let`. This is the usual relaxed A-normal form for a language with blocks. Strict A-normal form would need join points.
+- The condition of `while` is a term, because it is re-evaluated on every iteration.
+- `Term.val v` is shorthand for a finished value.
+
+**What changed with it:**
+- **Renaming, strengthening, substitution:** written for all three levels.
+- **Typing** (`Typechecking/Typing.lean`): the judgment is split into atoms (`HasTypeA`), computations (`HasTypeC`) and terms (`HasType`). The rules are the paper's, with each operand premise now about an atom. The drop rule applies before any computation.
+- **Machine** (`OperationalSemantics/Machine.lean`): the atoms of a computation are evaluated left to right in one step (`EvalAtom`, `EvalAtoms`), so each computation reduces in one step. The only continuation frames left are `let`, `seq`, `while` and the three pops. The frames for half-evaluated arguments, tuples and arrays are gone. `Continuations.lean` follows suit.
+- **Concrete syntax** (`ConcreteSyntax/Notation.lean`): `[OXIDE| … ]` accepts only programs in A-normal form. A non-atomic operand, or a `let` in operand position, is rejected with a message asking you to bind it with `let` first. It can't convert programs automatically, because every `let` needs a type annotation.
+
+**Updated and re-checked:**
+- All examples in `ConcreteSyntax/Examples.lean`, rewritten in A-normal form. There is a new machine run where `(x, 1)` is built in a single step, and a check that a nested tuple operand is rejected.
+- The three regression files:
+  - move/copy: the program was already in A-normal form; `ts_typed` and `ts_runs` are proved, plus a new `EvalAtom.copy_inv`.
+  - closure scopes: `tp_prog_untyped` and `tp_stuck_untyped` are proved.
+  - duplicate captures: the closure is now bound by a `let` before the call (`let f = || …; f()`); `dcBody_typed`, `dc_closure_untyped`, `dc_fn_not_wf` and `dcG_not_wf` are proved.
+- `canonical_forms` and `type_safety_of_progress_preservation` still hold. The value inversion lemma `HasType.val_inv` is proved.
+- `README.md`, `READING_GUIDE.md`, `GAPS_AND_GRAMMAR_DIFFERENCES.md`, `MISSING.md` and the file headers describe the new grammar. I updated the Properties table to match.
+
+As before, progress, preservation and type safety are stated but not proved.
+
 # Summary of changes for run 24e9f7c8-78b8-4882-a1ee-fa87b9fb325c
 You were right: duplicate captures let two unique references alias. I built a concrete counterexample in Lean, then fixed the typing rule. `lake build` succeeds with no `sorry` and no new axioms; the key theorems use only `propext`, `Classical.choice` and `Quot.sound`.
 

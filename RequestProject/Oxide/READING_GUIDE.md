@@ -33,8 +33,11 @@ The indices are typed:
 - `TVar Γ` points at a term variable of the current frame.
 
 For example:
-- `let x : τ = e₁; e₂` is `Term.letE τ e₁ e₂` with `e₂ : Term (.var :: Γ)`;
-- `letrgn<r> { e }` is `Term.letrgn e` with `e : Term (.rgn :: Γ)`;
+- terms are in A-normal form: atoms `Atom` (values, moves, copies), computations
+  `Comp` (one operation on atoms, or a control construct) and terms `Term`;
+- `let x : τ = c; e` is `Term.letE τ c e` with `c : Comp Γ` and
+  `e : Term (.var :: Γ)`;
+- `letrgn<r> { e }` is `Comp.letrgn e` with `e : Term (.rgn :: Γ)`;
 - terms are also indexed by a global signature `sig` (the declared functions), and
   a closed program is a `Term sig []`.
 
@@ -54,21 +57,21 @@ term it denotes.
 | (scopes; the paper uses names) | `Syntax/Scopes.lean` | `Bnd`, `Ctx`, `In`, `TVar`, renamings `TRen`/`Ren`, partial renamings (strengthening) `PRen`/`PRenT`, runtime scopes `Ctx.Runtime` |
 | §3.1 "Places and Place Expressions", "Annotations for References"; referents from §3.6 | `Syntax/Places.lean` | `Own`, `APlace`/`TPlace` (root and projection path), `APExpr`/`PExpr` (`place π` or `deref p q`), `PCtx`, `Loan`, `BaseTy`, `Prim`, `Referent` |
 | §3.2 *Types in Oxide*; frame expressions from §3.3 | `Syntax/Types.lean` | `Region`, `Binders`, `Ty`/`XTy`/`FrameExpr`/`FrameTy` (mutual), `TyPath`, `MTy.Of`, `MTy` |
-| §3.1 "Expressions"; values from §3.6 | `Syntax/Terms.lean` | `FnSig`, `Sig`, `FnIdx`, `Cap`, `Term`, `Value`, `Env`, `Program`, `Defs`, `GlobalEnv`, `FnDef` |
+| §3.1 "Expressions"; values from §3.6 | `Syntax/Terms.lean` | `FnSig`, `Sig`, `FnIdx`, `Cap`, `Atom`, `Comp`, `Term`, `Value`, `Env`, `Program`, `Defs`, `GlobalEnv`, `FnDef` |
 | §3.3 *Environments* (Γ with Δ folded in, Θ) | `Syntax/Environments.lean` | `SlotTys`, `StackTy`, `TempTy`, total lookups, `push*`/`pop*` |
 | §3.6 runtime stacks; the machine's continuations | `Syntax/Runtime.lean` | `Slots`, `Stack`, `Cont`, `Config`, `Config.init` |
 | (type-level substitutions, call type arguments, closure entries) | `Syntax/TypeSubst.lean` | `TSub`, `TArgs`, `Ty.inst`, `Entry`, `Inst` |
-| (instantiating bodies) | `Metafunctions/Substitution.lean` | `Sub`, `Term.subst`, `Term.openBody`, `Inst.closureTy`, `GlobalEnv.instBody` |
+| (instantiating bodies) | `Metafunctions/Substitution.lean` | `Sub`, `Atom.subst`/`Comp.subst`/`Term.subst`, `Term.openBody`, `Inst.closureTy`, `GlobalEnv.instBody` |
 | App. C, metafunctions on types | `Metafunctions/Types.lean` | `Ty.frgns`, `Ty.noncopyable`, `Ty.copyable`, `MTy.explode` |
 | App. C, places | `Metafunctions/Places.lean` | `APExpr.base`, `APlace.IsPrefix`, `APlace.Disjoint`, `APExpr.splitDeref` |
 | App. C, stack typings | `Metafunctions/StackTypings.lean` | `resolve` (to a `TyPath`), `placeTy`, `setPlaceTy`, `gcLoans`, `NotReborrowed`, `NotInClosure`, `capturedFrame`, `killNC` |
 | App. C, stacks | `Metafunctions/Stacks.lean` | `VPath` (total `get`/`set`), `Referent.resolve`, `Env.ofCap`, `Stack.read`, `Stack.write`, `Stack.evalPlace`, `Stack.push*`, `Stack.popL`, `Stack.popFrame` |
 | §3.4 *Region-Based Alias Management*; App. B.3 | `AliasManagement/OwnershipSafety.lean` | `PlaceTy` (`TC-*`), `OwnSafe` (`O-*`) |
 | §3.5 "Region Rewriting and Outlives"; App. B.2 | `Typechecking/RegionRewriting.lean` | `Mode`, `OutlivesJ`/`Outlives`, `RewriteJ`/`Rewrite` |
-| §3.5 *Typechecking Oxide Programs*; App. B.1, B.4, B.5 | `Typechecking/Typing.lean` | `RefTy`, `TyWF`, `EnvWF`, `StackWF`, **`Typing`**, `HasType`, `HasTypeV` |
+| §3.5 *Typechecking Oxide Programs*; App. B.1, B.4, B.5 | `Typechecking/Typing.lean` | `RefTy`, `TyWF`, `EnvWF`, `StackWF`, **`Typing`**, `HasTypeA`, `HasTypeC`, `HasType`, `HasTypeV` |
 | App. B.1, B.5 | `Typechecking/Validity.lean` | `StoreValid`, `FnDefWF`, `GlobalWF` |
 | (typing the machine's continuations) | `Typechecking/Continuations.lean` | `ContOK`, `ConfigTyped` |
-| §3.6 *Operational Semantics*; App. D | `OperationalSemantics/Machine.lean` | `Call`, **`Step`**, `Steps`, `Config.IsFinal` |
+| §3.6 *Operational Semantics*; App. D | `OperationalSemantics/Machine.lean` | `EvalAtom`, `EvalAtoms`, `Call`, **`Step`**, `Steps`, `Config.IsFinal` |
 | §3.7; App. E (statements) | `Metatheory/Statements.lean` | `canonical_forms`, `Progress`, `Preservation`, `TypeSafety`, `type_safety_of_progress_preservation` |
 | regressions (former counterexamples) | `Metatheory/Regressions/MoveCopy.lean` | `ts_typed`, `Step.copy_inv`, `ts_runs`, `ts_final` |
 | | `Metatheory/Regressions/ClosureScopes.lean` | `tp_not_covered`, `tp_closure_untyped`, `tp_prog_untyped`, `tp_closure_value_untyped`, `tp_stuck_untyped` |

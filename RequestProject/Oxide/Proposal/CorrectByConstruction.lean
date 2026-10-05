@@ -25,7 +25,7 @@ variable {sig : Sig}
 /-- A *source* program containing a raw pointer to a local variable, bypassing
 `&r ω p` and the loan machinery.  `ptr` is a runtime-only form in the paper. -/
 def srcWithPtr : Program sig :=
-  .letE .u32 (.val (.num 5)) (.val (.ptr (.place ⟨.here, []⟩)))
+  .letE .u32 (.atom (.val (.num 5))) (.val (.ptr (.place ⟨.here, []⟩)))
 
 /-- A source program containing the runtime value `dead`. -/
 def srcWithDead : Program sig := .val .dead

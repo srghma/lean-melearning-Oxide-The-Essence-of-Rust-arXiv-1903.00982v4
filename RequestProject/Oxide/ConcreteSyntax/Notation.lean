@@ -7,7 +7,8 @@ public import RequestProject.Oxide.Syntax.Runtime
 # Oxide: concrete syntax `[OXIDE| … ]`
 
 A concrete-syntax embedding of Oxide in Lean.  `[OXIDE| e ]` elaborates the
-Oxide expression `e` to a closed, scope-indexed term `Oxide.Term sig []`; named
+Oxide expression `e` (in A-normal form) to a closed, scope-indexed term
+`Oxide.Term sig []`; named
 variables, regions, type variables and frame variables are resolved to typed de
 Bruijn indices at macro-expansion time (`In.there (… In.here)` for any binder,
 `TVar.skipVar`/`TVar.skipRgn` chains for term variables).  An ill-scoped program
@@ -22,9 +23,21 @@ names of the declared functions are listed, in signature order, as
 `[OXIDE{f, g, …}| e ]` and `[OXIDE_FN{f, g, …}| … ]`; any other identifier that
 is not a bound variable is rejected.
 
+A-normal form: the concrete syntax follows the grammar of terms.  A term is a
+sequence of `let x : τ = c;` and `c;` ending with a computation; the right-hand
+side of a `let` and each statement is a computation (not a `let` or a sequence);
+and every operand (of a borrow index, an assignment, a call, a tuple, an array,
+an injection, and the scrutinee of `if`, `for` and `match`) must be an atom: a
+constant, a place, a global function name, `copy!(p)`, `move!(p)` or `val!(v)`.
+Anything else is rejected at expansion time with a message asking to bind the
+subexpression with `let` first.  (An automatic translation into A-normal form is
+not possible here, since a `let` needs a type annotation.)  The blocks of
+`letrgn`, `if`, `for`, `while`, `match` and closures, and the condition of
+`while`, are terms.
+
 Moves and copies: a bare place without dereference (`x`, `x.1`) elaborates to
-`Term.move` (which takes a `TPlace`, so it cannot dereference); a place through a
-dereference (`*r`, `(*r).0`) to `Term.copy`.  `copy!(p)` and `move!(p)` choose
+`Atom.move` (which takes a `TPlace`, so it cannot dereference); a place through a
+dereference (`*r`, `(*r).0`) to `Atom.copy`.  `copy!(p)` and `move!(p)` choose
 explicitly (`move!` rejects a place with a dereference).
 
 Closures are written in their own scope: the translation computes which
@@ -52,14 +65,16 @@ Grammar:
   entries have empty loan sets);
 * place expressions: `x`, `*p`, `p.n`, `(p)` (nested projections are written
   `(p.0).1`, since `0.1` is lexed as a decimal literal);
-* expressions: `()`, `n`, `true`, `false`, `p`, `` &`r ω p ``, `` &`r ω p[e] ``,
-  `` &`r ω p[e₁..e₂] `` (borrows name a *concrete* region, bound by `letrgn`),
-  `p[e]`, `p := e`, `` letrgn<`r> { e } ``, `let x : τ = e₁; e₂`, `e₁; e₂`,
-  `|x₁ : τ₁, …| -> τ { e }`, `|| -> τ { e }`, `f(e₁, …)`,
-  `` f::<Φ, …, `a, …; τ, …>(e₁, …) ``, `if e { e₁ } else { e₂ }`, `(e,)`,
-  `(e₁, …, eₙ)`, `[e₁, …]`, `for x in e { e' }`, `while e { e' }`,
-  `abort!("msg")`, `Left::<τ₁, τ₂>(e)`, `Right::<τ₁, τ₂>(e)`,
-  `match e { Left(x) => e₁, Right(y) => e₂ }` and blocks `{ e }`.
+* atoms `a`: `()`, `n`, `true`, `false`, places `p`, global function names,
+  `copy!(p)`, `move!(p)`, `val!(v)`;
+* computations `c`: atoms, `` &`r ω p ``, `` &`r ω p[a] ``, `` &`r ω p[a₁..a₂] ``
+  (borrows name a *concrete* region, bound by `letrgn`), `p[a]`, `p := a`,
+  `` letrgn<`r> { e } ``, `|x₁ : τ₁, …| -> τ { e }`, `|| -> τ { e }`,
+  `a(a₁, …)`, `` a::<Φ, …, `a, …; τ, …>(a₁, …) ``, `if a { e₁ } else { e₂ }`,
+  `(a,)`, `(a₁, …, aₙ)`, `[a₁, …]`, `for x in a { e }`, `while e₁ { e₂ }`,
+  `abort!("msg")`, `Left::<τ₁, τ₂>(a)`, `Right::<τ₁, τ₂>(a)`,
+  `match a { Left(x) => e₁, Right(y) => e₂ }`, and blocks `{ c }`;
+* terms `e`: `let x : τ = c; e`, `c; e`, `c`, and blocks `{ e }`.
   An identifier that is not a bound variable denotes a global function, which
   must be listed in `[OXIDE{…}| … ]`.  `copy!(p)` and `move!(p)` mark a use of a
   place explicitly.
@@ -573,6 +588,38 @@ def mkEntry (s : Scope) (b : Bind) : TransM Lean.Term := do
   | .fvar => `(Oxide.FrameExpr.var $i)
   | _ => Macro.throwUnsupported
 
+/-- The atom denoted by an expression, if it is one: a constant, a place (a move,
+or a copy if it goes through a dereference), `copy!(p)`, `move!(p)`, `val!(v)`, or
+a global function name. -/
+partial def transAtom? : TSyntax `oxide → TransM (Option Lean.Term)
+  | `(oxide| $n:num) => do return some (← `(Oxide.Atom.val $(← mkNum n)))
+  | `(oxide| ( )) => do return some (← `(Oxide.Atom.val Oxide.Value.unit))
+  | `(oxide| $p:oxide_place) => do
+      match p with
+      | `(oxide_place| $x:ident) =>
+          if (lookup (← read) x.getId (· == .var)).isSome then
+            return some (← `(Oxide.Atom.move $(← mkTPlace p)))
+          else match x.getId with
+            | `true => return some (← `(Oxide.Atom.val Oxide.Value.tt))
+            | `false => return some (← `(Oxide.Atom.val Oxide.Value.ff))
+            | _ => return some (← `(Oxide.Atom.val (Oxide.Value.fn $(← transGlobal x))))
+      | _ =>
+          if ← hasDeref p then return some (← `(Oxide.Atom.copy $(← mkPlace p)))
+          else return some (← `(Oxide.Atom.move $(← mkTPlace p)))
+  | `(oxide| copy!( $p:oxide_place )) => do return some (← `(Oxide.Atom.copy $(← mkPlace p)))
+  | `(oxide| move!( $p:oxide_place )) => do return some (← `(Oxide.Atom.move $(← mkTPlace p)))
+  | `(oxide| val!( $v:oxide_val )) => do return some (← `(Oxide.Atom.val $(← transVal v)))
+  | _ => return none
+
+/-- An operand, which must be an atom (A-normal form). -/
+partial def transAtom (stx : TSyntax `oxide) : TransM Lean.Term := do
+  match ← transAtom? stx with
+  | some a => pure a
+  | none =>
+    let msg := "A-normal form: an operand must be an atom (a constant, a place, `copy!(p)`, \
+      `move!(p)` or `val!(v)`); bind this expression to a variable with `let` first"
+    Macro.throwErrorAt stx msg
+
 mutual
 /-- Closures `|x₁ : τ₁, …| -> τ { e }`: the captured frame consists of the
 variables of the current frame that the body uses; the outer binders of the
@@ -584,7 +631,7 @@ partial def transClosure (ps : List (Name × TSyntax `oxide_ty)) (r : TSyntax `o
   let (_, used) ← collectUsed do
     let _ ← ps.mapM fun p => transTy p.2
     let _ ← transTy r
-    withParams (ps.map (·.1)) (transExpr e)
+    withParams (ps.map (·.1)) (transTerm e)
   let top := s.takeWhile fun b => b.sort == .var || b.sort == .rgn
   let fBinds := top.filter fun b => b.sort == .var && used.contains b.id
   let oBinds := s.filter fun b =>
@@ -606,54 +653,45 @@ partial def transClosure (ps : List (Name × TSyntax `oxide_ty)) (r : TSyntax `o
     let tys ← ps.mapM fun p => transTy p.2
     let ret ← transTy r
     let body ← withBinders (fScope ++ [(Name.anonymous, .frame)]) <|
-      withParams (ps.map (·.1)) (transExpr e)
+      withParams (ps.map (·.1)) (transTerm e)
     pure (tys, ret, body)
-  `(Oxide.Term.closure [$(fShape.toArray),*] $cap [$(oShape.toArray),*] $inst
+  `(Oxide.Comp.closure [$(fShape.toArray),*] $cap [$(oShape.toArray),*] $inst
       $(quote ps.length) $(← mkVec tys) $ret $body)
 
-partial def transExpr : TSyntax `oxide → TransM Lean.Term
-  | `(oxide| $n:num) => do `(Oxide.Term.val $(← mkNum n))
-  | `(oxide| ( )) => `(Oxide.Term.val Oxide.Value.unit)
-  | `(oxide| $p:oxide_place) => do
-      match p with
-      | `(oxide_place| $x:ident) =>
-          if (lookup (← read) x.getId (· == .var)).isSome then `(Oxide.Term.move $(← mkTPlace p))
-          else match x.getId with
-            | `true => `(Oxide.Term.val Oxide.Value.tt)
-            | `false => `(Oxide.Term.val Oxide.Value.ff)
-            | _ => do `(Oxide.Term.val (Oxide.Value.fn $(← transGlobal x)))
-      | _ =>
-          if ← hasDeref p then `(Oxide.Term.copy $(← mkPlace p))
-          else `(Oxide.Term.move $(← mkTPlace p))
-  | `(oxide| copy!( $p:oxide_place )) => do `(Oxide.Term.copy $(← mkPlace p))
-  | `(oxide| move!( $p:oxide_place )) => do `(Oxide.Term.move $(← mkTPlace p))
+/-- Computations: one operation on atoms, or a control construct whose blocks are
+terms. -/
+partial def transComp (stx : TSyntax `oxide) : TransM Lean.Term := do
+  if let some a ← transAtom? stx then
+    return ← `(Oxide.Comp.atom $a)
+  match stx with
   | `(oxide| & $r:oxide_rgn $o:ident $p:oxide_place) => do
-      `(Oxide.Term.borrow $(← transConcRgn r) $(← transOwn o) $(← mkPlace p))
+      `(Oxide.Comp.borrow $(← transConcRgn r) $(← transOwn o) $(← mkPlace p))
   | `(oxide| & $r:oxide_rgn $o:ident $p:oxide_place [ $e:oxide ]) => do
-      `(Oxide.Term.borrowIdx $(← transConcRgn r) $(← transOwn o) $(← mkPlace p) $(← transExpr e))
+      `(Oxide.Comp.borrowIdx $(← transConcRgn r) $(← transOwn o) $(← mkPlace p) $(← transAtom e))
   | `(oxide| & $r:oxide_rgn $o:ident $p:oxide_place [ $e₁:oxide .. $e₂:oxide ]) => do
-      `(Oxide.Term.borrowSlice $(← transConcRgn r) $(← transOwn o) $(← mkPlace p)
-          $(← transExpr e₁) $(← transExpr e₂))
+      `(Oxide.Comp.borrowSlice $(← transConcRgn r) $(← transOwn o) $(← mkPlace p)
+          $(← transAtom e₁) $(← transAtom e₂))
   | `(oxide| $p:oxide_place [ $e:oxide ]) => do
-      `(Oxide.Term.index $(← mkPlace p) $(← transExpr e))
+      `(Oxide.Comp.index $(← mkPlace p) $(← transAtom e))
   | `(oxide| $p:oxide_place := $e:oxide) => do
-      `(Oxide.Term.assign $(← mkPlace p) $(← transExpr e))
+      `(Oxide.Comp.assign $(← mkPlace p) $(← transAtom e))
   | `(oxide| letrgn < $r:oxide_rgn > { $e:oxide }) => do
       let x ← rgnName r
-      `(Oxide.Term.letrgn $(← withBinders [(x, .rgn)] (transExpr e)))
-  | `(oxide| let $x:ident : $t:oxide_ty = $e₁:oxide; $e₂:oxide) => do
-      let t ← transTy t
-      let e₁ ← transExpr e₁
-      let e₂ ← withVar x.getId (transExpr e₂)
-      `(Oxide.Term.letE $t $e₁ $e₂)
-  | `(oxide| $e₁:oxide; $e₂:oxide) => do
-      `(Oxide.Term.seq $(← transExpr e₁) $(← transExpr e₂))
+      `(Oxide.Comp.letrgn $(← withBinders [(x, .rgn)] (transTerm e)))
+  | `(oxide| let $_x:ident : $_t:oxide_ty = $_e₁:oxide; $_e₂:oxide) =>
+      Macro.throwErrorAt stx
+        "A-normal form: a `let` cannot appear here (it is not a computation); move it before \
+        the enclosing binding or operation"
+  | `(oxide| $_e₁:oxide; $_e₂:oxide) =>
+      Macro.throwErrorAt stx
+        "A-normal form: a sequence `e₁; e₂` cannot appear here (it is not a computation); move \
+        it before the enclosing binding or operation"
   | `(oxide| | $ps:oxide_param,* | -> $r:oxide_ty { $e:oxide }) => do
       transClosure (← ps.getElems.toList.mapM transParam) r e
   | `(oxide| || -> $r:oxide_ty { $e:oxide }) => transClosure [] r e
   | `(oxide| $f:oxide($args:oxide,*)) => do
-      let args ← args.getElems.toList.mapM transExpr
-      `(Oxide.Term.app $(← transExpr f) {} Oxide.TArgs.none $(quote args.length) $(← mkVec args))
+      let args ← args.getElems.toList.mapM transAtom
+      `(Oxide.Comp.app $(← transAtom f) {} Oxide.TArgs.none $(quote args.length) $(← mkVec args))
   | `(oxide| $f:oxide::<$gs:oxide_garg,*; $ts:oxide_ty,*>($args:oxide,*)) => do
       let mut Φs : List Lean.Term := []
       let mut rs : List Lean.Term := []
@@ -663,36 +701,48 @@ partial def transExpr : TSyntax `oxide → TransM Lean.Term
         | `(oxide_garg| $r:oxide_rgn) => rs := rs ++ [← transRgn r]
         | _ => Macro.throwErrorAt g "ill-formed generic argument"
       let ts ← ts.getElems.toList.mapM transTy
-      let args ← args.getElems.toList.mapM transExpr
-      `(Oxide.Term.app $(← transExpr f)
+      let args ← args.getElems.toList.mapM transAtom
+      `(Oxide.Comp.app $(← transAtom f)
           ({ nφ := $(quote Φs.length), nϱ := $(quote rs.length), nα := $(quote ts.length) } :
             Oxide.Binders)
           ⟨$(← mkVec Φs), $(← mkVec rs), $(← mkVec ts)⟩ $(quote args.length) $(← mkVec args))
   | `(oxide| if $c:oxide { $e₁:oxide } else { $e₂:oxide }) => do
-      `(Oxide.Term.ite $(← transExpr c) $(← transExpr e₁) $(← transExpr e₂))
+      `(Oxide.Comp.ite $(← transAtom c) $(← transTerm e₁) $(← transTerm e₂))
   | `(oxide| ( $e:oxide , )) => do
-      `(Oxide.Term.tuple 1 $(← mkVec [← transExpr e]))
+      `(Oxide.Comp.tuple 1 $(← mkVec [← transAtom e]))
   | `(oxide| ( $e:oxide, $es:oxide,* )) => do
-      let es ← (e :: es.getElems.toList).mapM transExpr
-      `(Oxide.Term.tuple $(quote es.length) $(← mkVec es))
+      let es ← (e :: es.getElems.toList).mapM transAtom
+      `(Oxide.Comp.tuple $(quote es.length) $(← mkVec es))
   | `(oxide| [ $es:oxide,* ]) => do
-      let es ← es.getElems.toList.mapM transExpr
-      `(Oxide.Term.array $(quote es.length) $(← mkVec es))
+      let es ← es.getElems.toList.mapM transAtom
+      `(Oxide.Comp.array $(quote es.length) $(← mkVec es))
   | `(oxide| for $x:ident in $e₁:oxide { $e₂:oxide }) => do
-      `(Oxide.Term.forE $(← transExpr e₁) $(← withVar x.getId (transExpr e₂)))
+      `(Oxide.Comp.forE $(← transAtom e₁) $(← withVar x.getId (transTerm e₂)))
   | `(oxide| while $e₁:oxide { $e₂:oxide }) => do
-      `(Oxide.Term.whileE $(← transExpr e₁) $(← transExpr e₂))
-  | `(oxide| abort!($s:str)) => `(Oxide.Term.abort $s)
+      `(Oxide.Comp.whileE $(← transTerm e₁) $(← transTerm e₂))
+  | `(oxide| abort!($s:str)) => `(Oxide.Comp.abort $s)
   | `(oxide| Left::<$t₁:oxide_ty, $t₂:oxide_ty>($e:oxide)) => do
-      `(Oxide.Term.inl $(← transTy t₁) $(← transTy t₂) $(← transExpr e))
+      `(Oxide.Comp.inl $(← transTy t₁) $(← transTy t₂) $(← transAtom e))
   | `(oxide| Right::<$t₁:oxide_ty, $t₂:oxide_ty>($e:oxide)) => do
-      `(Oxide.Term.inr $(← transTy t₁) $(← transTy t₂) $(← transExpr e))
+      `(Oxide.Comp.inr $(← transTy t₁) $(← transTy t₂) $(← transAtom e))
   | `(oxide| match $e:oxide { Left($x:ident) => $e₁:oxide, Right($y:ident) => $e₂:oxide }) => do
-      `(Oxide.Term.matchE $(← transExpr e) $(← withVar x.getId (transExpr e₁))
-          $(← withVar y.getId (transExpr e₂)))
-  | `(oxide| { $e:oxide }) => transExpr e
-  | `(oxide| val!( $v:oxide_val )) => do `(Oxide.Term.val $(← transVal v))
-  | stx => Macro.throwErrorAt stx "ill-formed Oxide expression"
+      `(Oxide.Comp.matchE $(← transAtom e) $(← withVar x.getId (transTerm e₁))
+          $(← withVar y.getId (transTerm e₂)))
+  | `(oxide| { $e:oxide }) => transComp e
+  | _ => Macro.throwErrorAt stx "ill-formed Oxide expression"
+
+/-- Terms: a sequence of `let x : τ = c;` and `c;` ending with a computation. -/
+partial def transTerm (stx : TSyntax `oxide) : TransM Lean.Term := do
+  match stx with
+  | `(oxide| let $x:ident : $t:oxide_ty = $e₁:oxide; $e₂:oxide) => do
+      let t ← transTy t
+      let c ← transComp e₁
+      let e ← withVar x.getId (transTerm e₂)
+      `(Oxide.Term.letE $t $c $e)
+  | `(oxide| $e₁:oxide; $e₂:oxide) => do
+      `(Oxide.Term.seq $(← transComp e₁) $(← transTerm e₂))
+  | `(oxide| { $e:oxide }) => transTerm e
+  | _ => do `(Oxide.Term.ret $(← transComp stx))
 end
 
 def transFn (globals : List Name) : TSyntax `oxide_fn → MacroM Lean.Term
@@ -708,7 +758,7 @@ def transFn (globals : List Name) : TSyntax `oxide_fn → MacroM Lean.Term
         let ps ← ps.getElems.toList.mapM transParam
         let tys ← ps.mapM fun p => transTy p.2
         let r ← transTy r
-        let body ← withBinders [(Name.anonymous, .frame)] <| withParams (ps.map (·.1)) (transExpr e)
+        let body ← withBinders [(Name.anonymous, .frame)] <| withParams (ps.map (·.1)) (transTerm e)
         pure (ps.map (·.1) |>.zip tys, r, body)
       let bs ← mkBinders frms rs αs
       let ps' ← mkVec (ps.map (·.2))
@@ -722,13 +772,13 @@ end Oxide.Notation
 /-- `[OXIDE| e ]`: the closed Oxide expression `e` as a scoped term `Oxide.Term sig []`
 (no global functions). -/
 macro "[OXIDE| " e:oxide " ]" : term => do
-  let t ← (Oxide.Notation.transExpr e).run' []
+  let t ← (Oxide.Notation.transTerm e).run' []
   `(($t : Oxide.Term _ []))
 
 /-- `[OXIDE{f, g, …}| e ]`: the closed Oxide expression `e`, whose global
 functions are `f, g, …` (in this order in the signature). -/
 macro "[OXIDE{" gs:ident,* "}| " e:oxide " ]" : term => do
-  let t ← (Oxide.Notation.transExpr e).run' (gs.getElems.toList.map (·.getId))
+  let t ← (Oxide.Notation.transTerm e).run' (gs.getElems.toList.map (·.getId))
   `(($t : Oxide.Term _ []))
 
 /-- `[OXIDE_TY| τ ]`: a closed Oxide type `Oxide.Ty []`. -/
