@@ -37,7 +37,8 @@ def tupleOfSlice : Value sig [] := .tuple 1 fun _ => .slice 0 Fin.elim0
 
 /-- A capture list naming the same variable twice.  `Cap.frameTy` gives both copies
 the variable's (possibly non-copyable) type, e.g. two copies of a `&uniq`
-reference inside the closure's frame. -/
+reference inside the closure's frame.  `T-Closure` now rejects such lists
+(`Cap.Nodup`; see `Metatheory/Regressions/DuplicateCaptures.lean`). -/
 def dupCap {Γ : Ctx} : Cap (.var :: Γ) [.var, .var] := .var .here (.var .here .nil)
 
 theorem dupCap_not_nodup {Γ : Ctx} : ¬ (dupCap (Γ := Γ)).vars.Nodup := by

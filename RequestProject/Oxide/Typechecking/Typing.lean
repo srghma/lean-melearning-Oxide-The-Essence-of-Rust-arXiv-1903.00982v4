@@ -272,7 +272,8 @@ inductive Typing (sig : Sig) : TyJ sig → Prop
   written in the closure's own scope, whose outer binders stand for `θ`.  Every
   binder the body can mention through `θ` must occur in the closure's type
   (`Inst.Covered`), so that the closure value can be strengthened past any binder
-  its type does not mention.  Captured regions must not occur in the signature.
+  its type does not mention.  The capture list names every variable and region
+  at most once (`Cap.Nodup`).  Captured regions must not occur in the signature.
   The captured non-copyable variables become dead, and the opened body is checked
   in a new frame holding the parameters on top of the captured frame `Φc`; that
   frame must then be poppable. -/
@@ -280,7 +281,7 @@ inductive Typing (sig : Sig) : TyJ sig → Prop
       (θ : Inst o S) (k : Nat) (ps : Fin k → Ty o) (ret : Ty o)
       (body : Term sig (vars k ++ (f ++ .frame :: o))) (Φc : FrameTy (f ++ .frame :: S) f)
       (Γb : StackTy (vars k ++ (f ++ .frame :: S)))
-      (hΦc : capturedFrame Γ c = some Φc)
+      (hΦc : capturedFrame Γ c = some Φc) (hnodup : c.Nodup)
       (hsig : ∀ r ∈ c.rgns, r ∉ (List.ofFn (θ.tys ps)).flatMap Ty.frgns ++ (θ.ty ret).frgns)
       (hparams : ∀ r ∈ (List.ofFn (θ.tys ps)).flatMap Ty.frgns ++ (θ.ty ret).frgns, Γ.loans r = [])
       (hcov : θ.Covered (θ.closureTy ps ret (.frame f Φc)))

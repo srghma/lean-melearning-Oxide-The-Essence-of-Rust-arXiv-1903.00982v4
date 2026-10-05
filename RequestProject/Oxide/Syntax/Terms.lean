@@ -115,6 +115,15 @@ def rgns {Γ : Ctx} : {f : Ctx} → Cap Γ f → List (In .rgn Γ)
   | _, .var _ c => c.rgns
   | _, .rgn r c => r :: c.rgns
 
+/-- A capture list names each variable and each region at most once.  `T-Closure`
+requires this: a variable captured twice would give two copies of a non-copyable
+value (for example two `&uniq` references to the same place) in the closure's
+frame, while the enclosing stack typing kills the original only once. -/
+def Nodup {Γ : Ctx} {f : Ctx} (c : Cap Γ f) : Prop := c.vars.Nodup ∧ c.rgns.Nodup
+
+instance {Γ : Ctx} {f : Ctx} (c : Cap Γ f) : Decidable c.Nodup := by
+  unfold Nodup; infer_instance
+
 end Cap
 
 /-! ## Terms and values -/

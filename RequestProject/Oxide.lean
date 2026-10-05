@@ -29,6 +29,7 @@ public import RequestProject.Oxide.Metatheory.Statements
 -- regressions: the former counterexamples are now ruled out
 public import RequestProject.Oxide.Metatheory.Regressions.MoveCopy
 public import RequestProject.Oxide.Metatheory.Regressions.ClosureScopes
+public import RequestProject.Oxide.Metatheory.Regressions.DuplicateCaptures
 -- not in the paper: concrete `[OXIDE| … ]` syntax
 public import RequestProject.Oxide.ConcreteSyntax.Notation
 public import RequestProject.Oxide.ConcreteSyntax.Examples

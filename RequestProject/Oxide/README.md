@@ -107,11 +107,25 @@ axioms (`propext`, `Classical.choice`, `Quot.sound`).
   `` letrgn<`r> { … } `` (`tp_prog_untyped`), the closure value is not well typed
   (`tp_closure_value_untyped`), and the configuration that used to be stuck is
   not well typed (`tp_stuck_untyped`).
+* Regression for the duplicate-capture counterexample
+  (`Metatheory/Regressions/DuplicateCaptures.lean`). In
+  `` fn dup<`ϱ>(y : &`ϱ uniq u32) -> () { (|| -> () { … })() } `` the closure
+  captures `y` twice, as `c₁` and `c₂`, both of type `` &`ϱ uniq u32 ``. Its
+  body takes `a = &r₁ uniq *c₁` and `b = &r₂ uniq *c₂`, two simultaneously live
+  unique borrows of the same location, writes through `b` and then through `a`.
+  Without the new premise this body type checks (`dcBody_typed`): the loan
+  `uniq *c₁` and the place `*c₂` have different roots, so ownership safety sees
+  them as disjoint. Every other premise of `T-Closure` holds
+  (`dc_closure_other_premises`). At runtime both slots hold the pointer stored in
+  `y` (`dc_env_aliases`). `T-Closure` now requires a duplicate-free capture list
+  (`Cap.Nodup`), so the closure term is ill typed (`dc_closure_untyped`), the
+  function is not well formed (`dc_fn_not_wf`), and neither is a global
+  environment containing it (`dcG_not_wf`).
 
 Not done: progress, preservation and type safety (`Progress G`,
 `Preservation G`, `TypeSafety G` in `Metatheory/Statements.lean`) are stated but
-neither proved nor refuted for the refined system. The two counterexamples of
-the previous version are ruled out (see the regressions above). A full proof
+neither proved nor refuted for the refined system. The counterexamples of
+the previous versions are ruled out (see the regressions above). A full proof
 would also need an invariant tying pointer values to the loans of the stack
 typing, so that the no-escape checks made when a binder is popped also cover
 the values the machine pops.
@@ -141,7 +155,11 @@ the values the machine pops.
   (`θ : Inst o Γ`). `E-Closure` reads the captured values off the stack
   (`Env.ofCap`); it does not overwrite non-copyable captures with `dead`
   (non-copyability is a property of types). `T-Closure` marks them dead
-  statically (`killNC`). The coverage premise `Inst.Covered` is stated
+  statically (`killNC`), and requires the capture list to name every variable
+  and region at most once (`Cap.Nodup`), since `killNC` kills each original only
+  once. The premise is a typing condition rather than part of the grammar
+  because renamings of terms (`Ren`, `Sub`) need not be injective, so a
+  duplicate-free capture list is not preserved by renaming in general. The coverage premise `Inst.Covered` is stated
   semantically (strengthenability of the type implies that of `θ`).
 * **`T-Move` on copyable types.** The paper restricts `T-Move` to non-copyable
   types. Here `T-Move` accepts any type, since a move of a copyable value is

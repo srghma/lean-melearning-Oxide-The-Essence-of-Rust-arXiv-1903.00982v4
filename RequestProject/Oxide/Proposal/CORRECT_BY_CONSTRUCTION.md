@@ -87,16 +87,26 @@ copies the variable's type, and `killNC` kills the original only once. For a
 non-copyable variable such as a `&uniq` reference, the closure's frame would hold
 two copies of one owned value.
 
-I suspect this lets two unique references alias inside a closure body. I have not
-confirmed it with a Lean typing derivation. The concrete syntax never produces
-duplicate captures, but the abstract syntax allows them.
+This did let two unique references alias inside a closure body: see
+`Metatheory/Regressions/DuplicateCaptures.lean`, where a closure body taking two
+simultaneously live unique borrows of one location type checks (`dcBody_typed`).
+The concrete syntax never produces duplicate captures, but the abstract syntax
+allows them.
+
+**Status: fixed by a typing premise.** `T-Closure` now requires `Cap.Nodup`
+(every variable and region captured at most once). The thinning below was not
+adopted: `Cap.rename` and `Cap.subst` act through arbitrary functions on term
+variables (`Ren.tvar`, `Sub.tv`), which need not be injective or order
+preserving, so a thinning is not stable under them. By the rule of thumb of this
+note, the condition therefore belongs to the typing rules.
 
 **Fix** (prototype `TopSel`, theorem `TopSel.toCap_vars_nodup`): captures are a
 thinning of the top frame, with constructors `keepVar`/`keepRgn`/`skipVar`/`skipRgn`
 and no constructor that crosses a `.frame` or a type-level binder. Captures are
 then in frame order and duplicate-free by construction. `Cap.inv` and `findVar`
-become the thinning's inverse, with no "first match" choice. This is stable under
-renaming, because a renaming of the outer scope just acts on the thinning.
+become the thinning's inverse, with no "first match" choice. It is stable under
+order-preserving injective renamings (such as weakenings), but not under the
+arbitrary renamings the syntax currently allows.
 
 ## 4. Unique encoding of initialization states
 

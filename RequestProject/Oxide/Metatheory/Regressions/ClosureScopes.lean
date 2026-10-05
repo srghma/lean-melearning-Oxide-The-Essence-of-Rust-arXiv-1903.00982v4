@@ -72,7 +72,7 @@ theorem tp_closure_untyped {Θ : TempTy [.rgn]} {Γ Γ' : StackTy [.rgn]} {τ : 
   generalize hJ : TyJ.expr Θ Γ tpClosure τ Γ' = J at h
   induction h generalizing Γ with
   | drop _ _ _ _ _ _ _ _ _ _ _ ih => cases hJ; exact ih rfl
-  | closure _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ hcov =>
+  | closure _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ hcov =>
       cases hJ
       exact tp_not_covered hcov
   | _ => cases hJ

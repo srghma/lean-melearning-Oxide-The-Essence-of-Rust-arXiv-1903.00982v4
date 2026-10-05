@@ -23,6 +23,13 @@ were about the previous rules; with the refinements listed in `README.md`
 replaced by the regression files in `Metatheory/Regressions/`. Whether progress
 and preservation now hold is not established.
 
+A further problem was found and fixed later: a closure could capture the same
+variable twice, and then hold two copies of a unique reference. A closure body
+taking two simultaneously live unique borrows of one location type checked
+(`dcBody_typed`). This is a violation of the uniqueness discipline, not a
+refutation of the stated progress or preservation theorems. `T-Closure` now
+requires `Cap.Nodup` (`Metatheory/Regressions/DuplicateCaptures.lean`).
+
 ## 2. Supporting lemmas of `proofs.tex`
 
 None are currently formalized for the scoped grammar. Before any progress or

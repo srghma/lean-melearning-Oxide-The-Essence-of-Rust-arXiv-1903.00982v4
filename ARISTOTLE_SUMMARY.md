@@ -1,3 +1,35 @@
+# Summary of changes for run 24e9f7c8-78b8-4882-a1ee-fa87b9fb325c
+You were right: duplicate captures let two unique references alias. I built a concrete counterexample in Lean, then fixed the typing rule. `lake build` succeeds with no `sorry` and no new axioms; the key theorems use only `propext`, `Classical.choice` and `Quot.sound`.
+
+**The counterexample** (`Metatheory/Regressions/DuplicateCaptures.lean`)
+
+The function is `fn dup<ϱ>(y : &ϱ uniq u32) -> () { (|| -> () { body })() }`. Its closure captures `y` twice, as `c₁` and `c₂`, and the body is:
+```
+letrgn<r₁> { letrgn<r₂> {
+  let a : &r₁ uniq u32 = &r₁ uniq *c₁;
+  let b : &r₂ uniq u32 = &r₂ uniq *c₂;
+  *b := 2; *a := 1; () } }
+```
+This takes two unique borrows of the same location `*y` that are live at the same time, and writes through `b` while `a` is still used afterwards. Rust's borrow checker rejects this; the old rules accepted it.
+- **The body type checks** (`dcBody_typed`), in exactly the stack typing the old `T-Closure` produced (`dcΓ0_eq`).
+- **Why it passes:** `y`'s region is abstract, so each dereference is checked through the abstract-region rule. That rule only compares `*c₂` against existing loans. The loan `uniq *c₁` has a different root variable, so it counts as disjoint from `*c₂`.
+- **Every other premise of the old rule holds** (`dc_closure_other_premises`). In an earlier commit, before the fix, the whole function was shown to be well formed.
+- **At runtime both copies hold `y`'s pointer** (`dc_env_aliases`).
+
+This breaks uniqueness. It does not refute the stated progress, preservation or type-safety theorems, which remain unproved.
+
+**The fix**
+- `Cap.Nodup` (in `Syntax/Terms.lean`) says a capture list names each variable and each region at most once. It is decidable.
+- `T-Closure` now has the premise `hnodup : c.Nodup`.
+- **Regression results, all proved:** the capture list is not duplicate-free (`dcCap_not_nodup`). The closure is ill typed in every stack typing (`dc_closure_untyped`), and so is the function body (`dc_fnBody_untyped`). The function is not well formed (`dc_fn_not_wf`), and neither is a global environment containing it (`dcG_not_wf`).
+- The other regression files and examples still build. The `[OXIDE| … ]` syntax already produced duplicate-free captures.
+
+**Why a typing premise and not the selection from item 3:** captures are renamed through arbitrary functions on term variables. These need not be injective or order-preserving, so a duplicate-free selection would not survive renaming. Under the rule from the earlier note, the condition therefore belongs in the typing rules.
+
+**Not checked in Lean:** that the same body with `y` captured once is rejected. Informally, the second borrow then conflicts with the loan `uniq *c`.
+
+I updated `README.md`, `READING_GUIDE.md`, `MISSING.md`, `Proposal/CORRECT_BY_CONSTRUCTION.md` and the comment on `dupCap`, and added the new file to `RequestProject/Oxide.lean`. The Properties table has a new proved entry for this regression, and the typing entry's comment mentions the new premise. The counterexample and the fix are in separate commits.
+
 # Summary of changes for run 81518266-fc34-49a8-9e44-3d4f68bf5700
 Much of the grammar is already correct by construction. That covers scopes, top-frame variables, the sorts of types, move vs. copy, places vs. place expressions, closure scopes, typed paths, `MTy` indexed by its declared type, functions by signature, and `Fin k` arities. The rule I'd use for the rest: **put an invariant in the type if it depends only on the syntax and survives renaming and substitution. Leave anything that depends on the stack typing to the typing rules.**
 

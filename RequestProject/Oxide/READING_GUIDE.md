@@ -72,6 +72,7 @@ term it denotes.
 | §3.7; App. E (statements) | `Metatheory/Statements.lean` | `canonical_forms`, `Progress`, `Preservation`, `TypeSafety`, `type_safety_of_progress_preservation` |
 | regressions (former counterexamples) | `Metatheory/Regressions/MoveCopy.lean` | `ts_typed`, `Step.copy_inv`, `ts_runs`, `ts_final` |
 | | `Metatheory/Regressions/ClosureScopes.lean` | `tp_not_covered`, `tp_closure_untyped`, `tp_prog_untyped`, `tp_closure_value_untyped`, `tp_stuck_untyped` |
+| | `Metatheory/Regressions/DuplicateCaptures.lean` | `dcBody_typed`, `dc_closure_other_premises`, `dcCap_not_nodup`, `dc_closure_untyped`, `dc_fn_not_wf`, `dcG_not_wf`, `dc_env_aliases` |
 | (not in the paper) | `ConcreteSyntax/Notation.lean`, `ConcreteSyntax/Examples.lean` | `[OXIDE| … ]`, `[OXIDE_TY| … ]`, `[OXIDE_FN| … ]` |
 
 ---
@@ -91,7 +92,7 @@ term it denotes.
    checks at the end of a binder's scope.
 5. `Typechecking/Continuations.lean` and `Metatheory/Statements.lean`: how the
    paper's theorems are stated for the machine.
-6. The two regression files, which show how the former counterexamples are
+6. The three regression files, which show how the former counterexamples are
    now ruled out.
 
 ---
