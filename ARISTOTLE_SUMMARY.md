@@ -1,3 +1,33 @@
+# Summary of changes for run 81518266-fc34-49a8-9e44-3d4f68bf5700
+Much of the grammar is already correct by construction. That covers scopes, top-frame variables, the sorts of types, move vs. copy, places vs. place expressions, closure scopes, typed paths, `MTy` indexed by its declared type, functions by signature, and `Fin k` arities. The rule I'd use for the rest: **put an invariant in the type if it depends only on the syntax and survives renaming and substitution. Leave anything that depends on the stack typing to the typing rules.**
+
+I wrote this up in `RequestProject/Oxide/Proposal/CORRECT_BY_CONSTRUCTION.md`. Lean witnesses and prototypes are in `RequestProject/Oxide/Proposal/CorrectByConstruction.lean`. That file builds with no `sorry` or warnings, `lake build` succeeds, and the grammar the rest of the project uses is unchanged. The changes, most valuable first:
+
+1. **Keep runtime values out of source programs.** `Term.val` accepts any value, so a program can contain `dead`, a raw `ptr` to a local, a slice or a closure value. The witnesses `srcWithPtr` and `srcWithDead` type check today. The machine never substitutes values into terms, so the fix is small:
+   - `Term.val` becomes `Term.const`, holding only constants and function names (`SrcVal`).
+   - The machine's focus becomes `eval e | ret v`, the usual CEK split.
+   - The `for` loop step that puts a pointer back into a term (`.forE (.val (.ptr …)) e₂`) becomes a continuation frame.
+2. **Split values by sort, as types already are.** Prototypes `SVal`/`XVal`/`MVal` match `Ty`/`XTy`/`MTy`:
+   - slices exist only behind a pointer;
+   - `dead` exists only in stack slots;
+   - stack slots hold `MVal`, and reading through a pointer returns `XVal`.
+
+   The witness `tupleOfSlice` shows a slice inside a tuple value is writable today.
+3. **Captures as an ordered selection of the current frame.** `Cap` can name the same variable twice (`dupCap`, `dupCap_not_nodup`). The typing then gives both copies the variable's type, and `killNC` kills the original once. I suspect this lets two `&uniq` copies alias inside a closure body, but I have not confirmed it with a typing derivation. The prototype `TopSel` only selects current-frame entries, in order. The proved theorem `TopSel.toCap_vars_nodup` shows its captures never name a variable twice.
+4. **One encoding per initialization state.** `.init` and "a tuple of `.init`" are different states today (`initPair_ne`). The prototype `MSt` indexes each state by a kind (`init | dead | mixed`), and its tuple constructor must be genuinely mixed. Each type then has exactly one fully initialized state and one dead state (proved as `Subsingleton` instances), and `mkTuple` becomes total.
+5. **Make closure coverage decidable.** Replace the semantic `Inst.Covered` with a check that the free binders of each entry are among those of the closure type. A fully syntactic version would break type substitution. I have not proved the check equivalent to `Covered`.
+6. **Choose move or copy by type in the concrete syntax.** Add a type-directed elaboration pass, as rustc does when it builds MIR. Then `let x : bool = true; x; if x {…}` no longer needs `copy!(x)`.
+7. **Smaller items:**
+   - store a single type annotation on injection values;
+   - give place-expression contexts a structured type;
+   - leave index expressions as they are.
+
+What should stay out of the grammar: array lengths against literal arity, projection indices in terms, ownership and loans. All of them depend on the stack typing, so encoding them would make terms intrinsically typed. I'd start with items 1, 3 and 5, which give the most for the least work. None of the proposals has been carried into the main grammar yet, and the Properties table is unchanged.
+
+## Suggested follow-up
+
+The abstract syntax lets a closure list the same variable twice in its captures (`Cap`). The closure typing then gives both copies that variable's type, even when it is not copyable (for example a `&uniq` reference). I suspect this lets two unique references alias inside the closure body, but I haven't confirmed it in Lean. I can switch captures to the duplicate-free selection described in item 3, or try to build a concrete counterexample first.
+
 # Summary of changes for run 894bf31f-4f74-4547-8380-572560837dc7
 I didn't change any files. These answers come from reading the current sources (`Typing.lean`, `Machine.lean`, `Scopes.lean`, `Types.lean`, `TypeSubst.lean`, `Notation.lean`). None of the reasoning below has been checked in Lean, and progress, preservation and type safety are still stated but not proved.
 

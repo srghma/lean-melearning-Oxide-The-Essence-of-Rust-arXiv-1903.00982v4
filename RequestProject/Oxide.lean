@@ -32,6 +32,8 @@ public import RequestProject.Oxide.Metatheory.Regressions.ClosureScopes
 -- not in the paper: concrete `[OXIDE| … ]` syntax
 public import RequestProject.Oxide.ConcreteSyntax.Notation
 public import RequestProject.Oxide.ConcreteSyntax.Examples
+-- design notes: checked sketches for a more correct-by-construction grammar
+public import RequestProject.Oxide.Proposal.CorrectByConstruction
 
 /-!
 # Oxide: The Essence of Rust — entry point
